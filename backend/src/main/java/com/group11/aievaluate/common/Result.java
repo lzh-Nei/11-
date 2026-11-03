@@ -16,9 +16,20 @@ public class Result<T> {
         return r;
     }
 
+    public static <T> Result<T> success() {
+        return success(null);
+    }
+
     public static <T> Result<T> error(String message) {
+        return error(-1, message);
+    }
+
+    /**
+     * 统一错误返回：code 为业务错误码，HTTP 状态码由异常处理器决定。
+     */
+    public static <T> Result<T> error(int code, String message) {
         Result<T> r = new Result<>();
-        r.setCode(-1);
+        r.setCode(code);
         r.setMessage(message);
         return r;
     }

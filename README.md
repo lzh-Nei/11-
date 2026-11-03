@@ -90,17 +90,23 @@ npm run dev
 
 后端
 
-前提：已安装 JDK 17+、Maven、MySQL
+前提：已安装 JDK 17+、Maven、MySQL、Redis
 
 
 
 bash
 
+# 1. 初始化数据库（创建 ai_evaluate 库、sys_user 表与演示账号）
+mysql --default-character-set=utf8mb4 -uroot -p < backend/sql/schema.sql
+
+# 2. 启动后端（数据库/Redis 地址见 backend/src/main/resources/application.yml）
 cd backend
 
 mvn spring-boot:run
 
 接口文档：http://127.0.0.1:8000/api/health
+
+认证与权限接口说明：docs/认证授权接口文档.md
 
 
 
