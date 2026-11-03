@@ -3,3 +3,6 @@ target/
 *.iml
 .vscode/
 .env
+
+# 上传文件与分片临时文件
+storage/

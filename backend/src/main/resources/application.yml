@@ -1,5 +1,12 @@
 server:
   port: 8000
+  tomcat:
+    # 高并发下载支撑点：每个下载请求占用一个线程做流式写出
+    threads:
+      max: 400
+      min-spare: 50
+    max-connections: 10000
+    accept-count: 200
 
 spring:
   datasource:
@@ -7,11 +14,21 @@ spring:
     username: root
     password: yourpassword
     driver-class-name: com.mysql.cj.jdbc.Driver
+  servlet:
+    multipart:
+      # 单个分片大小上限
+      max-file-size: 20MB
+      # 小文件批量上传时一次请求允许的总字节数
+      max-request-size: 100MB
 
 mybatis-plus:
   mapper-locations: classpath:mapper/*.xml
   configuration:
     map-underscore-to-camel-case: true
+
+filestore:
+  # 文件存储根目录（相对项目运行目录）
+  base-dir: ./storage
 
 llm:
   deepseek:
