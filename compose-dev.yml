@@ -63,8 +63,7 @@ services:
       timeout: 5s
       retries: 20
 
-  # 一次性：初始化三bucket（对齐T7：homework-hot / homework-cold / backup）
-  # ⚠️ 偏差登记：03-02 §四写swe-hot/swe-cold，本批按T7指令用homework-*，待文档同步或回改
+  # 一次性：初始化bucket（用户裁决：swe-hot/swe-cold对齐03-02 §四；backup为T7增量待03-02补录）
   minio-init:
     image: minio/mc:latest
     depends_on:
@@ -76,8 +75,8 @@ services:
     entrypoint: >
       /bin/sh -c "
       mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD &&
-      mc mb --ignore-existing local/homework-hot &&
-      mc mb --ignore-existing local/homework-cold &&
+      mc mb --ignore-existing local/swe-hot &&
+      mc mb --ignore-existing local/swe-cold &&
       mc mb --ignore-existing local/backup &&
       echo 'buckets-ready'"
 
