@@ -1,0 +1,107 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  checkstyle:
+    name: checkstyle (error阻塞)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Run checkstyle
+        run: mvn -B -ntp checkstyle:check -f backend/pom.xml
+      - name: Upload checkstyle report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkstyle-report
+          path: backend/target/checkstyle-result.xml
+          if-no-files-found: ignore
+
+  spotbugs:
+    name: spotbugs (High阻塞)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Run spotbugs
+        run: mvn -B -ntp compile spotbugs:check -f backend/pom.xml
+      - name: Upload spotbugs report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spotbugs-report
+          path: backend/target/spotbugsXml.xml
+          if-no-files-found: ignore
+
+  tests:
+    name: tests + jacoco (W5 report-only)
+    runs-on: ubuntu-latest
+    # W5=report-only：Jacoco仅生成报告不设阈值。W6切enforcement：解注释下方覆盖率门槛步骤
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Run tests & jacoco report
+        run: mvn -B -ntp verify -f backend/pom.xml
+      # - name: Coverage gate (W6 enforcement, M1阈值60%)
+      #   run: mvn -B -ntp jacoco:check -f backend/pom.xml  # 需pom内check execution按W5计划切换
+      - name: Upload jacoco report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report
+          path: backend/target/site/jacoco/
+          if-no-files-found: ignore
+
+  secret-scan:
+    name: secret-scan (敏感词历史扫描)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 50
+      - name: Scan working tree and recent history
+        run: |
+          set -e
+          PATTERNS='-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|AKIA[0-9A-Z]{16}|xox[bp]-[A-Za-z0-9]{10,}'
+          echo '[1/2] working tree scan'
+          if grep -rInE "$PATTERNS" --exclude-dir=.git --exclude-dir=target --exclude-dir=node_modules . ; then
+            echo "::error::疑似真实密钥入库"; exit 1
+          fi
+          echo '[2/2] recent history scan (last 50 commits)'
+          if git log -p -50 | grep -InE "$PATTERNS"; then
+            echo "::error::历史提交疑似密钥"; exit 1
+          fi
+          echo 'secret-scan OK'
+
+  frontend:
+    name: frontend build (目录存在才跑)
+    runs-on: ubuntu-latest
+    if: ${{ hashFiles('frontend/package.json') != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install
+        run: npm install --no-audit --no-fund
+        working-directory: frontend
+      - name: Build
+        run: npm run build
+        working-directory: frontend

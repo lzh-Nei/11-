@@ -104,7 +104,7 @@ cd backend
 
 mvn spring-boot:run
 
-接口文档：http://127.0.0.1:8000/api/health
+接口文档：http://127.0.0.1:8080/api/health
 
 认证与权限接口说明：docs/认证授权接口文档.md
 

@@ -1,24 +1,17 @@
-# Logs
-logs
+# ---- AIES 仓库忽略 ----
+# 环境与密钥（红线4：真实密钥/数据不得入库）
+.env
+docker/nginx/certs/
+
+# 构建产物与依赖
+target/
+node_modules/
+dist/
+
+# 日志与运行时
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
+storage/
 
-node_modules
-dist
-dist-ssr
-*.local
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+# IDE
+.idea/
+.vscode/
