@@ -29,6 +29,10 @@
             <span class="dim"
               >当前生效 v{{ evaluation.currentVersionNo }} · {{ formatDateTime(evaluation.updateTime) }}</span
             >
+            <span v-if="evaluation.reviewerName" class="dim">
+              复核教师：{{ evaluation.reviewerName }}
+            </span>
+            <span v-else-if="evaluation.aiModel" class="dim">AI 模型：{{ evaluation.aiModel }}</span>
           </div>
           <div class="band-actions">
             <el-button size="small" @click="load">刷新</el-button>
@@ -262,6 +266,7 @@ async function onSubmitReview(done: () => void) {
     mirrorForm()
     toast.success(`已提交，当前生效版本 v${vo.currentVersionNo}，总分 ${vo.totalScore}`)
     await historyPanel.value?.reload()
+    await load()
   } catch (e) {
     toast.error((e as { message?: string })?.message || '提交失败', '请检查意见长度与指标分')
   } finally {

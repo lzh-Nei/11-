@@ -41,7 +41,7 @@
         <el-table-column label="提交时间" width="170">
           <template #default="{ row }">{{ formatDateTime(row.createTime) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="190" fixed="right">
+        <el-table-column label="操作" width="280" fixed="right">
           <template #default="{ row }">
             <el-button size="small" text type="primary" @click="openDetail(row.id)">详情</el-button>
             <el-button
@@ -52,6 +52,15 @@
               @click="openEvaluation(row)"
             >
               查看评价
+            </el-button>
+            <el-button
+              v-if="canCancel(row)"
+              size="small"
+              text
+              type="danger"
+              @click="cancelSubmission(row)"
+            >
+              取消提交
             </el-button>
           </template>
         </el-table-column>
@@ -112,6 +121,10 @@
           <span class="dim"
             >版本 v{{ evaluation.currentVersionNo }} · {{ formatDateTime(evaluation.updateTime) }}</span
           >
+          <span v-if="evaluation.reviewerName" class="dim">
+            复核教师：{{ evaluation.reviewerName }}
+          </span>
+          <span v-else-if="evaluation.aiModel" class="dim">AI 模型：{{ evaluation.aiModel }}</span>
         </div>
         <DimensionRadar
           v-if="evaluation.metricScores"
@@ -123,6 +136,14 @@
       </template>
       <el-empty v-else description="暂无评价结果" />
       <template #footer>
+        <el-button
+          v-if="evaluation && evaluation.status === 'REVIEWED'"
+          type="warning"
+          plain
+          @click="appealEvaluation"
+        >
+          申请复核
+        </el-button>
         <el-button
           v-if="evaluation"
           type="success"
@@ -140,6 +161,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessageBox } from 'element-plus'
 import { submissionApi, type SubmissionMine, type SubmissionDetail } from '@/api/submission'
 import { evaluationApi, type EvaluationVO } from '@/api/evaluation'
 import { formatDateTime } from '@/utils/format'
@@ -239,6 +261,63 @@ async function openEvaluation(row: SubmissionMine) {
   evalTitle.value = row.fileName
   evalDialog.value = true
   await loadEvaluation(row.evaluationId)
+}
+
+function canCancel(row: SubmissionMine): boolean {
+  return !row.evaluationId
+    || row.evaluationStatus === 'PENDING'
+    || row.evaluationStatus === 'FAILED'
+}
+
+async function cancelSubmission(row: SubmissionMine) {
+  try {
+    await ElMessageBox.confirm(
+      `确定取消「${row.fileName}」这次提交吗？取消后该记录将不再进入教师评价队列。`,
+      '取消提交',
+      { type: 'warning', confirmButtonText: '确认取消', cancelButtonText: '保留' }
+    )
+  } catch {
+    return
+  }
+  try {
+    await submissionApi.cancel(row.id)
+    toast.success('本次提交已取消')
+    await load()
+  } catch (e) {
+    toast.error((e as { message?: string })?.message || '取消失败', '请稍后重试')
+  }
+}
+
+async function appealEvaluation() {
+  if (!evaluation.value) return
+  let reason = ''
+  try {
+    const result = await ElMessageBox.prompt(
+      '请说明对本次评价不服的原因，学校将随机改派另一位教师复评。',
+      '申请复核',
+      {
+        confirmButtonText: '提交申诉',
+        cancelButtonText: '取消',
+        inputType: 'textarea',
+        inputPlaceholder: '请填写申诉理由（不超过500字）',
+        inputValidator: (value) => (value && value.trim().length > 0) || '请填写申诉理由'
+      }
+    )
+    reason = result.value
+  } catch {
+    return
+  }
+  try {
+    const result = await evaluationApi.appeal(evaluation.value.id, reason.trim())
+    toast.success(
+      result.assignedTeacherName
+        ? `申诉已提交，已改派 ${result.assignedTeacherName} 老师复评`
+        : '申诉已提交，等待其他教师复评'
+    )
+    evalDialog.value = false
+  } catch (e) {
+    toast.error((e as { message?: string })?.message || '申诉提交失败', '请稍后重试')
+  }
 }
 onMounted(load)
 </script>

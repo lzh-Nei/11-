@@ -64,7 +64,7 @@ import StudentTasks from '@/views/StudentTasks.vue'
 import StudentSubmissions from '@/views/StudentSubmissions.vue'
 import TaskListPanel from '@/components/tasks/TaskListPanel.vue'
 import TaskDraftsPanel from '@/components/tasks/TaskDraftsPanel.vue'
-import ReviewHubView from '@/views/ReviewHubView.vue'
+import TeacherWorkflowPanel from '@/components/business/TeacherWorkflowPanel.vue'
 import AdminEvaluationsView from '@/components/admin/AdminEvaluationsView.vue'
 import UsersPanel from '@/components/admin/UsersPanel.vue'
 import RolesPanel from '@/components/admin/RolesPanel.vue'
@@ -154,7 +154,7 @@ const teacherGroups: ModuleGroup[] = [
         key: 'review',
         label: '评价与复核',
         icon: 'review',
-        component: ReviewHubView,
+        component: TeacherWorkflowPanel,
         props: { embedded: true }
       }
     ]

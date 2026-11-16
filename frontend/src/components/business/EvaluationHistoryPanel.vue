@@ -21,13 +21,16 @@
         </el-table-column>
         <el-table-column label="来源" width="120">
           <template #default="{ row }"><StatusTag :status="row.source" /></template>
-        </el-table-column>        <el-table-column label="总分" width="90">
+        </el-table-column>
+        <el-table-column label="总分" width="90">
           <template #default="{ row }">
             <span class="mono">{{ row.totalScore ?? '—' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作人" width="110">
-          <template #default="{ row }">{{ row.reviewerName ?? '系统' }}</template>
+        <el-table-column label="评价方" width="170">
+          <template #default="{ row }">
+            {{ row.aiModel ? `AI · ${row.aiModel}` : (row.reviewerName ?? '系统') }}
+          </template>
         </el-table-column>
         <el-table-column label="时间" width="160">
           <template #default="{ row }">{{ formatDateTime(row.createTime) }}</template>
@@ -57,7 +60,9 @@
           <span class="mono">{{ viewing.totalScore ?? '—' }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="版本时间">{{ formatDateTime(viewing.createTime) }}</el-descriptions-item>
-        <el-descriptions-item label="操作人">{{ viewing.reviewerName ?? '系统' }}</el-descriptions-item>
+        <el-descriptions-item label="评价方">
+          {{ viewing.aiModel ? `AI · ${viewing.aiModel}` : (viewing.reviewerName ?? '系统') }}
+        </el-descriptions-item>
       </el-descriptions>
       <el-alert
         v-if="viewing.teacherComment"

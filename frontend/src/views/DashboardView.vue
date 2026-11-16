@@ -249,7 +249,12 @@ const cards = computed<QuickCard[]>(() => {
       icon: 'manage',
       to: '/modules?group=teaching&child=task-list'
     },
-    { title: '评价与复核', desc: '查看评分、调整分数与历史版本', icon: 'review', to: '/review' }
+    {
+      title: '评价与复核',
+      desc: '提交队列、AI 初评、教师复核与归档记录',
+      icon: 'review',
+      to: '/modules?group=teaching&child=review'
+    }
   ]
   if (isTeacherData.value) {
     list.push({

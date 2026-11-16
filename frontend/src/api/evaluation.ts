@@ -10,6 +10,8 @@ export interface EvaluationVO {
   totalScore: number | null
   metricScores: Record<string, number> | null
   aiComment: string | null
+  aiModel?: string | null
+  reviewerName?: string | null
   errorCode: number | null
   updateTime: string
   traceId?: string | null
@@ -24,6 +26,7 @@ export interface EvaluationHistoryItem {
   source: string
   totalScore: number | null
   reviewerName: string | null
+  aiModel?: string | null
   createTime: string
   metricScores?: Record<string, number> | null
   aiComment?: string | null
@@ -72,5 +75,17 @@ export const evaluationApi = {
   /** E-06 手动评分旁路（UC-24：FAILED 直接打分，复用复核链） */
   async manualScore(id: number, payload: ReviewPayload): Promise<EvaluationVO> {
     return (await request.put(`/evaluations/${id}/manual`, payload)) as unknown as EvaluationVO
+  },
+  /** 学生对已复核评价发起申诉，随机改派其他教师 */
+  async appeal(
+    id: number,
+    reason: string
+  ): Promise<{ appealId: number; assignedTeacherId: number; assignedTeacherName: string | null; status: string }> {
+    return (await request.post(`/evaluations/${id}/appeal`, { reason })) as unknown as {
+      appealId: number
+      assignedTeacherId: number
+      assignedTeacherName: string | null
+      status: string
+    }
   }
 }

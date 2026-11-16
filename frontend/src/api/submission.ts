@@ -57,6 +57,10 @@ export const submissionApi = {
   async detail(id: number): Promise<SubmissionDetail> {
     return (await request.get(`/submissions/${id}`)) as unknown as SubmissionDetail
   },
+  /** 取消本人尚未完成评价的提交 */
+  async cancel(id: number): Promise<void> {
+    await request.post(`/submissions/${id}/cancel`)
+  },
   /** S-04 下载原件（302→MinIO 预签名直连）：二进制链路不经 axios 拦截器，返回文件 Blob */
   async download(id: number): Promise<Blob> {
     return await fetchBlob(`/api/submissions/${id}/download`)

@@ -64,7 +64,7 @@ const router = createRouter({
         {
           path: 'review',
           name: 'review-hub',
-          component: () => import('@/views/ReviewHubView.vue'),
+          redirect: '/modules?group=teaching&child=review',
           meta: { roles: ['TEACHER', 'ADMIN'] }
         },
         {
