@@ -33,7 +33,7 @@ import java.util.stream.Collectors;
  * 任务域业务（03-03 §五 T-01/T-04/T-05 / UC-10/13 / 04-04 S-05 IDOR清单）。
  *
  * <p>视角裁剪：学生=本班任务（状态标签可筛）；教师=本人（teacher_id=本人）；管理员=全局。
- * 任务不存在与无权访问统一返回 40400（防探测：不向学生泄露未发布任务的存在性）。</p>
+ * 详情/提交仍经 requireVisible 限制，任务不存在与无权访问统一返回 40400（防探测）。</p>
  */
 @Service
 @RequiredArgsConstructor
