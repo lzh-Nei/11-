@@ -167,9 +167,9 @@ class TaskServiceTest {
                         e -> assertThat(e.getCode()).isEqualTo(ErrorCode.NOT_FOUND.getCode()));
     }
 
-    /** 例7 学生任务列表：走本班+PUBLISHED过滤分支（忽略传入筛选），VO裁剪submissionCount为null */
+    /** 例7 学生任务列表：本班过滤 + 状态标签筛选，VO裁剪submissionCount为null */
     @Test
-    void studentListFiltersOwnClassPublishedAndTrimsStats() {
+    void studentListFiltersOwnClassByStatusAndTrimsStats() {
         Page<Task> page = new Page<>(1, 10, 1);
         page.setRecords(List.of(task(1L, 2L, 1L, "PUBLISHED")));
         doReturn(page).when(taskMapper).selectPage(any(), any());
