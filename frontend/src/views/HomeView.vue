@@ -26,6 +26,9 @@
         <a v-if="isTeacher" href="/report.html" target="_blank" rel="noopener">
           <el-button type="primary">报表驾驶舱</el-button>
         </a>
+        <template v-if="isTeacher">
+          <el-button @click="router.push('/tasks/manage')">任务管理</el-button>
+        </template>
         <template v-else>
           <el-button type="primary" @click="router.push('/tasks')">我的任务</el-button>
           <el-button @click="router.push('/submissions')">提交记录</el-button>

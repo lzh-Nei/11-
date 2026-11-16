@@ -24,7 +24,10 @@ const router = createRouter({
     { path: '/tasks/:id/submit', name: 'student-submit', component: StudentSubmit },
     { path: '/submissions', name: 'student-submissions', component: StudentSubmissions },
     // M1 演示终点画面（W7-C2 UC-21）：AI评价报告
-    { path: '/evaluations/:id', name: 'evaluation-report', component: EvaluationReport }
+    { path: '/evaluations/:id', name: 'evaluation-report', component: EvaluationReport },
+    // WP8-B3 教师工作台落位（Evaluate/Check 占位启用；页面内自校 TEACHER 权限）
+    { path: '/tasks/manage', name: 'teacher-tasks', component: () => import('@/views/Check.vue') },
+    { path: '/evaluations/:id/review', name: 'teacher-review', component: () => import('@/views/Evaluate.vue') }
   ]
 })
 
