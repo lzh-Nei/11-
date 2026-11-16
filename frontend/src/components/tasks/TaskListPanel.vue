@@ -25,13 +25,7 @@
         >
           发布任务
         </el-button>
-        <el-button
-          v-else-if="!readonly"
-          size="small"
-          @click="router.push(`/modules?group=teaching&child=task-edit`)"
-        >
-          编辑任务
-        </el-button>
+        <span v-else-if="!readonly" class="lock-note">已发布，指标与截止时间已锁定</span>
       </TaskCard>
     </div>
 
@@ -49,7 +43,6 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import { taskApi, type TaskInfo } from '@/api/task'
 import { toast } from '@/utils/toast'
@@ -61,7 +54,6 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 
 withDefaults(defineProps<{ readonly?: boolean }>(), { readonly: false })
 
-const router = useRouter()
 const loading = ref(false)
 const error = ref<string | null>(null)
 const tasks = ref<TaskInfo[]>([])
@@ -135,6 +127,10 @@ onMounted(load)
   display: flex;
   flex-direction: column;
   gap: var(--aies-gap);
+}
+.lock-note {
+  font-size: 12.5px;
+  color: var(--aies-ink3);
 }
 .pager {
   display: flex;

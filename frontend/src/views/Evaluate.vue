@@ -1,6 +1,8 @@
 <template>
   <PageShell :bare="embedded">
-    <PageHeader v-if="!embedded" title="复核工作台" subtitle="查看评分、调整分数与历史版本" />
+    <PageHeader v-if="!embedded" title="复核工作台" subtitle="查看评分、调整分数与历史版本">
+      <BackButton />
+    </PageHeader>
 
     <ScrollArea
       :passthrough="embedded"
@@ -132,6 +134,7 @@ import { formatDateTime } from '@/utils/format'
 import { toast } from '@/utils/toast'
 import PageShell from '@/components/ui/PageShell.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
+import BackButton from '@/components/ui/BackButton.vue'
 import ScoreDisplay from '@/components/ui/ScoreDisplay.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'

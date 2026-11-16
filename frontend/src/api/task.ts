@@ -17,7 +17,10 @@ export interface TaskInfo {
   classId: number
   deadline: string
   status: string
+  publishTime: string | null
   createTime: string
+  className: string | null
+  teacherName: string | null
   metrics: TaskMetric[]
 }
 

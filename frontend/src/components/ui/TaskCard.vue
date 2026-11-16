@@ -6,12 +6,19 @@
       <StatusTag :status="task.status" />
     </div>
     <p v-if="task.description" class="tc-desc">{{ task.description }}</p>
+    <p class="tc-meta">
+      <span>班级：{{ task.className || '—' }}</span>
+      <span>教师：{{ task.teacherName || '—' }}</span>
+    </p>
     <div class="tc-metrics">
       <span v-for="m in task.metrics" :key="m.id" class="metric-chip">
         {{ m.metricName }} <b>{{ m.weight }}%</b>
       </span>
     </div>
     <div class="tc-foot">
+      <span class="tc-publish">{{
+        task.publishTime ? `发布于 ${formatDateTime(task.publishTime)}` : '尚未发布'
+      }}</span>
       <DeadlineBadge :deadline="task.deadline" :status="task.status" />
     </div>
     <div v-if="$slots.default" class="tc-action" @click.stop>
@@ -22,6 +29,7 @@
 
 <script setup lang="ts">
 import type { TaskInfo } from '@/api/task'
+import { formatDateTime } from '@/utils/format'
 import StatusTag from './StatusTag.vue'
 import DeadlineBadge from './DeadlineBadge.vue'
 
@@ -70,6 +78,14 @@ const emit = defineEmits<{ open: [] }>()
   gap: 8px;
   margin-top: 10px;
 }
+.tc-meta {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: var(--aies-ink3);
+}
 .metric-chip {
   font-size: 12px;
   padding: 3px 10px;
@@ -86,7 +102,13 @@ const emit = defineEmits<{ open: [] }>()
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
   margin-top: 12px;
+}
+.tc-publish {
+  font-size: 12px;
+  color: var(--aies-ink3);
 }
 .tc-action {
   margin-top: 12px;

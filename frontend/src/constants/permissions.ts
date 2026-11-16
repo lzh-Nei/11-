@@ -80,7 +80,11 @@ export const PERM_ROUTE: Record<string, PermEntry> = {
     hint: '进入提交模块（学生提交档案 / 教师评价复核）'
   },
   'submission:mine': { kind: 'route', to: '/submissions', hint: '进入提交档案模块' },
-  'evaluation:view': { kind: 'route', to: '/my-evaluations', hint: '进入我的评价模块（报告新窗口打开）' },
+  'evaluation:view': {
+    kind: 'route',
+    to: '/submissions',
+    hint: '在提交档案中点击「查看评价」查看老师或大模型评价'
+  },
   'evaluation:review': { kind: 'route', to: '/review', hint: '进入评价复核模块' },
   'evaluation:re-evaluate': { kind: 'route', to: '/review', hint: '在评价复核工作台内操作重评' },
   'evaluation:history:view': {

@@ -1,16 +1,15 @@
 <template>
   <!-- 评价与复核（教师）：本人任务下的评价列表 → 同页展开评分详情、改分与历史版本 -->
   <PageShell :bare="embedded">
-    <PageHeader
-      v-if="!embedded"
-      title="评价与复核"
-      subtitle="选择一条评价，查看评分并完成复核"
-    />
+    <PageHeader v-if="!embedded" title="评价与复核" subtitle="选择一条评价，查看评分并完成复核">
+      <BackButton />
+      <el-button @click="router.push('/modules?group=teaching&child=task-list')">去任务列表</el-button>
+    </PageHeader>
 
     <div class="head">
       <div>
-        <h3>我的评价记录</h3>
-        <p class="hint">这里列出你所负责任务的评价记录；选择一条即可在下方查看评分并完成复核。</p>
+        <h3>评价与复核历史</h3>
+        <p class="hint">查看本人任务下学生的确认、改分与历史版本；选择一条即可在下方完成复核。</p>
       </div>
       <div class="tools">
         <el-select v-model="status" placeholder="全部状态" style="width: 140px" @change="reload">
@@ -41,6 +40,9 @@
         </el-table-column>
         <el-table-column label="学生" width="120">
           <template #default="{ row }">{{ row.studentName ?? '—' }}</template>
+        </el-table-column>
+        <el-table-column label="教师" width="120">
+          <template #default="{ row }">{{ row.teacherName ?? '—' }}</template>
         </el-table-column>
         <el-table-column label="状态" width="110">
           <template #default="{ row }"><StatusTag :status="row.status" /></template>
@@ -83,16 +85,19 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { adminApi, type AdminEvaluation } from '@/api/admin'
 import { formatDateTime } from '@/utils/format'
 import PageShell from '@/components/ui/PageShell.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
+import BackButton from '@/components/ui/BackButton.vue'
 import DataTableShell from '@/components/ui/DataTableShell.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
 import Evaluate from '@/views/Evaluate.vue'
 
 withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 
+const router = useRouter()
 const loading = ref(false)
 const error = ref<string | null>(null)
 const rows = ref<AdminEvaluation[]>([])

@@ -1,6 +1,7 @@
 <template>
   <PageShell :width="860">
     <PageHeader title="评价报告" subtitle="查看本次作业的评分、评语与历史版本">
+      <BackButton />
       <el-button size="small" :loading="loading" @click="load">刷新</el-button>
     </PageHeader>
 
@@ -72,6 +73,7 @@ import { formatDateTime } from '@/utils/format'
 import { useAuthStore } from '@/stores/auth'
 import PageShell from '@/components/ui/PageShell.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
+import BackButton from '@/components/ui/BackButton.vue'
 import ScoreDisplay from '@/components/ui/ScoreDisplay.vue'
 import DimensionRadar from '@/components/ui/DimensionRadar.vue'
 import SuggestionList from '@/components/ui/SuggestionList.vue'

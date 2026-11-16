@@ -69,7 +69,6 @@ import PermissionCatalog from '@/components/business/PermissionCatalog.vue'
 import DashboardView from '@/views/DashboardView.vue'
 import StudentTasks from '@/views/StudentTasks.vue'
 import StudentSubmissions from '@/views/StudentSubmissions.vue'
-import MyEvaluationsView from '@/views/MyEvaluationsView.vue'
 import TaskListPanel from '@/components/tasks/TaskListPanel.vue'
 import TaskCreatePanel from '@/components/tasks/TaskCreatePanel.vue'
 import TaskEditPanel from '@/components/tasks/TaskEditPanel.vue'
@@ -127,13 +126,6 @@ const studentGroups: ModuleGroup[] = [
         label: '提交档案',
         icon: 'archive',
         component: StudentSubmissions,
-        props: { embedded: true }
-      },
-      {
-        key: 'evaluations',
-        label: '我的评价',
-        icon: 'evaluation',
-        component: MyEvaluationsView,
         props: { embedded: true }
       }
     ]

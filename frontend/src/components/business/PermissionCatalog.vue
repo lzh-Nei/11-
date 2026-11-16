@@ -141,7 +141,7 @@ function onPermClick(code: string) {
     return
   }
   if (code === 'evaluation:view') {
-    if (isStudent) router.push(studyModule('evaluations'))
+    if (isStudent) router.push(studyModule('submissions'))
     else if (isAdmin) router.push(teachingModule('evaluations'))
     else router.push(teachingModule('review'))
     return

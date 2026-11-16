@@ -16,8 +16,11 @@
         <b class="stat-value">{{ formatBytes(totalSize) }}</b>
       </div>
       <div class="stat-chip">
-        <span class="stat-label">最近上传</span>
-        <b class="stat-value">{{ latestUpload ? formatRelative(latestUpload) : '—' }}</b>
+        <span class="stat-label">最近上传者</span>
+        <b class="stat-value stat-person">{{ latestUpload?.uploaderName || '暂无记录' }}</b>
+        <small v-if="latestUpload" class="stat-sub">
+          {{ latestUpload.className || '班级未绑定' }} · {{ formatDateTime(latestUpload.uploadTime) }}
+        </small>
       </div>
     </section>
 
@@ -55,15 +58,20 @@
         <thead>
           <tr>
             <th>文件名</th>
+            <th style="width: 180px">上传者</th>
             <th style="width: 110px">大小</th>
             <th style="width: 160px">上传时间</th>
-            <th style="width: 120px">操作</th>
+            <th style="width: 150px">操作</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="f in pageRows" :key="f.id">
             <td>
               <span class="file-name" :title="f.name">{{ f.name }}</span>
+            </td>
+            <td>
+              <div class="uploader-name">{{ f.uploaderName || '未记录' }}</div>
+              <small class="uploader-class">{{ f.className || '班级未绑定' }}</small>
             </td>
             <td class="mono dim">{{ formatBytes(f.size) }}</td>
             <td>
@@ -81,6 +89,16 @@
               >
                 下载
               </el-button>
+              <el-button
+                v-if="isAdmin"
+                size="small"
+                type="danger"
+                plain
+                :loading="deletingId === f.id"
+                @click="removeFile(f)"
+              >
+                删除
+              </el-button>
             </td>
           </tr>
         </tbody>
@@ -96,8 +114,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessageBox } from 'element-plus'
 import { fileApi, type FileMeta } from '@/api/file'
 import { downloadApi } from '@/api/download'
+import { useAuthStore } from '@/stores/auth'
 import { formatBytes, formatDateTime, formatRelative } from '@/utils/format'
 import { saveBlob } from '@/utils/file'
 import { toast } from '@/utils/toast'
@@ -106,6 +126,8 @@ import PageHeader from '@/components/ui/PageHeader.vue'
 import DataTableShell from '@/components/ui/DataTableShell.vue'
 
 const router = useRouter()
+const auth = useAuthStore()
+const isAdmin = computed(() => auth.role === 'ADMIN')
 
 const loading = ref(false)
 const error = ref<string | null>(null)
@@ -115,9 +137,10 @@ const sortKey = ref<'time' | 'name' | 'size'>('time')
 const page = ref(1)
 const size = 10
 const downloadingId = ref<string | null>(null)
+const deletingId = ref<string | null>(null)
 
 const totalSize = computed(() => rows.value.reduce((a, f) => a + (Number(f.size) || 0), 0))
-const latestUpload = computed(() => rows.value[0]?.uploadTime ?? null)
+const latestUpload = computed(() => rows.value[0] ?? null)
 
 const filtered = computed(() => {
   const kw = keyword.value.trim().toLowerCase()
@@ -163,6 +186,29 @@ async function download(f: FileMeta) {
   }
 }
 
+async function removeFile(f: FileMeta) {
+  try {
+    await ElMessageBox.confirm(
+      `确认从文件中心移除「${f.name}」？移除后列表中将不再展示该文件。`,
+      '删除文件',
+      { type: 'warning', confirmButtonText: '确认删除', cancelButtonText: '取消' }
+    )
+  } catch {
+    return
+  }
+  deletingId.value = f.id
+  try {
+    await fileApi.remove(f.id)
+    toast.success('文件已从文件中心移除')
+    if (page.value > 1 && pageRows.value.length === 1) page.value -= 1
+    await load()
+  } catch (e) {
+    toast.error((e as { message?: string })?.message || '删除失败', '请稍后重试')
+  } finally {
+    deletingId.value = null
+  }
+}
+
 onMounted(load)
 </script>
 
@@ -191,6 +237,22 @@ onMounted(load)
 .stat-value {
   font: 600 18px var(--aies-mono, monospace);
   color: var(--aies-ink);
+}
+.stat-person {
+  font-family: inherit;
+  font-size: 17px;
+}
+.stat-sub {
+  font-size: 11.5px;
+  color: var(--aies-ink3);
+}
+.uploader-name {
+  font-size: 13px;
+  color: var(--aies-ink2);
+}
+.uploader-class {
+  font-size: 11.5px;
+  color: var(--aies-ink3);
 }
 .source-tip {
   margin-bottom: var(--aies-gap);

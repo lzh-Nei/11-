@@ -77,43 +77,43 @@ const roleLabel = computed(() => {
 })
 const initial = computed(() => (auth.me?.realName || auth.me?.username || 'U').slice(0, 1))
 
-/** 三角色统一左侧模块栏：功能模块（二级/三级目录） / 文件中心 / 个人中心 */
-const groups = computed<ModuleGroup[]>(() => [
-  {
-    label: '工作区',
-    items: [
-      {
-        key: 'modules',
-        label: '功能模块',
-        icon: 'dashboard',
-        to: '/modules',
-        match: (p) =>
-          p === '/modules' ||
-          p === '/tasks' ||
-          p === '/tasks/manage' ||
-          p === '/submissions' ||
-          p === '/my-evaluations' ||
-          p === '/review' ||
-          /^\/tasks\/\d+\/submit$/.test(p) ||
-          /^\/evaluations\/\d+(\/review)?$/.test(p)
-      },
-      {
-        key: 'files',
-        label: '文件中心',
-        icon: 'files',
-        to: '/files',
-        match: (p) => p === '/files'
-      },
-      {
-        key: 'account',
-        label: '个人中心',
-        icon: 'user',
-        to: '/account',
-        match: (p) => p === '/account' || p === '/change-password'
-      }
-    ]
+/** 左侧模块栏：功能模块 + 文件中心（仅教师/管理员）+ 个人中心 */
+const groups = computed<ModuleGroup[]>(() => {
+  const items: ModuleItem[] = [
+    {
+      key: 'modules',
+      label: '功能模块',
+      icon: 'dashboard',
+      to: '/modules',
+      match: (p) =>
+        p === '/modules' ||
+        p === '/tasks' ||
+        p === '/tasks/manage' ||
+        p === '/submissions' ||
+        p === '/my-evaluations' ||
+        p === '/review' ||
+        /^\/tasks\/\d+\/submit$/.test(p) ||
+        /^\/evaluations\/\d+(\/review)?$/.test(p)
+    }
+  ]
+  if (auth.role !== 'STUDENT') {
+    items.push({
+      key: 'files',
+      label: '文件中心',
+      icon: 'files',
+      to: '/files',
+      match: (p) => p === '/files'
+    })
   }
-])
+  items.push({
+    key: 'account',
+    label: '个人中心',
+    icon: 'user',
+    to: '/account',
+    match: (p) => p === '/account' || p === '/change-password'
+  })
+  return [{ label: '工作区', items }]
+})
 
 function isActive(item: ModuleItem): boolean {
   return item.match(route.path)

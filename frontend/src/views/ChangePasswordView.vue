@@ -1,8 +1,10 @@
 <template>
   <!-- 登录后自助改密（UC-07）：复用邮箱验证码通道（A-06 scene=RESET_PASSWORD → A-10 重置）
        成功即作废该用户全部 RT（S-10），前端同步清态回登录页 -->
-  <PageShell :width="860">
-    <PageHeader title="修改密码" subtitle="通过邮箱验证码修改密码，成功后需重新登录" />
+  <PageShell :width="860" flush>
+    <PageHeader title="修改密码" subtitle="通过邮箱验证码修改密码，成功后需重新登录">
+      <BackButton />
+    </PageHeader>
 
     <el-alert
       v-if="!emailBound"
@@ -89,6 +91,7 @@ import { useAuthStore } from '@/stores/auth'
 import { toast } from '@/utils/toast'
 import PageShell from '@/components/ui/PageShell.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
+import BackButton from '@/components/ui/BackButton.vue'
 import CaptchaInput from '@/components/ui/CaptchaInput.vue'
 import EmailCodeInput from '@/components/business/EmailCodeInput.vue'
 

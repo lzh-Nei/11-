@@ -102,10 +102,9 @@ textarea{width:100%;min-height:64px;font-family:var(--mono);font-size:13px}
 <div class="shell">
   <aside class="rail">
     <div class="brand"><div class="mark">A</div><div><b>AIES 驾驶舱</b><small>教学AI检查评价系统</small></div></div>
+    <button class="nav-btn" onclick="backToApp()">← 返回上一页</button>
     <button class="nav-btn" id="nav-dash" onclick="go('dash')">报表驾驶舱</button>
-    <button class="nav-btn" id="nav-console" onclick="go('console')">API 控制台</button>
-    <button class="nav-btn" id="nav-id" onclick="go('id')">身份与权限</button>
-    <div class="rail-foot">UC-25 查询链 · V14 权限<br>数据源：本机后端契约</div>
+    <div class="rail-foot">教学评价数据总览</div>
   </aside>
   <main class="main">
     <div id="view-login" class="card">
@@ -121,14 +120,16 @@ textarea{width:100%;min-height:64px;font-family:var(--mono);font-size:13px}
              style="height:40px;border-radius:var(--r-md);border:1px solid var(--line2);cursor:pointer;background:var(--paper)">
       </div>
       <button class="btn" style="width:100%" onclick="login()">密码登录</button>
-      <div class="sub" style="margin-top:8px">契约同源：本页验证码与主应用同一 /api/auth/captcha 端点（A-04，Redis TTL 5min）。</div>
-      <div class="sep"></div>
-      <div class="ovl">或使用 TOKEN</div>
-      <div class="row" style="margin-top:8px">
-        <input id="tokenIn" placeholder="粘贴 JWT（F12 → Local Storage）" style="flex:1">
-        <button class="ghost" onclick="useToken()">装载</button>
+      <div class="sub" style="margin-top:8px">使用平台账号登录后查看教学报表。</div>
+      <div class="hidden">
+        <div class="sep"></div>
+        <div class="ovl">或使用 TOKEN</div>
+        <div class="row" style="margin-top:8px">
+          <input id="tokenIn" placeholder="粘贴访问令牌" style="flex:1">
+          <button class="ghost" onclick="useToken()">装载</button>
+        </div>
       </div>
-      <div class="sub" id="loginMsg" style="margin-top:10px">同源部署时将自动探测已有登录态。</div>
+      <div class="sub" id="loginMsg" style="margin-top:10px">已登录平台账号时可自动进入。</div>
     </div>
     <div id="view-dash" class="hidden">
       <div class="row" style="margin-bottom:14px">
@@ -137,10 +138,10 @@ textarea{width:100%;min-height:64px;font-family:var(--mono);font-size:13px}
         <button class="btn" onclick="doRefresh()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" style="vertical-align:-1px;margin-right:5px"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>刷新缓存</button>
         <span id="dashMsg" class="lat"></span>
       </div>
-      <div class="sub" style="margin:-6px 0 14px">演示路径：在控制台执行一次复核或重评，回此页点刷新，四图即时变化（缓存主动失效可视化）。</div>
+      <div class="sub" style="margin:-6px 0 14px">完成复核或重新评价后，点击刷新即可看到最新统计。</div>
       <div class="kpis" id="kpis"></div>
       <div class="grid" id="charts"></div>
-      <div class="card" style="margin-top:16px">
+      <div class="card hidden" style="margin-top:16px">
         <div class="row" style="justify-content:space-between">
           <h3>原始响应<span class="sub" style="display:inline">（契约校准对照用）</span></h3>
           <button class="ghost" onclick="toggleRaw()">展开/收起</button>
@@ -175,6 +176,11 @@ textarea{width:100%;min-height:64px;font-family:var(--mono);font-size:13px}
 </div>
 <div id="toast"></div>
 <script>
+function backToApp(){
+  if(window.opener){ window.close(); return; }
+  if(window.history.length>1){ window.history.back(); return; }
+  window.location.href='/modules';
+}
 /* ══════════ 契约校准区（唯一允许手改的区域，diff 定位锚）
    锁定版（W12-D39，执行侧按 ReportOverviewDTO 真实结构 + LoginPrincipal 体系锁定）：
    - overview 响应：{tasks:[{taskId,title,submitted,scored,avgScore,rate}],
@@ -239,24 +245,36 @@ const payload=r=>r.json&&r.json.data!==undefined?r.json.data:r.json;
 /* ══════════ 视图路由 ══════════ */
 const VIEWS=['dash','console','id'];
 function go(v){
-  VIEWS.forEach(x=>{$('view-'+x).classList.toggle('hidden',x!==v);$('nav-'+x).classList.toggle('on',x===v)});
+  VIEWS.forEach(x=>{
+    $('view-'+x).classList.toggle('hidden',x!==v);
+    const nav=$('nav-'+x);
+    if(nav) nav.classList.toggle('on',x===v);
+  });
   if(v==='id')renderIdentity();
   if(v==='dash')requestAnimationFrame(()=>S.charts.forEach(c=>c&&c.resize()));
 }
 /* ══════════ 认证 ══════════ */
 function detectToken(){
+  const mainToken=(localStorage.getItem('aies_at')||'').trim();
+  if(jwtLike(mainToken)){
+    S.token=mainToken;localStorage.setItem('aies_ui_token',mainToken);return true;
+  }
   if(S.token&&jwtLike(S.token))return true;
   for(let i=0;i<localStorage.length;i++){const v=(localStorage.getItem(localStorage.key(i))||'').trim();
     if(jwtLike(v)){S.token=v;localStorage.setItem('aies_ui_token',v);return true;}}
   return false;
 }
 function setWho(){
-  const d=S.identity||{};const box=$('who');if(!box)return;
+  const d=S.identity||{};const box=$('who');
   const name=d.name||d.realName||d.username||d.studentId||'已登录';
   const role=String(d.role||(Array.isArray(d.roles)?d.roles[0]:'')||'');
   const isS=/student/i.test(role);
-  box.innerHTML=`<span class="pill ${isS?'t':'warn'}">${esc(role||'USER')}</span><span style="font-size:13px">${esc(name)}</span>`;
-  if(isS)S.scope='me';else if(/teacher/i.test(role))S.scope='teacher';
+  if(box)box.innerHTML=`<span class="pill ${isS?'t':'warn'}">${esc(role||'USER')}</span><span style="font-size:13px">${esc(name)}</span>`;
+  if(isS)S.scope='me';
+  else if(/teacher|admin/i.test(role))S.scope='teacher';
+  else S.scope='me';
+  const teacherBtn=$('sc-teacher');
+  if(teacherBtn)teacherBtn.classList.toggle('hidden',isS);
   syncScope();
 }
 function setAuthed(on){document.body.classList.toggle('authed',on);}
@@ -334,7 +352,7 @@ function deriveKpi(d){
   const defs=[['任务总数',pick(CONFIG.kpi.tasks)],['平均分',pick(CONFIG.kpi.avg)],['提交数',pick(CONFIG.kpi.subs)],['待复核',pick(CONFIG.kpi.pending)]];
   return defs.filter(x=>x[1]!=null);
 }
-const emptyBox=()=>'<div class="empty">该图字段待契约校准：改 CONFIG.fields 对应键为实际字段名（对照原始响应），或把响应贴给 PM 锁定映射</div>';
+const emptyBox=()=>'<div class="empty">暂无该图表数据</div>';
 /* name 候选首二位引用 CONFIG.nameKey（契约知识在 CONFIG 声明）；ck=CONFIG.keys[k]（T3 校准：per-chart 键优先） */
 function toNameValue(v,ck=null,nested=[]){
   let d=v;
@@ -387,8 +405,9 @@ async function loadReport(){
   const r=await api(S.scope==='me'?CONFIG.overviewMe:CONFIG.overviewTeacher);
   showSkeleton(false);renderRaw(r.json);
   if(r.status===401){deauth('登录态失效，请重新登录');return;}
-  if(r.status!==200){m.innerHTML=`<span class="err-t">HTTP ${r.status}</span> ${esc((r.json&&r.json.message)||'')}`;return;}
-  m.innerHTML=`<span class="pill ok">200</span><span class="lat">${r.ms}ms · ${S.scope==='me'?'学生个人':'教师聚合'}</span>`;
+  if(r.status===403&&S.scope==='teacher'){S.scope='me';syncScope();return loadReport();}
+  if(r.status!==200){m.innerHTML=`<span class="err-t">报表暂时无法加载</span> <span class="lat">${esc((r.json&&r.json.message)||'请稍后重试')}</span>`;return;}
+  m.innerHTML=`<span class="pill ok">已更新</span><span class="lat">${r.ms}ms · ${S.scope==='me'?'学生个人':'教师聚合'}</span>`;
   renderAll(payload(r));
 }
 /* ══════════ 身份与权限 ══════════ */

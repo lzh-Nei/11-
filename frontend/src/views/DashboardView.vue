@@ -55,6 +55,62 @@
           :footnote="s.footnote"
         />
       </div>
+
+      <section v-if="overview" class="analysis-block">
+        <p class="analysis-desc">{{ analysisDesc }}</p>
+        <div class="chart-grid">
+          <ChartPanel
+            title="成绩分布"
+            hint="按总分区间统计"
+            :empty="!scoreDist.length"
+            empty-text="还没有成绩分布数据"
+          >
+            <div class="bar-list">
+              <div v-for="item in scoreDist" :key="item.range" class="bar-row">
+                <span class="bar-label">{{ item.range }}</span>
+                <div class="bar-track">
+                  <i :style="{ width: barWidth(item.count) }"></i>
+                </div>
+                <b class="bar-count">{{ item.count }}</b>
+              </div>
+            </div>
+          </ChartPanel>
+
+          <ChartPanel
+            title="各指标平均分"
+            hint="满分 100"
+            :empty="!metricRadar.length"
+            empty-text="还没有指标得分数据"
+          >
+            <DimensionRadar :scores="radarScores" :size="270" />
+          </ChartPanel>
+        </div>
+
+        <ChartPanel
+          title="任务表现"
+          hint="提交、出分与平均分"
+          :empty="!taskRows.length"
+          empty-text="还没有任务表现数据"
+        >
+          <el-table :data="taskRows" stripe size="small">
+            <el-table-column prop="title" label="任务" min-width="180" />
+            <el-table-column label="提交" width="80">
+              <template #default="{ row }">{{ row.submitted }}</template>
+            </el-table-column>
+            <el-table-column label="已出分" width="90">
+              <template #default="{ row }">{{ row.scored }}</template>
+            </el-table-column>
+            <el-table-column label="平均分" width="90">
+              <template #default="{ row }">
+                {{ row.avgScore == null ? '—' : Number(row.avgScore).toFixed(1) }}
+              </template>
+            </el-table-column>
+            <el-table-column label="出分率" width="100">
+              <template #default="{ row }">{{ scoreRate(row) }}</template>
+            </el-table-column>
+          </el-table>
+        </ChartPanel>
+      </section>
     </template>
 
     <section v-if="!embedded" class="section">
@@ -95,6 +151,8 @@ import AppSkeleton from '@/components/ui/AppSkeleton.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import NavIcon from '@/components/ui/NavIcon.vue'
+import ChartPanel from '@/components/ui/ChartPanel.vue'
+import DimensionRadar from '@/components/ui/DimensionRadar.vue'
 import { reportApi, type ReportOverview } from '@/api/report'
 import { toast } from '@/utils/toast'
 import { openWindow } from '@/utils/window'
@@ -147,14 +205,41 @@ const stats = computed(() => {
   ]
 })
 
+const scoreDist = computed(() => overview.value?.scoreDist ?? [])
+const taskRows = computed(() => overview.value?.tasks ?? [])
+const metricRadar = computed(() => overview.value?.metricRadar ?? [])
+const radarScores = computed<Record<string, number>>(() =>
+  Object.fromEntries(metricRadar.value.map((item) => [item.metricName, Number(item.avgScore) || 0]))
+)
+const scoreMax = computed(() => Math.max(1, ...scoreDist.value.map((item) => item.count)))
+const analysisDesc = computed(() => {
+  if (isTeacher.value) {
+    return '以下数据汇总你所负责任务的提交、出分、成绩分布与指标表现，可结合任务表现表定位需要关注的学生与指标。'
+  }
+  return '以下数据来自你本人在各任务中的提交与评价记录，展示成绩分布、各指标平均分与任务完成情况；切换任务后会自动刷新。'
+})
+
+function barWidth(count: number): string {
+  return `${Math.max(4, Math.round((count / scoreMax.value) * 100))}%`
+}
+
+function scoreRate(row: { submitted: number; scored: number }): string {
+  const submitted = Number(row.submitted) || 0
+  if (!submitted) return '—'
+  return `${Math.round((Number(row.scored) || 0) / submitted * 100)}%`
+}
+
 /** 模块导览：与左侧导航同源的角色/权限口径 */
 const cards = computed<QuickCard[]>(() => {
   if (!isTeacher.value) {
     return [
       { title: '任务中心', desc: '查看已发布任务、截止时间与评分指标', icon: 'tasks', to: '/tasks' },
-      { title: '提交档案', desc: '本人提交版本、文件处理状态与评分结果', icon: 'archive', to: '/submissions' },
-      { title: '我的评价', desc: '已出分/已复核的评价报告入口', icon: 'evaluation', to: '/my-evaluations' },
-      { title: '文件中心', desc: '查看已上传文件并下载', icon: 'files', to: '/files' }
+      {
+        title: '提交档案',
+        desc: '本人提交版本、文件处理状态与评价结果',
+        icon: 'archive',
+        to: '/submissions'
+      }
     ]
   }
   const list: QuickCard[] = [
@@ -242,6 +327,60 @@ onMounted(loadOverview)
   .stat-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+.analysis-block {
+  margin-top: var(--aies-gap-lg);
+}
+.analysis-desc {
+  margin: 0 0 var(--aies-gap);
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--aies-ink2);
+}
+.chart-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: var(--aies-gap);
+  margin-bottom: var(--aies-gap);
+}
+@media (max-width: 960px) {
+  .chart-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.bar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 0;
+}
+.bar-row {
+  display: grid;
+  grid-template-columns: 72px 1fr 36px;
+  align-items: center;
+  gap: 10px;
+}
+.bar-label {
+  font-size: 12.5px;
+  color: var(--aies-ink3);
+}
+.bar-track {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--aies-paper);
+  overflow: hidden;
+}
+.bar-track i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--aies-brand);
+  transition: width var(--aies-t);
+}
+.bar-count {
+  font: 600 12px var(--aies-mono, monospace);
+  color: var(--aies-ink2);
+  text-align: right;
 }
 .section {
   margin-top: var(--aies-gap-lg);

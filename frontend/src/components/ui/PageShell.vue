@@ -5,7 +5,7 @@
        fluid=取消 1080 宽度上限与居中边距，模块页全宽铺满（宽屏不留大侧边距） -->
   <div
     class="page-shell"
-    :class="{ bare, fill, fluid }"
+    :class="{ bare, fill, fluid, flush }"
     :style="bare || fluid ? undefined : { maxWidth: `${width}px` }"
   >
     <slot />
@@ -13,12 +13,22 @@
 </template>
 
 <script setup lang="ts">
-withDefaults(defineProps<{ width?: number; bare?: boolean; fill?: boolean; fluid?: boolean }>(), {
-  width: 1080,
-  bare: false,
-  fill: false,
-  fluid: false
-})
+withDefaults(
+  defineProps<{
+    width?: number
+    bare?: boolean
+    fill?: boolean
+    fluid?: boolean
+    flush?: boolean
+  }>(),
+  {
+    width: 1080,
+    bare: false,
+    fill: false,
+    fluid: false,
+    flush: false
+  }
+)
 </script>
 
 <style scoped>
@@ -40,6 +50,10 @@ withDefaults(defineProps<{ width?: number; bare?: boolean; fill?: boolean; fluid
 }
 .page-shell.fluid {
   max-width: none;
+  margin-left: 0;
+  margin-right: 0;
+}
+.page-shell.flush {
   margin-left: 0;
   margin-right: 0;
 }

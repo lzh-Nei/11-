@@ -7,7 +7,6 @@ import AppLayout from '@/components/layout/AppLayout.vue'
 import StudentTasks from '@/views/StudentTasks.vue'
 import StudentSubmit from '@/views/StudentSubmit.vue'
 import StudentSubmissions from '@/views/StudentSubmissions.vue'
-import MyEvaluationsView from '@/views/MyEvaluationsView.vue'
 import EvaluationReport from '@/views/EvaluationReport.vue'
 
 const router = createRouter({
@@ -52,7 +51,7 @@ const router = createRouter({
         {
           path: 'my-evaluations',
           name: 'my-evaluations',
-          component: MyEvaluationsView,
+          redirect: '/modules?group=study&child=submissions',
           meta: { roles: ['STUDENT'] }
         },
         { path: 'evaluations/:id', name: 'evaluation-report', component: EvaluationReport },
@@ -68,7 +67,12 @@ const router = createRouter({
           component: () => import('@/views/Evaluate.vue'),
           meta: { roles: ['TEACHER', 'ADMIN'] }
         },
-        { path: 'files', name: 'file-center', component: () => import('@/views/FileCenterView.vue') },
+        {
+          path: 'files',
+          name: 'file-center',
+          component: () => import('@/views/FileCenterView.vue'),
+          meta: { roles: ['TEACHER', 'ADMIN'] }
+        },
         {
           path: 'modules',
           name: 'modules',

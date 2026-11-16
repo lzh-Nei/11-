@@ -4,6 +4,7 @@
       title="提交作业"
       :subtitle="task.title ? `${task.title} · 上传并提交作业` : '上传并提交作业'"
     >
+      <BackButton />
       <el-button @click="router.push('/tasks')">返回任务中心</el-button>
     </PageHeader>
 
@@ -88,6 +89,7 @@ import { toast } from '@/utils/toast'
 import PageShell from '@/components/ui/PageShell.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import FileUploadZone from '@/components/ui/FileUploadZone.vue'
+import BackButton from '@/components/ui/BackButton.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
 import DeadlineBadge from '@/components/ui/DeadlineBadge.vue'
 import AppSkeleton from '@/components/ui/AppSkeleton.vue'
@@ -108,7 +110,10 @@ const task = ref<TaskInfo>({
   classId: 0,
   deadline: '',
   status: '',
+  publishTime: null,
   createTime: '',
+  className: null,
+  teacherName: null,
   metrics: []
 })
 const file = ref<File | null>(null)

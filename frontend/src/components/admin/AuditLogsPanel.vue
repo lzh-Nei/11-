@@ -96,6 +96,8 @@ const ACTION_LABELS: Record<string, string> = {
   ENABLE_PROMPT: '启用评分提示词',
   ENABLE_GOLDEN: '启用基准样本',
   DISABLE_GOLDEN: '停用基准样本',
+  DELETE_FILE: '删除文件',
+  HIDE_FILE: '从文件中心移除',
   RE_EVALUATE: '重新评价'
 }
 
@@ -115,6 +117,7 @@ function targetLabel(target: string | null): string {
   if (kind === 'golden') return `样本 #${value}`
   if (kind === 'prompt') return `提示词 ${value}`
   if (kind === 'evaluation') return `评价 #${value}`
+  if (kind === 'file') return '文件'
   return '其他对象'
 }
 

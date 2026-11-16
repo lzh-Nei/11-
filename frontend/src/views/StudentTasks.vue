@@ -11,15 +11,16 @@
     <EmptyState v-else-if="!tasks.length" description="暂无已发布任务——教师发布后这里会亮起来" />
     <ScrollArea v-else max-height="calc(100vh - 320px)" padded>
       <div class="card-list">
-        <TaskCard v-for="t in tasks" :key="t.id" :task="t" @open="openSubmit(t.id)">
+        <TaskCard v-for="t in tasks" :key="t.id" :task="t" @open="openTask(t)">
           <el-button
+            v-if="canSubmit(t)"
             type="primary"
             size="small"
-            :disabled="isOverdue(t) || t.status === 'CLOSED'"
             @click="openSubmit(t.id)"
           >
             提交作业 ↗
           </el-button>
+          <span v-else class="task-note">{{ taskNote(t) }}</span>
         </TaskCard>
       </div>
     </ScrollArea>
@@ -63,6 +64,20 @@ function isOverdue(t: TaskInfo) {
   return t.status === 'CLOSED' || new Date(t.deadline).getTime() < Date.now()
 }
 
+function canSubmit(t: TaskInfo) {
+  return t.status === 'PUBLISHED' && !isOverdue(t)
+}
+
+function taskNote(t: TaskInfo) {
+  if (t.status === 'DRAFT') return '教师尚未发布'
+  if (t.status === 'CLOSED' || isOverdue(t)) return '任务已截止'
+  return '暂不可提交'
+}
+
+function openTask(t: TaskInfo) {
+  if (canSubmit(t)) openSubmit(t.id)
+}
+
 function reload() {
   page.value = 1
   load()
@@ -101,6 +116,10 @@ onMounted(load)
   display: flex;
   flex-direction: column;
   gap: var(--aies-gap);
+}
+.task-note {
+  font-size: 12.5px;
+  color: var(--aies-ink3);
 }
 .pager {
   display: flex;

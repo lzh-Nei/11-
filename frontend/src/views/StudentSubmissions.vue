@@ -41,7 +41,7 @@
         <el-table-column label="提交时间" width="170">
           <template #default="{ row }">{{ formatDateTime(row.createTime) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="180" fixed="right">
+        <el-table-column label="操作" width="190" fixed="right">
           <template #default="{ row }">
             <el-button size="small" text type="primary" @click="openDetail(row.id)">详情</el-button>
             <el-button
@@ -49,9 +49,9 @@
               text
               type="success"
               :disabled="!row.evaluationId"
-              @click="openReport(row.evaluationId)"
+              @click="openEvaluation(row)"
             >
-              评价报告 ↗
+              查看评价
             </el-button>
           </template>
         </el-table-column>
@@ -87,42 +87,7 @@
         >
           下载原件（链接 5 分钟内有效）
         </el-button>
-        <!-- UC-21（W7-C2）：评价报告下钻页（新窗口，保留左右模块布局） -->
-        <el-button
-          type="success"
-          size="small"
-          :disabled="!detail?.evaluationId"
-          @click="openReport(detail!.evaluationId)"
-        >
-          查看评价报告 ↗
-        </el-button>
       </div>
-
-      <!-- UC-18/21：评价结果内嵌（E-01 真实数据，完整报告另开页） -->
-      <section v-if="detail?.evaluationId" class="eval-block">
-        <div class="eval-head">
-          <h4>评价结果（当前生效）</h4>
-          <el-button link type="primary" @click="openReport(detail.evaluationId)"> 完整报告 ↗ </el-button>
-        </div>
-        <AppSkeleton v-if="evalLoading" :rows="2" :row-height="56" />
-        <ErrorState v-else-if="evalError" title="评价加载失败" :message="evalError" :retryable="false" />
-        <template v-else-if="evaluation">
-          <div class="eval-band">
-            <ScoreDisplay :score="evaluation.totalScore" />
-            <StatusTag :status="evaluation.status" />
-            <span class="dim"
-              >版本 v{{ evaluation.currentVersionNo }} · {{ formatDateTime(evaluation.updateTime) }}</span
-            >
-          </div>
-          <DimensionRadar
-            v-if="evaluation.metricScores"
-            :scores="metricRecord"
-            :size="220"
-            class="eval-radar"
-          />
-          <SuggestionList v-if="evaluation.aiComment" :comment="evaluation.aiComment" class="eval-comment" />
-        </template>
-      </section>
 
       <template v-if="detail?.textPreview">
         <div class="preview-title">作业文本预览（共 {{ detail.textChars }} 字，最多展示前 2000 字）</div>
@@ -130,6 +95,45 @@
       </template>
       <el-empty v-else-if="detail" description="暂无可预览的文本（文件仍在处理或处理失败）" :image-size="80" />
     </el-drawer>
+
+    <el-dialog
+      v-model="evalDialog"
+      :title="`评价结果 · ${evalTitle}`"
+      width="760px"
+      destroy-on-close
+      class="eval-dialog"
+    >
+      <AppSkeleton v-if="evalLoading" :rows="3" :row-height="64" />
+      <ErrorState v-else-if="evalError" title="评价加载失败" :message="evalError" :retryable="false" />
+      <template v-else-if="evaluation">
+        <div class="eval-band">
+          <ScoreDisplay :score="evaluation.totalScore" />
+          <StatusTag :status="evaluation.status" />
+          <span class="dim"
+            >版本 v{{ evaluation.currentVersionNo }} · {{ formatDateTime(evaluation.updateTime) }}</span
+          >
+        </div>
+        <DimensionRadar
+          v-if="evaluation.metricScores"
+          :scores="metricRecord"
+          :size="240"
+          class="eval-radar"
+        />
+        <SuggestionList v-if="evaluation.aiComment" :comment="evaluation.aiComment" class="eval-comment" />
+      </template>
+      <el-empty v-else description="暂无评价结果" />
+      <template #footer>
+        <el-button
+          v-if="evaluation"
+          type="success"
+          plain
+          @click="openReport(evaluation.id)"
+        >
+          在新窗口查看完整报告 ↗
+        </el-button>
+        <el-button @click="evalDialog = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </PageShell>
 </template>
 
@@ -163,6 +167,8 @@ const size = 20
 const total = ref(0)
 const drawer = ref(false)
 const detail = ref<SubmissionDetail | null>(null)
+const evalDialog = ref(false)
+const evalTitle = ref('')
 const evaluation = ref<EvaluationVO | null>(null)
 const evalLoading = ref(false)
 const evalError = ref<string | null>(null)
@@ -223,10 +229,16 @@ async function openDetail(id: number) {
   try {
     detail.value = await submissionApi.detail(id)
     drawer.value = true
-    await loadEvaluation(detail.value.evaluationId)
   } catch (e) {
     toast.error((e as { message?: string })?.message || '详情加载失败', '请重试')
   }
+}
+
+async function openEvaluation(row: SubmissionMine) {
+  if (!row.evaluationId) return
+  evalTitle.value = row.fileName
+  evalDialog.value = true
+  await loadEvaluation(row.evaluationId)
 }
 onMounted(load)
 </script>
@@ -234,23 +246,6 @@ onMounted(load)
 <style scoped>
 .drawer-actions {
   margin: var(--aies-gap) 0;
-}
-.eval-block {
-  margin: var(--aies-gap) 0;
-  padding: var(--aies-gap);
-  background: var(--aies-paper);
-  border: 1px solid var(--aies-border);
-  border-radius: var(--aies-radius-lg);
-}
-.eval-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.eval-head h4 {
-  margin: 0;
-  font-size: 14px;
-  color: var(--aies-ink);
 }
 .eval-band {
   display: flex;
