@@ -63,7 +63,7 @@ class EvaluationCommandServiceTest {
         rabbitTemplate = mock(RabbitTemplate.class);
         service = new EvaluationCommandService(evaluationResultMapper, evaluationHistoryMapper,
                 submissionMapper, taskMapper, taskService, auditLogMapper, rabbitTemplate,
-                new ObjectMapper());
+                new ObjectMapper(), mock(org.springframework.context.ApplicationEventPublisher.class));
     }
 
     private LoginPrincipal principal(long userId, String role) {

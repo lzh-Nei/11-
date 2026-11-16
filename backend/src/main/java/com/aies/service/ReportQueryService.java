@@ -95,16 +95,25 @@ public class ReportQueryService {
         log.info("报表缓存已强制失效: scope={} userId={}", scope, userId);
     }
 
-    /** 失效事件监听（AFTER_COMMIT：事务提交成功才失效，防删了缓存落库回滚→旧值回填）。 */
+    /**
+     * 失效事件监听（AFTER_COMMIT：事务提交成功才失效，防删了缓存落库回滚→旧值回填）。
+     * 盲点1防御（PM预警三坑之一）：afterCommit 阶段删 Redis 失败时 DB 已提交，
+     * 异常必须吞噬（try-catch+日志），靠 TTL 10min 兜底——不允许传播回主流程
+     * （否则调用方收到异常但数据实际已变更）。
+     */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onCacheEvict(ReportCacheEvictEvent event) {
-        redis.delete(CACHE_PREFIX + "me:" + event.studentId());
-        // 教师 scope 按 taskId 找到任教教师——失效其 teacher 缓存（批量键删除）
-        Task task = taskMapper.selectById(event.taskId());
-        if (task != null && task.getTeacherId() != null) {
-            redis.delete(CACHE_PREFIX + "teacher:" + task.getTeacherId());
+        try {
+            redis.delete(CACHE_PREFIX + "me:" + event.studentId());
+            Task task = taskMapper.selectById(event.taskId());
+            if (task != null && task.getTeacherId() != null) {
+                redis.delete(CACHE_PREFIX + "teacher:" + task.getTeacherId());
+            }
+            log.info("报表缓存事件失效完成: taskId={} studentId={}", event.taskId(), event.studentId());
+        } catch (Exception e) {
+            log.warn("报表缓存事件失效失败（TTL 10min 兜底收敛）: taskId={} studentId={} err={}",
+                    event.taskId(), event.studentId(), e.getMessage());
         }
-        log.info("报表缓存事件失效完成: taskId={} studentId={}", event.taskId(), event.studentId());
     }
 
     private interface DtoBuilder {
