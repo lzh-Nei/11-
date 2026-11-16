@@ -26,6 +26,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
@@ -41,6 +42,7 @@ public class TaskService {
 
     private static final String STATUS_DRAFT = "DRAFT";
     private static final String STATUS_PUBLISHED = "PUBLISHED";
+    private static final String STATUS_CLOSED = "CLOSED";
     private static final String ROLE_STUDENT = "STUDENT";
     private static final String ROLE_TEACHER = "TEACHER";
     /** UC-10：指标权重和必须等于100（双端校验的服务端手段，03-02 §3.3勘误） */
@@ -109,11 +111,29 @@ public class TaskService {
         return toVO(task, metrics, true);
     }
 
-    /** 编辑任务（仅草稿）：标题/说明/截止/班级/指标集可改；发布后指标锁定 */
+    /** 编辑任务：草稿可全量修改；已发布任务在无提交时可改结构，有提交时仅可改标题/说明/截止时间 */
     @Transactional
     public TaskVO update(long taskId, TaskCreateRequest request, LoginPrincipal principal) {
-        Task task = requireDraftManageable(taskId, principal, "编辑");
+        Task task = requireManageable(taskId, principal, "编辑");
         validateTaskFields(request, principal);
+
+        long submissions = submissionMapper.selectCount(new LambdaQueryWrapper<Submission>()
+                .eq(Submission::getTaskId, taskId));
+        if (submissions > 0) {
+            if (!Objects.equals(task.getClassId(), request.getClassId())) {
+                throw new BusinessException(ErrorCode.PARAM_ERROR.getCode(),
+                        "任务已有学生提交，不能更换班级");
+            }
+            List<TaskMetric> existing = taskMetricMapper.selectList(
+                    new LambdaQueryWrapper<TaskMetric>()
+                            .eq(TaskMetric::getTaskId, taskId)
+                            .orderByAsc(TaskMetric::getSortOrder)
+                            .orderByAsc(TaskMetric::getId));
+            if (!sameMetrics(existing, request.getMetrics())) {
+                throw new BusinessException(ErrorCode.PARAM_ERROR.getCode(),
+                        "任务已有学生提交，不能修改评分指标");
+            }
+        }
 
         task.setTitle(request.getTitle().trim());
         task.setDescription(request.getDescription());
@@ -140,10 +160,10 @@ public class TaskService {
         return toVO(task, metrics, true);
     }
 
-    /** 删除任务（仅草稿且无学生提交）：指标集同事务清理 */
+    /** 删除任务：草稿/已发布均可，但已有学生提交的任务禁止删除 */
     @Transactional
     public void delete(long taskId, LoginPrincipal principal) {
-        requireDraftManageable(taskId, principal, "删除");
+        requireManageable(taskId, principal, "删除");
         long submissions = submissionMapper.selectCount(new LambdaQueryWrapper<Submission>()
                 .eq(Submission::getTaskId, taskId));
         if (submissions > 0) {
@@ -155,8 +175,8 @@ public class TaskService {
         taskMapper.deleteById(taskId);
     }
 
-    /** 可管理任务（草稿 + 归属）：教师=本人；管理员=全局；学生不可见 */
-    private Task requireDraftManageable(long taskId, LoginPrincipal principal, String action) {
+    /** 可管理任务（草稿/已发布 + 归属）：教师=本人；管理员=全局；学生不可见；已关闭只读。 */
+    private Task requireManageable(long taskId, LoginPrincipal principal, String action) {
         Task task = taskMapper.selectById(taskId);
         if (task == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND);
@@ -172,11 +192,36 @@ public class TaskService {
                 // ADMIN：全局可管理（报表同口径）
             }
         }
-        if (!STATUS_DRAFT.equals(task.getStatus())) {
+        if (STATUS_CLOSED.equals(task.getStatus())) {
             throw new BusinessException(ErrorCode.PARAM_ERROR.getCode(),
-                    "仅草稿状态任务可" + action + "，当前状态: " + task.getStatus());
+                    "已关闭任务不能" + action + "，请保留用于评价追溯");
+        }
+        if (!STATUS_DRAFT.equals(task.getStatus()) && !STATUS_PUBLISHED.equals(task.getStatus())) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR.getCode(),
+                    "任务状态不允许" + action);
         }
         return task;
+    }
+
+    /** 已有提交时：指标集合与顺序必须和原任务一致（名称不区分大小写，权重按数值比较）。 */
+    private boolean sameMetrics(List<TaskMetric> existing,
+                                List<TaskCreateRequest.MetricItem> requested) {
+        if (existing.size() != requested.size()) {
+            return false;
+        }
+        for (int i = 0; i < existing.size(); i++) {
+            String existingName = existing.get(i).getMetricName();
+            String requestedName = requested.get(i).getMetricName();
+            if (existingName == null || requestedName == null
+                    || !existingName.equalsIgnoreCase(requestedName.trim())) {
+                return false;
+            }
+            if (existing.get(i).getWeight() == null || requested.get(i).getWeight() == null
+                    || existing.get(i).getWeight().compareTo(requested.get(i).getWeight()) != 0) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** 创建/编辑共用字段校验：截止时间、班级归属、权重和、指标名唯一 */
@@ -303,11 +348,16 @@ public class TaskService {
     }
 
     /**
-     * T-05 任务列表：学生=本班已发布（忽略传入筛选，防跨班探测）；教师=本人全部+筛选；
-     * 管理员=全局+筛选。固定 create_time DESC 排序（无用户输入，无40006面）。
+     * T-05 任务列表：学生=本班+状态标签；教师=本人；管理员=全局。
+     * 教师/管理员可用 stage（全部=非草稿 / 已发布=未过截止 / 已截止=关闭或已过截止）。
      */
     public Page<TaskVO> list(long page, long size, Long classId, String status,
                              LoginPrincipal principal) {
+        return list(page, size, classId, status, null, principal);
+    }
+
+    public Page<TaskVO> list(long page, long size, Long classId, String status,
+                             String stage, LoginPrincipal principal) {
         LambdaQueryWrapper<Task> wrapper = new LambdaQueryWrapper<>();
         if (ROLE_STUDENT.equals(principal.role())) {
             User user = userMapper.selectById(principal.userId());
@@ -323,7 +373,9 @@ public class TaskService {
             if (classId != null) {
                 wrapper.eq(Task::getClassId, classId);
             }
-            if (StringUtils.hasText(status)) {
+            if (StringUtils.hasText(stage)) {
+                applyStage(wrapper, stage);
+            } else if (StringUtils.hasText(status)) {
                 wrapper.eq(Task::getStatus, status);
             }
         }
@@ -339,6 +391,18 @@ public class TaskService {
         Page<TaskVO> voPage = new Page<>(result.getCurrent(), result.getSize(), result.getTotal());
         voPage.setRecords(records);
         return voPage;
+    }
+
+    private void applyStage(LambdaQueryWrapper<Task> wrapper, String stage) {
+        LocalDateTime now = LocalDateTime.now();
+        switch (stage) {
+            case "published" -> wrapper.eq(Task::getStatus, STATUS_PUBLISHED)
+                    .gt(Task::getDeadline, now);
+            case "ended" -> wrapper.and(w -> w.eq(Task::getStatus, STATUS_CLOSED)
+                    .or(x -> x.eq(Task::getStatus, STATUS_PUBLISHED)
+                            .lt(Task::getDeadline, now)));
+            default -> wrapper.ne(Task::getStatus, STATUS_DRAFT);
+        }
     }
 
     /* ===== S-05 IDOR 归属校验（04-04 §三：task详情——学生=本班+PUBLISHED；教师=本人） =====

@@ -140,7 +140,7 @@ class TaskControllerTest {
         Page<TaskVO> page = new Page<>(1, 10);
         page.setRecords(List.of(taskVO()));
         page.setTotal(1);
-        when(taskService.list(eq(1L), eq(10L), eq(1L), eq("PUBLISHED"), any()))
+        when(taskService.list(eq(1L), eq(10L), eq(1L), eq("PUBLISHED"), any(), any()))
                 .thenReturn(page);
 
         mockMvc.perform(get("/api/tasks")

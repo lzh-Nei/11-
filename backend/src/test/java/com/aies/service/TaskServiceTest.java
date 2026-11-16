@@ -315,12 +315,12 @@ class TaskServiceTest {
                         e -> assertThat(e.getCode()).isEqualTo(ErrorCode.NOT_FOUND.getCode()));
     }
 
-    /** 构造任务实体（id/归属教师/班级/状态齐备，createTime供列表排序字段读取） */
-    /** T-02 编辑草稿任务：字段+指标集替换（发布后锁定语义由状态校验承载） */
+    /** T-02 编辑草稿任务：字段+指标集替换 */
     @Test
     void updateDraftShouldReplaceMetrics() {
         when(taskMapper.selectById(5L)).thenReturn(task(5L, 2L, 1L, "DRAFT"));
         when(taskMapper.selectClassTeacher(1L)).thenReturn(2L);
+        when(submissionMapper.selectCount(any())).thenReturn(0L);
         when(taskMetricMapper.selectList(any())).thenReturn(List.of(metric(5L, "metric-a", "40")));
 
         var vo = taskService.update(5L,
@@ -332,15 +332,45 @@ class TaskServiceTest {
         verify(taskMetricMapper, times(3)).insert(any(TaskMetric.class));
     }
 
-    /** T-02 编辑已发布任务：拒绝（发布后指标集锁定） */
+    /** T-02 已发布任务无提交：允许修改结构与指标 */
     @Test
-    void updatePublishedShouldReject() {
+    void updatePublishedWithoutSubmissionsShouldAllow() {
         when(taskMapper.selectById(5L)).thenReturn(task(5L, 2L, 1L, "PUBLISHED"));
+        when(taskMapper.selectClassTeacher(1L)).thenReturn(2L);
+        when(submissionMapper.selectCount(any())).thenReturn(0L);
+        when(taskMetricMapper.selectList(any())).thenReturn(List.of(metric(5L, "metric-a", "40")));
+
+        var vo = taskService.update(5L,
+                request(new BigDecimal("40"), new BigDecimal("35"), new BigDecimal("25")), teacher);
+
+        assertThat(vo).isNotNull();
+        verify(taskMapper).updateById(any(Task.class));
+    }
+
+    /** T-02 已发布任务有提交：改指标拒绝，避免破坏既有评价口径 */
+    @Test
+    void updatePublishedWithSubmissionsRejectsMetricChange() {
+        when(taskMapper.selectById(5L)).thenReturn(task(5L, 2L, 1L, "PUBLISHED"));
+        when(taskMapper.selectClassTeacher(1L)).thenReturn(2L);
+        when(submissionMapper.selectCount(any())).thenReturn(1L);
+        when(taskMetricMapper.selectList(any())).thenReturn(List.of(metric(5L, "metric-a", "40")));
 
         assertThatThrownBy(() -> taskService.update(5L,
                 request(new BigDecimal("40"), new BigDecimal("35"), new BigDecimal("25")), teacher))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("仅草稿");
+                .isInstanceOfSatisfying(BusinessException.class,
+                        e -> assertThat(e.getMessage()).contains("不能修改评分指标"));
+        verify(taskMapper, never()).updateById(any(Task.class));
+    }
+
+    /** T-02 已关闭任务：拒绝编辑 */
+    @Test
+    void updateClosedShouldReject() {
+        when(taskMapper.selectById(5L)).thenReturn(task(5L, 2L, 1L, "CLOSED"));
+
+        assertThatThrownBy(() -> taskService.update(5L,
+                request(new BigDecimal("40"), new BigDecimal("35"), new BigDecimal("25")), teacher))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        e -> assertThat(e.getMessage()).contains("已关闭"));
         verify(taskMapper, never()).updateById(any(Task.class));
     }
 
@@ -356,10 +386,21 @@ class TaskServiceTest {
         verify(taskMapper).deleteById(5L);
     }
 
+    /** T-02 删除已发布且无提交任务：允许 */
+    @Test
+    void deletePublishedWithoutSubmissionsShouldDelete() {
+        when(taskMapper.selectById(5L)).thenReturn(task(5L, 2L, 1L, "PUBLISHED"));
+        when(submissionMapper.selectCount(any())).thenReturn(0L);
+
+        taskService.delete(5L, teacher);
+
+        verify(taskMapper).deleteById(5L);
+    }
+
     /** T-02 删除有学生提交的任务：拒绝（保留业务证据链） */
     @Test
     void deleteWithSubmissionsShouldReject() {
-        when(taskMapper.selectById(5L)).thenReturn(task(5L, 2L, 1L, "DRAFT"));
+        when(taskMapper.selectById(5L)).thenReturn(task(5L, 2L, 1L, "PUBLISHED"));
         when(submissionMapper.selectCount(any())).thenReturn(1L);
 
         assertThatThrownBy(() -> taskService.delete(5L, teacher))

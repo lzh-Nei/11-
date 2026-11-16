@@ -75,7 +75,7 @@ public class TaskController {
         return Result.success(taskService.getById(id, currentPrincipal()));
     }
 
-    /** T-05 任务列表：学生=本班已发布/教师=本人全部/管理员=全局；班级与状态筛选+分页；权限点 task:view */
+    /** T-05 任务列表：学生=本班+状态/教师=本人+stage/管理员=全局+stage；权限点 task:view */
     @PreAuthorize("hasAuthority('" + PermissionConstants.TASK_VIEW + "')")
     @GetMapping
     public Result<Page<TaskVO>> list(
@@ -83,8 +83,9 @@ public class TaskController {
             @RequestParam(defaultValue = "10") @Min(value = 1, message = "每页条数最小为1")
             @Max(value = 100, message = "每页条数最大为100") long size,
             @RequestParam(required = false) Long classId,
-            @RequestParam(required = false) String status) {
-        return Result.success(taskService.list(page, size, classId, status, currentPrincipal()));
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String stage) {
+        return Result.success(taskService.list(page, size, classId, status, stage, currentPrincipal()));
     }
 
     /** 当前主体（JWT过滤器装配；未登录时此路径不可达） */
