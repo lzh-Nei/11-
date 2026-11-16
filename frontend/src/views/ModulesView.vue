@@ -63,9 +63,7 @@ import DashboardView from '@/views/DashboardView.vue'
 import StudentTasks from '@/views/StudentTasks.vue'
 import StudentSubmissions from '@/views/StudentSubmissions.vue'
 import TaskListPanel from '@/components/tasks/TaskListPanel.vue'
-import TaskCreatePanel from '@/components/tasks/TaskCreatePanel.vue'
-import TaskEditPanel from '@/components/tasks/TaskEditPanel.vue'
-import TaskDeletePanel from '@/components/tasks/TaskDeletePanel.vue'
+import TaskDraftsPanel from '@/components/tasks/TaskDraftsPanel.vue'
 import ReviewHubView from '@/views/ReviewHubView.vue'
 import AdminEvaluationsView from '@/components/admin/AdminEvaluationsView.vue'
 import UsersPanel from '@/components/admin/UsersPanel.vue'
@@ -151,9 +149,7 @@ const teacherGroups: ModuleGroup[] = [
     icon: 'manage',
     children: [
       { key: 'task-list', label: '任务列表', icon: 'tasks', component: TaskListPanel },
-      { key: 'task-create', label: '新建任务', icon: 'manage', component: TaskCreatePanel },
-      { key: 'task-edit', label: '编辑任务', icon: 'manage', component: TaskEditPanel },
-      { key: 'task-delete', label: '删除任务', icon: 'archive', component: TaskDeletePanel },
+      { key: 'task-drafts', label: '草稿箱', icon: 'archive', component: TaskDraftsPanel },
       {
         key: 'review',
         label: '评价与复核',
@@ -204,10 +200,17 @@ const adminGroups: ModuleGroup[] = [
     icon: 'manage',
     children: [
       {
-        key: 'task-overview',
-        label: '任务概览',
+        key: 'task-list',
+        label: '任务列表',
         icon: 'tasks',
         component: TaskListPanel,
+        props: { readonly: true }
+      },
+      {
+        key: 'task-drafts',
+        label: '草稿箱',
+        icon: 'archive',
+        component: TaskDraftsPanel,
         props: { readonly: true }
       },
       { key: 'evaluations', label: '评价与复核', icon: 'review', component: AdminEvaluationsView }

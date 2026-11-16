@@ -68,9 +68,21 @@ export type PermEntry =
 export const PERM_ROUTE: Record<string, PermEntry> = {
   'auth:logout': { kind: 'action', act: 'logout', hint: '退出登录' },
   'user:me': { kind: 'action', act: 'profile', hint: '定位到个人信息卡' },
-  'task:create': { kind: 'route', to: '/modules?group=teaching&child=task-create', hint: '新建任务' },
-  'task:publish': { kind: 'route', to: '/modules?group=teaching&child=task-list', hint: '在任务列表发布草稿' },
-  'task:edit': { kind: 'route', to: '/modules?group=teaching&child=task-edit', hint: '编辑草稿任务' },
+  'task:create': {
+    kind: 'route',
+    to: '/modules?group=teaching&child=task-list',
+    hint: '任务列表 → 新建任务（保存为草稿）'
+  },
+  'task:publish': {
+    kind: 'route',
+    to: '/modules?group=teaching&child=task-drafts',
+    hint: '草稿箱 → 发布任务'
+  },
+  'task:edit': {
+    kind: 'route',
+    to: '/modules?group=teaching&child=task-list',
+    hint: '任务列表 → 任务卡编辑'
+  },
   'task:view': { kind: 'route', to: '/modules?group=teaching&child=task-list', hint: '查看任务' },
   'task:mine': { kind: 'route', to: '/modules?group=study&child=tasks', hint: '我的任务' },
   'submission:upload': { kind: 'route', to: '/tasks', hint: '在任务中心选择任务提交作业' },

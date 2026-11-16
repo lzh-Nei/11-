@@ -21,6 +21,7 @@ export interface TaskInfo {
   createTime: string
   className: string | null
   teacherName: string | null
+  submissionCount?: number | null
   metrics: TaskMetric[]
 }
 
@@ -42,9 +43,10 @@ export interface TaskCreatePayload {
 }
 
 export const taskApi = {
-  async list(page = 1, size = 10, status?: string): Promise<PageResult<TaskInfo>> {
+  async list(page = 1, size = 10, status?: string, stage?: string): Promise<PageResult<TaskInfo>> {
     const params: Record<string, unknown> = { page, size }
     if (status) params.status = status
+    if (stage) params.stage = stage
     return (await request.get('/tasks', { params })) as unknown as PageResult<TaskInfo>
   },
   async detail(id: number): Promise<TaskInfo> {

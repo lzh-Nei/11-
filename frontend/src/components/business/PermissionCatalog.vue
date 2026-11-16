@@ -118,19 +118,22 @@ function onPermClick(code: string) {
   if (code === 'submission:upload') {
     // 上传动作发生在任务中心（选任务 → 提交）
     if (isStudent) router.push(studyModule('tasks'))
-    else if (isAdmin) router.push(teachingModule('task-overview'))
     else router.push(teachingModule('task-list'))
     return
   }
-  if (code === 'task:edit') {
-    if (isAdmin) router.push(teachingModule('task-overview'))
-    else router.push(teachingModule('task-edit'))
+  if (code === 'task:edit' || code === 'task:create' || code === 'task:view') {
+    if (isStudent) router.push(studyModule('tasks'))
+    else router.push(teachingModule('task-list'))
     return
   }
-  if (code === 'task:create' || code === 'task:publish' || code === 'task:view' || code === 'task:mine') {
+  if (code === 'task:publish') {
     if (isStudent) router.push(studyModule('tasks'))
-    else if (isAdmin) router.push(teachingModule('task-overview'))
-    else router.push(code === 'task:create' ? teachingModule('task-create') : teachingModule('task-list'))
+    else if (isAdmin) router.push(teachingModule('task-list'))
+    else router.push(teachingModule('task-drafts'))
+    return
+  }
+  if (code === 'task:mine') {
+    router.push(studyModule('tasks'))
     return
   }
   if (code === 'submission:view' || code === 'submission:mine') {

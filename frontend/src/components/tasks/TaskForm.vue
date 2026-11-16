@@ -1,12 +1,25 @@
 <template>
   <!-- 任务编辑表单（新建/编辑共用）：标题、班级、说明、截止时间、指标权重 -->
   <el-form label-position="top" class="task-form" @submit.prevent="submit">
+    <el-alert
+      v-if="lockStructure"
+      type="info"
+      show-icon
+      :closable="false"
+      class="lock-tip"
+      title="该任务已有学生提交：班级与评分指标已锁定，仅可修改标题、说明和截止时间。"
+    />
     <div class="form-grid">
       <el-form-item label="任务标题" required>
         <el-input v-model="draft.title" placeholder="如：实训作业1 · Word 文档格式检查" maxlength="64" />
       </el-form-item>
       <el-form-item label="所属班级" required>
-        <el-select v-model="draft.classId" placeholder="选择班级" style="width: 100%">
+        <el-select
+          v-model="draft.classId"
+          placeholder="选择班级"
+          style="width: 100%"
+          :disabled="lockStructure"
+        >
           <el-option v-for="c in classes" :key="c.id" :label="c.className" :value="c.id" />
         </el-select>
       </el-form-item>
@@ -37,19 +50,26 @@
         <ScrollArea max-height="240px" padded>
           <div class="metric-rows">
             <div v-for="(m, i) in draft.metrics" :key="i" class="metric-row">
-              <el-input v-model="m.metricName" placeholder="指标名称" style="flex: 1" maxlength="32" />
+              <el-input
+                v-model="m.metricName"
+                placeholder="指标名称"
+                style="flex: 1"
+                maxlength="32"
+                :disabled="lockStructure"
+              />
               <el-input-number
                 v-model="m.weight"
                 :min="1"
                 :max="100"
                 controls-position="right"
                 style="width: 110px"
+                :disabled="lockStructure"
               />
               <span class="metric-unit">%（第 {{ i + 1 }} 项）</span>
               <el-button
                 text
                 type="danger"
-                :disabled="draft.metrics.length <= 1"
+                :disabled="lockStructure || draft.metrics.length <= 1"
                 @click="draft.metrics.splice(i, 1)"
                 >删除</el-button
               >
@@ -60,6 +80,7 @@
           <el-button
             size="small"
             plain
+            :disabled="lockStructure"
             @click="draft.metrics.push({ metricName: '', weight: 20, sortOrder: draft.metrics.length + 1 })"
           >
             + 添加指标
@@ -87,8 +108,13 @@ import { toast } from '@/utils/toast'
 import ScrollArea from '@/components/ui/ScrollArea.vue'
 
 const props = withDefaults(
-  defineProps<{ initial?: TaskInfo | null; submitText?: string; loading?: boolean }>(),
-  { initial: null, submitText: '保存任务', loading: false }
+  defineProps<{
+    initial?: TaskInfo | null
+    submitText?: string
+    loading?: boolean
+    lockStructure?: boolean
+  }>(),
+  { initial: null, submitText: '保存任务', loading: false, lockStructure: false }
 )
 const emit = defineEmits<{ submit: [payload: TaskCreatePayload] }>()
 
@@ -177,6 +203,9 @@ onMounted(async () => {
 <style scoped>
 .task-form {
   max-width: 860px;
+}
+.lock-tip {
+  margin-bottom: var(--aies-gap);
 }
 .form-grid {
   display: grid;
