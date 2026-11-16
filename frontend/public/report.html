@@ -183,6 +183,13 @@ const CONFIG={
   refreshPath:'/api/reports/refresh', refreshMethod:'POST',
   authScheme:'Bearer',
   fields:{task:'tasks',dist:'scoreDist',radar:'metricRadar',gap:'scoreGapDist'},
+  /* T3 契约校准（2026-11-16 实弹响应锁定）：keys 为四图 name/value 字段映射——
+     metricRadar 元素 {metricName,avgScore} 双键均不在通用候选链（原雷达图空态根因），
+     scoreDist/scoreGapDist {range,count}×5，tasks nameKey=title */
+  keys:{task:{nameKey:'title',valueKey:null},
+        dist:{nameKey:'range',valueKey:'count'},
+        radar:{nameKey:'metricName',valueKey:'avgScore'},
+        gap:{nameKey:'range',valueKey:'count'}},
   nameKey:'title',
   kpiMode:'fromTasks',
   kpi:{tasks:['totalTasks','taskCount','taskTotal'],avg:['averageScore','avgScore','avg'],
@@ -297,14 +304,17 @@ function deriveKpi(d){
   return defs.filter(x=>x[1]!=null);
 }
 const emptyBox=()=>'<div class="empty">该图字段待契约校准：改 CONFIG.fields 对应键为实际字段名（对照原始响应），或把响应贴给 PM 锁定映射</div>';
-/* name 候选首二位引用 CONFIG.nameKey（契约知识在 CONFIG 声明） */
-function toNameValue(v,nested=[]){
+/* name 候选首二位引用 CONFIG.nameKey（契约知识在 CONFIG 声明）；ck=CONFIG.keys[k]（T3 校准：per-chart 键优先） */
+function toNameValue(v,ck=null,nested=[]){
   let d=v;
   if(d&&typeof d==='object'&&!Array.isArray(d))for(const k of nested)if(d[k]!==undefined){d=d[k];break;}
   if(!d)return null;
+  const nk=v2=>ck&&ck.nameKey&&v2[ck.nameKey]!==undefined?v2[ck.nameKey]
+    :(v2.name??(CONFIG.nameKey&&v2[CONFIG.nameKey])??v2.label??v2.range??v2.key??v2.category??v2.metric??null);
+  const vk=v2=>ck&&ck.valueKey&&v2[ck.valueKey]!==undefined?v2[ck.valueKey]
+    :(v2.value??v2.count??v2.avg??v2.score??v2.ratio??v2.percent??v2.num??v2.total);
   if(Array.isArray(d))return d.map((it,i)=>it&&typeof it==='object'
-    ?{name:String(it.name??(CONFIG.nameKey&&it[CONFIG.nameKey])??it.label??it.range??it.key??it.category??it.metric??('#'+i)),
-      value:num(it.value??it.count??it.avg??it.score??it.ratio??it.percent??it.num??it.total)}
+    ?{name:String(nk(it)??'#'+i),value:num(vk(it))}
     :{name:'#'+i,value:num(it)}).filter(x=>x.value!==null);
   if(typeof d==='object')return Object.entries(d).map(([k,val])=>({name:k,value:num(val)})).filter(x=>x.value!==null);
   return null;
@@ -312,12 +322,12 @@ function toNameValue(v,nested=[]){
 const niceMax=m=>m<=1?1:m<=10?10:m<=100?100:Math.ceil(m/50)*50;
 function renderAll(data){
   $('kpis').innerHTML=deriveKpi(data).map(([l,v])=>`<div class="kpi"><div class="ovl">${l}</div><div class="v">${v}</div></div>`).join('');
-  if(!window.echarts){CHART_DEFS.forEach(c=>{const nv=toNameValue(dig(data,CONFIG.fields[c.k]),[c.k]);$('ch-'+c.k).innerHTML=nv?cssBars(nv):emptyBox();});return;}
+  if(!window.echarts){CHART_DEFS.forEach(c=>{const nv=toNameValue(dig(data,CONFIG.fields[c.k]),CONFIG.keys[c.k]);$('ch-'+c.k).innerHTML=nv?cssBars(nv):emptyBox();});return;}
   S.charts.forEach(c=>c.dispose());S.charts=[];
-  drawBar('task',toNameValue(dig(data,CONFIG.fields.task)));
-  drawBar('dist',toNameValue(dig(data,CONFIG.fields.dist)));
+  drawBar('task',toNameValue(dig(data,CONFIG.fields.task),CONFIG.keys.task));
+  drawBar('dist',toNameValue(dig(data,CONFIG.fields.dist),CONFIG.keys.dist));
   drawRadar(dig(data,CONFIG.fields.radar));
-  drawBar('gap',toNameValue(dig(data,CONFIG.fields.gap)));
+  drawBar('gap',toNameValue(dig(data,CONFIG.fields.gap),CONFIG.keys.gap));
 }
 function drawBar(k,nv){
   const el=$('ch-'+k);if(!el)return;
@@ -330,7 +340,7 @@ function drawBar(k,nv){
 }
 function drawRadar(v){
   const el=$('ch-radar');if(!el)return;
-  const nv=toNameValue(v,['indicators','axes','metrics','dimensions']);
+  const nv=toNameValue(v,null,['indicators','axes','metrics','dimensions']);
   if(!nv||nv.length<3){el.innerHTML=emptyBox();return;}
   const max=niceMax(Math.max(...nv.map(x=>x.value)));
   const c=echarts.init(el);S.charts.push(c);
