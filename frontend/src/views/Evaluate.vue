@@ -2,120 +2,122 @@
   <PageShell>
     <PageHeader title="复核工作台" :subtitle="`教师视角 · 评价 #${route.params.id}（UC-22/23/24/25）`" />
 
-    <AppSkeleton v-if="loading && !evaluation" :rows="3" :row-height="80" />
-    <ErrorState v-else-if="error" :message="error" @retry="load" />
+    <ScrollArea max-height="calc(100vh - 220px)" padded>
+      <AppSkeleton v-if="loading && !evaluation" :rows="3" :row-height="80" />
+      <ErrorState v-else-if="error" :message="error" @retry="load" />
 
-    <template v-else-if="evaluation">
-      <el-alert
-        v-if="evaluation.status === 'PENDING'"
-        title="评价进行中（AI 管道排队/评分中）——出分后本页 10 秒内自动刷新，可手动点刷新"
-        type="info"
-        show-icon
-        :closable="false"
-        class="tip"
-      />
+      <template v-else-if="evaluation">
+        <el-alert
+          v-if="evaluation.status === 'PENDING'"
+          title="评价进行中（AI 管道排队/评分中）——出分后本页 10 秒内自动刷新，可手动点刷新"
+          type="info"
+          show-icon
+          :closable="false"
+          class="tip"
+        />
 
-      <section class="band">
-        <div class="band-left">
-          <ScoreDisplay :score="evaluation.totalScore" />
-          <StatusTag :status="evaluation.status" />
-          <span class="dim"
-            >当前生效 v{{ evaluation.currentVersionNo }} · {{ formatDateTime(evaluation.updateTime) }}</span
-          >
-          <span v-if="evaluation.traceId" class="mono dim">trace {{ maskId(evaluation.traceId) }}</span>
-        </div>
-        <div class="band-actions">
-          <el-button size="small" @click="load">刷新</el-button>
-          <!-- E-03 重评：REVIEWED/FAILED→PENDING 走 MQ 重走管道（不可逆确认） -->
-          <ConfirmAction
-            v-if="evaluation.status === 'REVIEWED' || evaluation.status === 'FAILED'"
-            title="触发重评"
-            message="当前评分将被标记为 PENDING 并重新走 AI 评价管道（旧版本保留可追溯）。确认重评？"
-            confirm-text="确认重评"
-            @execute="onReEvaluate"
-          >
-            <template #default="{ trigger, loading }">
-              <el-button size="small" type="warning" plain :loading="loading" @click="trigger"
-                >重评（E-03）</el-button
-              >
-            </template>
-          </ConfirmAction>
-        </div>
-      </section>
-
-      <template
-        v-if="
-          evaluation.status === 'AI_DONE' ||
-          evaluation.status === 'REVIEWED' ||
-          evaluation.status === 'FAILED'
-        "
-      >
-        <section class="review-grid">
-          <!-- 左：AI 原判（只读参照） -->
-          <div class="panel">
-            <h3>AI 评价参照</h3>
-            <DimensionRadar :scores="metricRecord" :size="250" />
-            <SuggestionList :comment="evaluation.aiComment" />
+        <section class="band">
+          <div class="band-left">
+            <ScoreDisplay :score="evaluation.totalScore" />
+            <StatusTag :status="evaluation.status" />
+            <span class="dim"
+              >当前生效 v{{ evaluation.currentVersionNo }} · {{ formatDateTime(evaluation.updateTime) }}</span
+            >
+            <span v-if="evaluation.traceId" class="mono dim">trace {{ maskId(evaluation.traceId) }}</span>
           </div>
-
-          <!-- 右：教师复核表单（ReviewWorkbench 语义落位） -->
-          <div class="panel">
-            <h3>{{ isManual ? '手动评分（E-06 / UC-24）' : '教师复核（E-02 / UC-22）' }}</h3>
-            <el-form label-position="top">
-              <el-form-item label="总分（0-100）" required>
-                <el-input-number
-                  v-model="form.totalScore"
-                  :min="0"
-                  :max="100"
-                  :step="0.5"
-                  controls-position="right"
-                  style="width: 140px"
-                />
-              </el-form-item>
-              <el-form-item v-for="(_, k) in form.metricScores" :key="k" :label="`${k}（0-100）`">
-                <el-input-number
-                  v-model="form.metricScores[k]"
-                  :min="0"
-                  :max="100"
-                  :step="0.5"
-                  controls-position="right"
-                  style="width: 140px"
-                  size="small"
-                />
-              </el-form-item>
-              <el-form-item label="复核意见（≥10 字，留痕进历史版本）" required>
-                <el-input
-                  v-model="form.reviewComment"
-                  type="textarea"
-                  :rows="3"
-                  maxlength="300"
-                  show-word-limit
-                  placeholder="说明改分/确认理由：依据、偏差、处理方式……"
-                />
-              </el-form-item>
-              <ConfirmAction
-                :title="isManual ? '提交手动评分' : '提交复核'"
-                message="评分将写入新历史版本并触发报表缓存主动失效（D-36），旧版本保留可追溯。确认提交？"
-                confirm-text="确认提交"
-                @execute="onSubmitReview"
-              >
-                <template #default="{ trigger, loading }">
-                  <el-button type="primary" :loading="loading" :disabled="!canSubmit" @click="trigger">
-                    {{ isManual ? '提交手动评分' : '提交复核' }}
-                  </el-button>
-                </template>
-              </ConfirmAction>
-              <span v-if="form.reviewComment && form.reviewComment.length < 10" class="dim"
-                >意见不足 10 字（后端将拒绝）</span
-              >
-            </el-form>
+          <div class="band-actions">
+            <el-button size="small" @click="load">刷新</el-button>
+            <!-- E-03 重评：REVIEWED/FAILED→PENDING 走 MQ 重走管道（不可逆确认） -->
+            <ConfirmAction
+              v-if="evaluation.status === 'REVIEWED' || evaluation.status === 'FAILED'"
+              title="触发重评"
+              message="当前评分将被标记为 PENDING 并重新走 AI 评价管道（旧版本保留可追溯）。确认重评？"
+              confirm-text="确认重评"
+              @execute="onReEvaluate"
+            >
+              <template #default="{ trigger, loading }">
+                <el-button size="small" type="warning" plain :loading="loading" @click="trigger"
+                  >重评（E-03）</el-button
+                >
+              </template>
+            </ConfirmAction>
           </div>
         </section>
-      </template>
 
-      <!-- 历史版本（E-04 分页 + E-05 单版本快照）：共用组件，独立容错 -->
-      <EvaluationHistoryPanel ref="historyPanel" :evaluation-id="id" />
-    </template>
+        <template
+          v-if="
+            evaluation.status === 'AI_DONE' ||
+            evaluation.status === 'REVIEWED' ||
+            evaluation.status === 'FAILED'
+          "
+        >
+          <section class="review-grid">
+            <!-- 左：AI 原判（只读参照） -->
+            <div class="panel">
+              <h3>AI 评价参照</h3>
+              <DimensionRadar :scores="metricRecord" :size="250" />
+              <SuggestionList :comment="evaluation.aiComment" />
+            </div>
+
+            <!-- 右：教师复核表单（ReviewWorkbench 语义落位） -->
+            <div class="panel">
+              <h3>{{ isManual ? '手动评分（E-06 / UC-24）' : '教师复核（E-02 / UC-22）' }}</h3>
+              <el-form label-position="top">
+                <el-form-item label="总分（0-100）" required>
+                  <el-input-number
+                    v-model="form.totalScore"
+                    :min="0"
+                    :max="100"
+                    :step="0.5"
+                    controls-position="right"
+                    style="width: 140px"
+                  />
+                </el-form-item>
+                <el-form-item v-for="(_, k) in form.metricScores" :key="k" :label="`${k}（0-100）`">
+                  <el-input-number
+                    v-model="form.metricScores[k]"
+                    :min="0"
+                    :max="100"
+                    :step="0.5"
+                    controls-position="right"
+                    style="width: 140px"
+                    size="small"
+                  />
+                </el-form-item>
+                <el-form-item label="复核意见（≥10 字，留痕进历史版本）" required>
+                  <el-input
+                    v-model="form.reviewComment"
+                    type="textarea"
+                    :rows="3"
+                    maxlength="300"
+                    show-word-limit
+                    placeholder="说明改分/确认理由：依据、偏差、处理方式……"
+                  />
+                </el-form-item>
+                <ConfirmAction
+                  :title="isManual ? '提交手动评分' : '提交复核'"
+                  message="评分将写入新历史版本并触发报表缓存主动失效（D-36），旧版本保留可追溯。确认提交？"
+                  confirm-text="确认提交"
+                  @execute="onSubmitReview"
+                >
+                  <template #default="{ trigger, loading }">
+                    <el-button type="primary" :loading="loading" :disabled="!canSubmit" @click="trigger">
+                      {{ isManual ? '提交手动评分' : '提交复核' }}
+                    </el-button>
+                  </template>
+                </ConfirmAction>
+                <span v-if="form.reviewComment && form.reviewComment.length < 10" class="dim"
+                  >意见不足 10 字（后端将拒绝）</span
+                >
+              </el-form>
+            </div>
+          </section>
+        </template>
+
+        <!-- 历史版本（E-04 分页 + E-05 单版本快照）：共用组件，独立容错 -->
+        <EvaluationHistoryPanel ref="historyPanel" :evaluation-id="id" />
+      </template>
+    </ScrollArea>
   </PageShell>
 </template>
 
@@ -130,6 +132,7 @@ import PageHeader from '@/components/ui/PageHeader.vue'
 import ScoreDisplay from '@/components/ui/ScoreDisplay.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'
+import ScrollArea from '@/components/ui/ScrollArea.vue'
 import ConfirmAction from '@/components/ui/ConfirmAction.vue'
 import EvaluationHistoryPanel from '@/components/business/EvaluationHistoryPanel.vue'
 

@@ -4,64 +4,66 @@
       <el-button size="small" :loading="loading" @click="load">刷新</el-button>
     </PageHeader>
 
-    <AppSkeleton v-if="loading && !evaluation" :rows="3" :row-height="80" />
-    <ErrorState v-else-if="error" :message="error" @retry="load" />
+    <ScrollArea max-height="calc(100vh - 220px)" padded>
+      <AppSkeleton v-if="loading && !evaluation" :rows="3" :row-height="80" />
+      <ErrorState v-else-if="error" :message="error" @retry="load" />
 
-    <template v-else-if="evaluation">
-      <!-- PENDING：评价进行中（10s 轮询，LLD §4.3 步骤7 学生端刷新口径） -->
-      <EmptyState
-        v-if="evaluation.status === 'PENDING'"
-        description="AI 评价进行中，页面每 10 秒自动刷新（评价管道：解析 → qwen2.5:7b 评分 → 校验落库）"
-      />
+      <template v-else-if="evaluation">
+        <!-- PENDING：评价进行中（10s 轮询，LLD §4.3 步骤7 学生端刷新口径） -->
+        <EmptyState
+          v-if="evaluation.status === 'PENDING'"
+          description="AI 评价进行中，页面每 10 秒自动刷新（评价管道：解析 → qwen2.5:7b 评分 → 校验落库）"
+        />
 
-      <!-- FAILED：40003 重试耗尽（UC-24 教师人工评分旁路 E-06） -->
-      <ErrorState
-        v-else-if="evaluation.status === 'FAILED'"
-        title="AI 评价失败（40003）"
-        message="模型输出多次未通过格式校验，已登记留痕；教师可在复核工作台手动评分（UC-24 / E-06）。"
-        :retryable="false"
-      />
+        <!-- FAILED：40003 重试耗尽（UC-24 教师人工评分旁路 E-06） -->
+        <ErrorState
+          v-else-if="evaluation.status === 'FAILED'"
+          title="AI 评价失败（40003）"
+          message="模型输出多次未通过格式校验，已登记留痕；教师可在复核工作台手动评分（UC-24 / E-06）。"
+          :retryable="false"
+        />
 
-      <!-- AI_DONE / REVIEWED：报告主体 -->
-      <template v-else>
-        <section class="score-band">
-          <div class="total-block">
-            <ScoreDisplay :score="evaluation.totalScore" />
-            <span class="total-label">总分（100分制）</span>
+        <!-- AI_DONE / REVIEWED：报告主体 -->
+        <template v-else>
+          <section class="score-band">
+            <div class="total-block">
+              <ScoreDisplay :score="evaluation.totalScore" />
+              <span class="total-label">总分（100分制）</span>
+            </div>
+            <div class="radar-block">
+              <DimensionRadar :scores="metricRecord" :size="280" />
+              <span class="radar-label">维度雷达（指标均分 / 100）</span>
+            </div>
+          </section>
+
+          <section class="section">
+            <h3>AI 评语</h3>
+            <SuggestionList :comment="evaluation.aiComment" />
+          </section>
+
+          <el-descriptions :column="3" border class="meta">
+            <el-descriptions-item label="评价状态"
+              ><StatusTag :status="evaluation.status"
+            /></el-descriptions-item>
+            <el-descriptions-item label="生效版本">v{{ evaluation.currentVersionNo }}</el-descriptions-item>
+            <el-descriptions-item label="更新时间">{{
+              formatDateTime(evaluation.updateTime)
+            }}</el-descriptions-item>
+            <el-descriptions-item v-if="evaluation.traceId" label="TraceID（教师可见）" :span="3">
+              <span class="mono">{{ maskId(evaluation.traceId) }}</span>
+            </el-descriptions-item>
+          </el-descriptions>
+
+          <div class="foot-actions">
+            <ReportDownloadButton :submission-id="evaluation.submissionId" />
+            <span class="dim">复核流转：教师确认/改分走 UC-22（E-02），历史版本 UC-25（E-04/E-05）</span>
           </div>
-          <div class="radar-block">
-            <DimensionRadar :scores="metricRecord" :size="280" />
-            <span class="radar-label">维度雷达（指标均分 / 100）</span>
-          </div>
-        </section>
 
-        <section class="section">
-          <h3>AI 评语</h3>
-          <SuggestionList :comment="evaluation.aiComment" />
-        </section>
-
-        <el-descriptions :column="3" border class="meta">
-          <el-descriptions-item label="评价状态"
-            ><StatusTag :status="evaluation.status"
-          /></el-descriptions-item>
-          <el-descriptions-item label="生效版本">v{{ evaluation.currentVersionNo }}</el-descriptions-item>
-          <el-descriptions-item label="更新时间">{{
-            formatDateTime(evaluation.updateTime)
-          }}</el-descriptions-item>
-          <el-descriptions-item v-if="evaluation.traceId" label="TraceID（教师可见）" :span="3">
-            <span class="mono">{{ maskId(evaluation.traceId) }}</span>
-          </el-descriptions-item>
-        </el-descriptions>
-
-        <div class="foot-actions">
-          <ReportDownloadButton :submission-id="evaluation.submissionId" />
-          <span class="dim">复核流转：教师确认/改分走 UC-22（E-02），历史版本 UC-25（E-04/E-05）</span>
-        </div>
-
-        <!-- 历史版本链（E-04/E-05）：权限矩阵授予 evaluation:history:view 的角色可见 -->
-        <EvaluationHistoryPanel v-if="canViewHistory" :evaluation-id="Number(route.params.id)" />
+          <!-- 历史版本链（E-04/E-05）：权限矩阵授予 evaluation:history:view 的角色可见 -->
+          <EvaluationHistoryPanel v-if="canViewHistory" :evaluation-id="Number(route.params.id)" />
+        </template>
       </template>
-    </template>
+    </ScrollArea>
   </PageShell>
 </template>
 
@@ -80,6 +82,7 @@ import StatusTag from '@/components/ui/StatusTag.vue'
 import AppSkeleton from '@/components/ui/AppSkeleton.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import ScrollArea from '@/components/ui/ScrollArea.vue'
 import ReportDownloadButton from '@/components/business/ReportDownloadButton.vue'
 import EvaluationHistoryPanel from '@/components/business/EvaluationHistoryPanel.vue'
 

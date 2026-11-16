@@ -4,96 +4,100 @@
       <el-button @click="router.push('/tasks')">返回任务中心</el-button>
     </PageHeader>
 
-    <AppSkeleton v-if="loading" :rows="2" :row-height="70" />
-    <ErrorState v-else-if="error" :message="error" @retry="load" />
-    <template v-else>
-      <!-- 任务详情卡（TaskDetailCard 语义落位：S-05 真身渲染） -->
-      <section class="detail-card">
-        <div class="dc-head">
-          <b>{{ task.title }}</b>
-          <StatusTag :status="task.status" />
-        </div>
-        <p v-if="task.description" class="dc-desc">{{ task.description }}</p>
-        <div class="dc-row">
-          <span class="dc-label">截止</span>
-          <DeadlineBadge :deadline="task.deadline" :status="task.status" />
-        </div>
-        <div class="dc-row">
-          <span class="dc-label">指标集（AI 按 Σweight=100 评分）</span>
-          <div class="dc-metrics">
-            <span v-for="m in task.metrics" :key="m.id" class="metric-chip">
-              {{ m.metricName }} <b>{{ m.weight }}%</b>
-            </span>
+    <ScrollArea max-height="calc(100vh - 220px)" padded>
+      <AppSkeleton v-if="loading" :rows="2" :row-height="70" />
+      <ErrorState v-else-if="error" :message="error" @retry="load" />
+      <template v-else>
+        <!-- 任务详情卡（TaskDetailCard 语义落位：S-05 真身渲染） -->
+        <section class="detail-card">
+          <div class="dc-head">
+            <b>{{ task.title }}</b>
+            <StatusTag :status="task.status" />
           </div>
-        </div>
-      </section>
-
-      <el-alert
-        v-if="latestVersion > 0"
-        :title="`当前最新版本 v${latestVersion}：再次上传将生成 v${latestVersion + 1}（旧版本保留可追溯，UC-16 A1）`"
-        type="info"
-        show-icon
-        :closable="false"
-        class="ver-tip"
-      />
-
-      <!-- 上传区图形交互（upload 铁律：进度/速度/取消/失败重试） -->
-      <FileUploadZone
-        accept=".docx,.pdf"
-        idle-title="选择作业文件"
-        :uploading="uploading"
-        :failed="uploadFailed"
-        :file-name="file?.name ?? ''"
-        :percent="percent"
-        :sent-bytes="sentBytes"
-        :total-bytes="file?.size ?? 0"
-        :bytes-per-second="speed"
-        @pick="onPick"
-        @cancel="onCancel"
-        @retry-upload="onSubmit"
-      >
-      </FileUploadZone>
-
-      <div class="actions">
-        <ConfirmAction
-          title="提交作业"
-          message="提交后立即触发 AI 解析与评价（此动作产生新版本记录，不可撤回）。确认提交？"
-          confirm-text="确认提交"
-          @execute="onConfirmSubmit"
-        >
-          <template #default="{ trigger, loading }">
-            <el-button type="primary" :loading="loading" :disabled="!file || uploading" @click="trigger">
-              提交作业
-            </el-button>
-          </template>
-        </ConfirmAction>
-        <span v-if="!file" class="dim">请先选择文件（仅 .docx / .pdf，≤ 20MB）</span>
-      </div>
-
-      <!-- 分片上传演示区（upload×5 真实承载：S-06 链路可视化——产物 fileId 不入提交表，桥接端点待补，见发现项台账） -->
-      <el-collapse class="shard-demo">
-        <el-collapse-item
-          title="分片上传演示（S-06 upload×5 链路：init → chunk → corrupt → 重传 → complete）"
-        >
-          <div class="shard-actions">
-            <el-button size="small" @click="demoBatch" :loading="batching"
-              >U-04 小文件批量上传（batch）</el-button
-            >
-            <el-button size="small" @click="demoShard" :loading="sharding" :disabled="!file">
-              走分片链上传当前选中文件（init/chunk/complete）
-            </el-button>
-            <el-button v-if="shardId && sharded" size="small" type="warning" plain @click="demoCorrupt">
-              U-05 注入坏块（corrupt-chunk）
-            </el-button>
+          <p v-if="task.description" class="dc-desc">{{ task.description }}</p>
+          <div class="dc-row">
+            <span class="dc-label">截止</span>
+            <DeadlineBadge :deadline="task.deadline" :status="task.status" />
           </div>
-          <pre v-if="shardLog" class="shard-log">{{ shardLog }}</pre>
-          <p class="dim" style="margin-top: 8px">
-            说明：分片链真实上传至 MinIO（2MB/片、断点续传、MD5 坏块检测与定向重传闭环）。当前后端无
-            fileId→提交记录 桥接端点（发现项 F-08 已登记），产物仅为文件存储，不产生提交版本。
-          </p>
-        </el-collapse-item>
-      </el-collapse>
-    </template>
+          <div class="dc-row">
+            <span class="dc-label">指标集（AI 按 Σweight=100 评分）</span>
+            <div class="dc-metrics">
+              <span v-for="m in task.metrics" :key="m.id" class="metric-chip">
+                {{ m.metricName }} <b>{{ m.weight }}%</b>
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <el-alert
+          v-if="latestVersion > 0"
+          :title="`当前最新版本 v${latestVersion}：再次上传将生成 v${latestVersion + 1}（旧版本保留可追溯，UC-16 A1）`"
+          type="info"
+          show-icon
+          :closable="false"
+          class="ver-tip"
+        />
+
+        <!-- 上传区图形交互（upload 铁律：进度/速度/取消/失败重试） -->
+        <FileUploadZone
+          accept=".docx,.pdf"
+          idle-title="选择作业文件"
+          :uploading="uploading"
+          :failed="uploadFailed"
+          :file-name="file?.name ?? ''"
+          :percent="percent"
+          :sent-bytes="sentBytes"
+          :total-bytes="file?.size ?? 0"
+          :bytes-per-second="speed"
+          @pick="onPick"
+          @cancel="onCancel"
+          @retry-upload="onSubmit"
+        >
+        </FileUploadZone>
+
+        <div class="actions">
+          <ConfirmAction
+            title="提交作业"
+            message="提交后立即触发 AI 解析与评价（此动作产生新版本记录，不可撤回）。确认提交？"
+            confirm-text="确认提交"
+            @execute="onConfirmSubmit"
+          >
+            <template #default="{ trigger, loading }">
+              <el-button type="primary" :loading="loading" :disabled="!file || uploading" @click="trigger">
+                提交作业
+              </el-button>
+            </template>
+          </ConfirmAction>
+          <span v-if="!file" class="dim">请先选择文件（仅 .docx / .pdf，≤ 20MB）</span>
+        </div>
+
+        <!-- 分片上传演示区（upload×5 真实承载：S-06 链路可视化——产物 fileId 不入提交表，桥接端点待补，见发现项台账） -->
+        <el-collapse class="shard-demo">
+          <el-collapse-item
+            title="分片上传演示（S-06 upload×5 链路：init → chunk → corrupt → 重传 → complete）"
+          >
+            <div class="shard-actions">
+              <el-button size="small" @click="demoBatch" :loading="batching"
+                >U-04 小文件批量上传（batch）</el-button
+              >
+              <el-button size="small" @click="demoShard" :loading="sharding" :disabled="!file">
+                走分片链上传当前选中文件（init/chunk/complete）
+              </el-button>
+              <el-button v-if="shardId && sharded" size="small" type="warning" plain @click="demoCorrupt">
+                U-05 注入坏块（corrupt-chunk）
+              </el-button>
+            </div>
+            <ScrollArea v-if="shardLog" max-height="220px">
+              <pre class="shard-log">{{ shardLog }}</pre>
+            </ScrollArea>
+            <p class="dim" style="margin-top: 8px">
+              说明：分片链真实上传至 MinIO（2MB/片、断点续传、MD5 坏块检测与定向重传闭环）。当前后端无
+              fileId→提交记录 桥接端点（发现项 F-08 已登记），产物仅为文件存储，不产生提交版本。
+            </p>
+          </el-collapse-item>
+        </el-collapse>
+      </template>
+    </ScrollArea>
   </PageShell>
 </template>
 
@@ -111,6 +115,7 @@ import StatusTag from '@/components/ui/StatusTag.vue'
 import DeadlineBadge from '@/components/ui/DeadlineBadge.vue'
 import AppSkeleton from '@/components/ui/AppSkeleton.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'
+import ScrollArea from '@/components/ui/ScrollArea.vue'
 import ConfirmAction from '@/components/ui/ConfirmAction.vue'
 
 const route = useRoute()

@@ -115,6 +115,11 @@
   Prompt 版本表。
 - Element Plus 表格改为身体区 `.el-scrollbar__wrap` 内部纵向滚动（保留横向滚动与右侧固定列），
   表头常驻；原生表格（文件中心/Prompt/复核台）表头 `position: sticky`。
+- **学生端/教师端补齐**：提交作业、评价报告、复核工作台、任务管理整页内容包入页面级 ScrollArea
+  （页头固定、只有内容区滚动）；AI 评语统一由 `SuggestionList` 内滚（报告/复核台/版本快照共用）；
+  分片上传日志与任务指标编辑行各自限高内滚；任务卡列表、提交档案、我的评价、复核台列表沿用
+  已有内滚组件。
 - 验证口径：内层 `scrollTop` 变化时 `window.scrollY` 与 `document.scrollingElement.scrollTop`
-  恒为 0，`body.scrollHeight` 等于视口高度；审计长列表（16+ 行）实测通过。
+  恒为 0，`body.scrollHeight` 等于视口高度；审计长列表（16+ 行）、教师任务管理、复核台、
+  学生报告/提交页均实测通过。
 

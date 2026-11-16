@@ -1,20 +1,26 @@
 <template>
-  <!-- 评语结构化：AI 评语按条渲染（支持 1./一、/• 行拆分），无结构则整段 -->
+  <!-- 评语结构化：AI 评语按条渲染（支持 1./一、/• 行拆分），无结构则整段；
+       长评语在组件内滚动（WP8-C3），不把整页顶长 -->
   <div class="suggestion-list">
-    <div v-if="items.length" class="items">
-      <div v-for="(item, i) in items" :key="i" class="item">
-        <span class="idx">{{ i + 1 }}</span>
-        <span class="txt">{{ item }}</span>
+    <ScrollArea :max-height="maxHeight" padded>
+      <div v-if="items.length" class="items">
+        <div v-for="(item, i) in items" :key="i" class="item">
+          <span class="idx">{{ i + 1 }}</span>
+          <span class="txt">{{ item }}</span>
+        </div>
       </div>
-    </div>
-    <p v-else class="whole">{{ comment }}</p>
+      <p v-else class="whole">{{ comment }}</p>
+    </ScrollArea>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import ScrollArea from './ScrollArea.vue'
 
-const props = defineProps<{ comment: string | null | undefined }>()
+const props = withDefaults(defineProps<{ comment: string | null | undefined; maxHeight?: string }>(), {
+  maxHeight: '360px'
+})
 
 const items = computed(() => {
   const c = (props.comment ?? '').trim()
