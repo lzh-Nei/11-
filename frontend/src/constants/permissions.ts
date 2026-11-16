@@ -20,6 +20,7 @@ export const PERM_MAP: Record<string, string> = {
   'evaluation:re-evaluate': '触发重评',
   'evaluation:history:view': '查看评价历史',
   'report:view': '查看报表',
+  'report:view:student': '查看本人报表',
   'report:export': '导出报表',
   'report:refresh': '刷新报表缓存',
   'report:view:teacher': '教师聚合报表',
@@ -87,8 +88,13 @@ export const PERM_ROUTE: Record<string, PermEntry> = {
     hint: '版本链在复核工作台内查看（按评价进入）'
   },
   'report:view': { kind: 'action', act: 'dashboard', hint: '打开报表驾驶舱' },
+  'report:view:student': {
+    kind: 'route',
+    to: '/',
+    hint: '首页统计卡展示本人报表数据（提交/出分/待批阅）'
+  },
   'report:view:teacher': { kind: 'action', act: 'dashboard', hint: '打开教师聚合驾驶舱' },
-  'report:refresh': { kind: 'action', act: 'dashboard', hint: '刷新按钮在驾驶舱内' },
+  'report:refresh': { kind: 'action', act: 'dashboard', hint: '首页页头「刷新报表缓存」按钮' },
   'report:export': { kind: 'reserved', hint: '导出端点预留，M3 报表导出规划' },
   'class:manage': { kind: 'reserved', hint: '班级管理端点预留，M3 规划' },
   'role:manage': { kind: 'reserved', hint: '管理端预留，M3 规划' },

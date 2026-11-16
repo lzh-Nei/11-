@@ -115,81 +115,25 @@
         </section>
       </template>
 
-      <!-- 历史版本（E-04 分页 + E-05 单版本快照） -->
-      <section class="history">
-        <h3>评价历史（版本链可追溯）</h3>
-        <el-alert
-          v-if="historyDenied"
-          title="历史版本无权查看（E-04 归属校验：仅限本人任务的复核记录；该评价归属其他教师或数据造数教师不匹配）"
-          type="info"
-          show-icon
-          :closable="false"
-        />
-        <el-table v-else-if="history.length" :data="history" stripe size="small">
-          <el-table-column prop="versionNo" label="版本" width="70">
-            <template #default="{ row }"
-              ><span class="mono">v{{ row.versionNo }}</span></template
-            >
-          </el-table-column>
-          <el-table-column prop="source" label="来源" width="110" />
-          <el-table-column label="总分" width="90">
-            <template #default="{ row }">
-              <span class="mono">{{ row.totalScore ?? '—' }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column prop="changeReason" label="变更原因" min-width="180" show-overflow-tooltip />
-          <el-table-column label="操作人" width="110">
-            <template #default="{ row }">{{ row.operatorName ?? '系统' }}</template>
-          </el-table-column>
-          <el-table-column label="时间" width="160">
-            <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
-          </el-table-column>
-          <el-table-column label="快照" width="90">
-            <template #default="{ row }">
-              <el-button size="small" text type="primary" @click="openVersion(row.versionNo)">查看</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-        <EmptyState v-else description="暂无历史版本" />
-        <div v-if="nextCursor" style="margin-top: 10px">
-          <el-button size="small" plain @click="loadHistory(nextCursor)">加载更早版本</el-button>
-        </div>
-      </section>
+      <!-- 历史版本（E-04 分页 + E-05 单版本快照）：共用组件，独立容错 -->
+      <EvaluationHistoryPanel ref="historyPanel" :evaluation-id="id" />
     </template>
   </PageShell>
-
-  <!-- E-05 版本快照抽屉 -->
-  <el-drawer
-    v-model="versionDrawer"
-    :title="`版本快照 v${viewing?.currentVersionNo ?? ''}（E-05）`"
-    size="40%"
-  >
-    <el-descriptions v-if="viewing" :column="2" border>
-      <el-descriptions-item label="状态"><StatusTag :status="viewing.status" /></el-descriptions-item>
-      <el-descriptions-item label="总分"
-        ><span class="mono">{{ viewing.totalScore ?? '—' }}</span></el-descriptions-item
-      >
-    </el-descriptions>
-    <DimensionRadar v-if="viewing?.metricScores" :scores="viewMetric" :size="220" style="margin-top: 14px" />
-    <SuggestionList v-if="viewing?.aiComment" :comment="viewing.aiComment" style="margin-top: 14px" />
-  </el-drawer>
 </template>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { evaluationApi, type EvaluationVO, type EvaluationHistoryItem } from '@/api/evaluation'
+import { evaluationApi, type EvaluationVO } from '@/api/evaluation'
 import { formatDateTime, maskId } from '@/utils/format'
 import { toast } from '@/utils/toast'
 import PageShell from '@/components/ui/PageShell.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import ScoreDisplay from '@/components/ui/ScoreDisplay.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
-import DimensionRadar from '@/components/ui/DimensionRadar.vue'
-import SuggestionList from '@/components/ui/SuggestionList.vue'
-import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'
 import ConfirmAction from '@/components/ui/ConfirmAction.vue'
+import EvaluationHistoryPanel from '@/components/business/EvaluationHistoryPanel.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -198,11 +142,7 @@ const id = Number(route.params.id)
 const loading = ref(false)
 const error = ref<string | null>(null)
 const evaluation = ref<EvaluationVO | null>(null)
-const history = ref<EvaluationHistoryItem[]>([])
-const nextCursor = ref<string | null>(null)
-const historyDenied = ref(false)
-const versionDrawer = ref(false)
-const viewing = ref<EvaluationVO | null>(null)
+const historyPanel = ref<{ reload: () => Promise<void> } | null>(null)
 let timer: number | undefined
 
 /* 复核表单：初始值镜像 AI 当前判（教师在此基础上改） */
@@ -221,13 +161,6 @@ const canSubmit = computed(() => form.totalScore != null && (form.reviewComment?
 
 const metricRecord = computed<Record<string, number>>(() => {
   const src = evaluation.value?.metricScores ?? {}
-  const out: Record<string, number> = {}
-  for (const [k, v] of Object.entries(src)) out[k] = Number(v) || 0
-  return out
-})
-
-const viewMetric = computed<Record<string, number>>(() => {
-  const src = viewing.value?.metricScores ?? {}
   const out: Record<string, number> = {}
   for (const [k, v] of Object.entries(src)) out[k] = Number(v) || 0
   return out
@@ -254,26 +187,11 @@ async function load() {
       window.clearInterval(timer)
       timer = undefined
     }
-    // 历史区独立容错：E-04 教师归属校验（限本人任务）不通过时降级提示，主面板照常
-    historyDenied.value = false
-    try {
-      await loadHistory()
-    } catch {
-      historyDenied.value = true
-      history.value = []
-      nextCursor.value = null
-    }
   } catch (e) {
     error.value = (e as { message?: string })?.message || '网络或服务暂时不可用，请稍后重试'
   } finally {
     loading.value = false
   }
-}
-
-async function loadHistory(cursor?: string) {
-  const page = await evaluationApi.history(id, cursor, 20)
-  history.value = cursor ? [...history.value, ...page.items] : page.items
-  nextCursor.value = page.nextCursor
 }
 
 /** E-02 复核 / E-06 手动评分（ConfirmAction 闭环 → 表缓存主动失效 D-36） */
@@ -291,7 +209,7 @@ async function onSubmitReview(done: () => void) {
     evaluation.value = vo
     mirrorForm()
     toast.success(`已提交：生效 v${vo.currentVersionNo}，报表缓存已主动失效`)
-    await loadHistory()
+    await historyPanel.value?.reload()
   } catch (e) {
     toast.error((e as { message?: string })?.message || '提交失败', '请检查意见长度与分数范围')
   } finally {
@@ -309,16 +227,6 @@ async function onReEvaluate(done: () => void) {
     toast.error((e as { message?: string })?.message || '重评触发失败', '请重试')
   } finally {
     done()
-  }
-}
-
-/** E-05 单版本快照 */
-async function openVersion(versionNo: number) {
-  try {
-    viewing.value = await evaluationApi.historyVersion(id, versionNo)
-    versionDrawer.value = true
-  } catch (e) {
-    toast.error((e as { message?: string })?.message || '快照加载失败')
   }
 }
 
@@ -373,19 +281,6 @@ onBeforeUnmount(() => {
   padding: var(--aies-gap-lg);
 }
 .panel h3 {
-  margin: 0 0 12px;
-  font-size: 15px;
-  color: var(--aies-ink);
-}
-.history {
-  margin-top: var(--aies-gap-lg);
-  background: var(--aies-surface);
-  border: 1px solid var(--aies-border);
-  border-radius: var(--aies-radius-lg);
-  box-shadow: var(--aies-shadow);
-  padding: var(--aies-gap-lg);
-}
-.history h3 {
   margin: 0 0 12px;
   font-size: 15px;
   color: var(--aies-ink);

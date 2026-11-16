@@ -1,4 +1,5 @@
-/** 触发浏览器保存 Blob（临时对象 URL + a[download]，用完即回收） */
+/** 触发浏览器保存 Blob（临时对象 URL + a[download]）。
+    回收必须延后：部分浏览器在 click 同步返回后仍需读取 URL，立即 revoke 会取消下载。 */
 export function saveBlob(blob: Blob, fileName: string): void {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -7,5 +8,5 @@ export function saveBlob(blob: Blob, fileName: string): void {
   document.body.appendChild(a)
   a.click()
   a.remove()
-  URL.revokeObjectURL(url)
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000)
 }

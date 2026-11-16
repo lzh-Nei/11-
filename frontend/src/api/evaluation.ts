@@ -15,18 +15,26 @@ export interface EvaluationVO {
 }
 
 /** E-04 历史版本行（UC-25：倒序游标分页） */
+/** E-04 历史版本行 / E-05 版本快照（EvaluationHistoryVO 真身：
+    list 场景只填 versionNo/source/totalScore/reviewerName/createTime，
+    E-05 额外填 metricScores/aiComment/teacherComment/traceId） */
 export interface EvaluationHistoryItem {
   versionNo: number
   source: string
   totalScore: number | null
-  changeReason: string | null
-  operatorName: string | null
-  createdAt: string
+  reviewerName: string | null
+  createTime: string
+  metricScores?: Record<string, number> | null
+  aiComment?: string | null
+  teacherComment?: string | null
+  traceId?: string | null
 }
 
+/** E-04 游标分页（EvaluationHistoryPageVO 真身：list/nextCursor/hasMore） */
 export interface EvaluationHistoryPage {
-  items: EvaluationHistoryItem[]
+  list: EvaluationHistoryItem[]
   nextCursor: string | null
+  hasMore: boolean
 }
 
 /** E-02/E-06 复核/手动评分载荷（ReviewEvaluationRequest 真身：totalScore 必填） */
@@ -57,8 +65,8 @@ export const evaluationApi = {
     return (await request.get(`/evaluations/${id}/history`, { params })) as unknown as EvaluationHistoryPage
   },
   /** E-05 单版本完整快照（UC-25） */
-  async historyVersion(id: number, versionNo: number): Promise<EvaluationVO> {
-    return (await request.get(`/evaluations/${id}/history/${versionNo}`)) as unknown as EvaluationVO
+  async historyVersion(id: number, versionNo: number): Promise<EvaluationHistoryItem> {
+    return (await request.get(`/evaluations/${id}/history/${versionNo}`)) as unknown as EvaluationHistoryItem
   },
   /** E-06 手动评分旁路（UC-24：FAILED 直接打分，复用复核链） */
   async manualScore(id: number, payload: ReviewPayload): Promise<EvaluationVO> {

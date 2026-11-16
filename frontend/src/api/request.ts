@@ -29,6 +29,10 @@ request.interceptors.response.use(
       return resp
     }
     const body = resp.data as ApiBody
+    // 非 Result 包络（FileController / DownloadController info 等裸 DTO）：原样放行
+    if (!body || typeof body !== 'object' || typeof (body as { code?: unknown }).code !== 'number') {
+      return body as never
+    }
     if (body.code === 0) {
       return body.data as never
     }

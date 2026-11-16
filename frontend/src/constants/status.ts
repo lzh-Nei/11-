@@ -25,7 +25,11 @@ export const STATUS_MAP: Record<string, StatusMeta> = {
   GENERATING: { label: '解析中', tone: 'warn' },
   SUCCESS: { label: '成功', tone: 'ok' },
   /* 补写（V6：PENDING/DONE） */
-  DONE: { label: '完成', tone: 'ok' }
+  DONE: { label: '完成', tone: 'ok' },
+  /* 评价历史来源（EvaluationHistory.source：AI_INITIAL/TEACHER_REVIEW/RE_EVALUATE） */
+  AI_INITIAL: { label: 'AI 初评', tone: 'teal' },
+  TEACHER_REVIEW: { label: '教师复核', tone: 'ok' },
+  RE_EVALUATE: { label: '重评', tone: 'warn' }
 }
 
 /** 未知枚举兜底：原值展示 + muted 灰（不臆造中文翻译） */

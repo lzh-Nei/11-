@@ -57,6 +57,9 @@
           <ReportDownloadButton :submission-id="evaluation.submissionId" />
           <span class="dim">复核流转：教师确认/改分走 UC-22（E-02），历史版本 UC-25（E-04/E-05）</span>
         </div>
+
+        <!-- 历史版本链（E-04/E-05）：权限矩阵授予 evaluation:history:view 的角色可见 -->
+        <EvaluationHistoryPanel v-if="canViewHistory" :evaluation-id="Number(route.params.id)" />
       </template>
     </template>
   </PageShell>
@@ -67,6 +70,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { evaluationApi, type EvaluationVO } from '@/api/evaluation'
 import { formatDateTime, maskId } from '@/utils/format'
+import { useAuthStore } from '@/stores/auth'
 import PageShell from '@/components/ui/PageShell.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import ScoreDisplay from '@/components/ui/ScoreDisplay.vue'
@@ -77,13 +81,18 @@ import AppSkeleton from '@/components/ui/AppSkeleton.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ReportDownloadButton from '@/components/business/ReportDownloadButton.vue'
+import EvaluationHistoryPanel from '@/components/business/EvaluationHistoryPanel.vue'
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 const loading = ref(false)
 const error = ref<string | null>(null)
 const evaluation = ref<EvaluationVO | null>(null)
 let timer: number | undefined
+
+/* 历史版本区按权限矩阵显隐（学生角色未授予 evaluation:history:view，见 D-36） */
+const canViewHistory = computed(() => (auth.me?.permissions ?? []).includes('evaluation:history:view'))
 
 /* 指标分字典 → 雷达（空值过滤为 0 保持形状） */
 const metricRecord = computed<Record<string, number>>(() => {

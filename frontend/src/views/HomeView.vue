@@ -26,6 +26,9 @@
         <a v-if="isTeacher" href="/report.html" target="_blank" rel="noopener">
           <el-button type="primary">报表驾驶舱</el-button>
         </a>
+        <el-button v-if="canRefreshReport" plain :loading="refreshing" @click="refreshReport">
+          刷新报表缓存
+        </el-button>
         <template v-if="isTeacher">
           <el-button @click="router.push('/tasks/manage')">任务管理</el-button>
         </template>
@@ -33,6 +36,7 @@
           <el-button type="primary" @click="router.push('/tasks')">我的任务</el-button>
           <el-button @click="router.push('/submissions')">提交记录</el-button>
         </template>
+        <el-button @click="router.push('/files')">文件中心</el-button>
       </PageHeader>
 
       <!-- 四态齐全：骨架 → 错误重试 → 空 → 数据（统计卡行接真接口 overview） -->
@@ -125,8 +129,11 @@ const auth = useAuthStore()
 const loading = ref(false)
 const loadError = ref<string | null>(null)
 const overview = ref<ReportOverview | null>(null)
+const refreshing = ref(false)
 
 const isTeacher = computed(() => auth.role === 'TEACHER' || auth.role === 'ADMIN')
+/* 刷新权限只发给教师（report:refresh）；学生看不到按钮，服务端仍会兜底 40301 */
+const canRefreshReport = computed(() => (auth.me?.permissions ?? []).includes('report:refresh'))
 const roleTagType = computed(() => {
   if (auth.role === 'ADMIN') return 'danger'
   if (auth.role === 'TEACHER') return 'warning'
@@ -172,6 +179,20 @@ async function loadOverview() {
 }
 
 function noop() {}
+
+/** UC-30 报表缓存重建（report:refresh）：重建后立即重载统计卡，避免 10min 陈旧窗口 */
+async function refreshReport() {
+  refreshing.value = true
+  try {
+    await reportApi.refresh()
+    await loadOverview()
+    toast.success('报表缓存已重建，统计数据已刷新')
+  } catch (e) {
+    toast.error((e as { message?: string })?.message || '缓存重建失败', '请稍后重试')
+  } finally {
+    refreshing.value = false
+  }
+}
 
 /* 权限即导航（WP8-B4）：route 直达 / action 执行 / reserved 如实告知预留状态 */
 function permTooltip(code: string): string {
