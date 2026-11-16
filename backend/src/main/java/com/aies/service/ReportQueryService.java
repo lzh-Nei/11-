@@ -11,7 +11,6 @@ import com.aies.mapper.SubmissionMapper;
 import com.aies.mapper.TaskMapper;
 import com.aies.model.ReportOverviewDTO;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -178,11 +177,11 @@ public class ReportQueryService {
                 .filter(r -> SCORED_STATUS.contains(r.getStatus()) && r.getTotalScore() != null)
                 .map(EvaluationResult::getTotalScore).toList();
         List<ReportOverviewDTO.RangeCount> scoreDist = List.of(
-                new ReportOverviewDTO.RangeCount("0-59", scores.stream().filter(s -> s.compareTo(BD(60)) < 0).count()),
-                new ReportOverviewDTO.RangeCount("60-69", scores.stream().filter(s -> s.compareTo(BD(60)) >= 0 && s.compareTo(BD(70)) < 0).count()),
-                new ReportOverviewDTO.RangeCount("70-79", scores.stream().filter(s -> s.compareTo(BD(70)) >= 0 && s.compareTo(BD(80)) < 0).count()),
-                new ReportOverviewDTO.RangeCount("80-89", scores.stream().filter(s -> s.compareTo(BD(80)) >= 0 && s.compareTo(BD(90)) < 0).count()),
-                new ReportOverviewDTO.RangeCount("90-100", scores.stream().filter(s -> s.compareTo(BD(90)) >= 0).count()));
+                new ReportOverviewDTO.RangeCount("0-59", scores.stream().filter(s -> s.compareTo(bd(60)) < 0).count()),
+                new ReportOverviewDTO.RangeCount("60-69", scores.stream().filter(s -> s.compareTo(bd(60)) >= 0 && s.compareTo(bd(70)) < 0).count()),
+                new ReportOverviewDTO.RangeCount("70-79", scores.stream().filter(s -> s.compareTo(bd(70)) >= 0 && s.compareTo(bd(80)) < 0).count()),
+                new ReportOverviewDTO.RangeCount("80-89", scores.stream().filter(s -> s.compareTo(bd(80)) >= 0 && s.compareTo(bd(90)) < 0).count()),
+                new ReportOverviewDTO.RangeCount("90-100", scores.stream().filter(s -> s.compareTo(bd(90)) >= 0).count()));
 
         // 图3 指标雷达（metric_scores JSON 逐键均分；解析失败行跳过并留痕——聚合容错不阻塞报表）
         Map<String, List<BigDecimal>> metricAgg = new LinkedHashMap<>();
@@ -233,14 +232,14 @@ public class ReportQueryService {
             }
         }
         return List.of(
-                new ReportOverviewDTO.RangeCount("≤5", gaps.stream().filter(g -> g.compareTo(BD(5)) <= 0).count()),
-                new ReportOverviewDTO.RangeCount("6-10", gaps.stream().filter(g -> g.compareTo(BD(5)) > 0 && g.compareTo(BD(10)) <= 0).count()),
-                new ReportOverviewDTO.RangeCount("11-20", gaps.stream().filter(g -> g.compareTo(BD(10)) > 0 && g.compareTo(BD(20)) <= 0).count()),
-                new ReportOverviewDTO.RangeCount(">20", gaps.stream().filter(g -> g.compareTo(BD(20)) > 0).count()),
+                new ReportOverviewDTO.RangeCount("≤5", gaps.stream().filter(g -> g.compareTo(bd(5)) <= 0).count()),
+                new ReportOverviewDTO.RangeCount("6-10", gaps.stream().filter(g -> g.compareTo(bd(5)) > 0 && g.compareTo(bd(10)) <= 0).count()),
+                new ReportOverviewDTO.RangeCount("11-20", gaps.stream().filter(g -> g.compareTo(bd(10)) > 0 && g.compareTo(bd(20)) <= 0).count()),
+                new ReportOverviewDTO.RangeCount(">20", gaps.stream().filter(g -> g.compareTo(bd(20)) > 0).count()),
                 new ReportOverviewDTO.RangeCount("无复核", Math.max(subIds.size() - gaps.size(), 0)));
     }
 
-    private static BigDecimal BD(int v) {
+    private static BigDecimal bd(int v) {
         return BigDecimal.valueOf(v);
     }
 
