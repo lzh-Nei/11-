@@ -54,6 +54,12 @@ const router = createRouter({
           redirect: '/modules?group=study&child=submissions',
           meta: { roles: ['STUDENT'] }
         },
+        {
+          // 旧版报表驾驶舱书签兼容：功能已并入教学/学习分析模块
+          path: 'report.html',
+          name: 'legacy-report',
+          redirect: '/modules?group=analysis&child=report'
+        },
         { path: 'evaluations/:id', name: 'evaluation-report', component: EvaluationReport },
         {
           path: 'review',

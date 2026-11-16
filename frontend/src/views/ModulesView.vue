@@ -66,6 +66,7 @@ import PageHeader from '@/components/ui/PageHeader.vue'
 import ScrollArea from '@/components/ui/ScrollArea.vue'
 import NavIcon from '@/components/ui/NavIcon.vue'
 import PermissionCatalog from '@/components/business/PermissionCatalog.vue'
+import ReportDashboard from '@/components/business/ReportDashboard.vue'
 import DashboardView from '@/views/DashboardView.vue'
 import StudentTasks from '@/views/StudentTasks.vue'
 import StudentSubmissions from '@/views/StudentSubmissions.vue'
@@ -141,6 +142,13 @@ const studentGroups: ModuleGroup[] = [
         icon: 'dashboard',
         component: DashboardView,
         props: { embedded: true }
+      },
+      {
+        key: 'report',
+        label: '报表驾驶舱',
+        icon: 'chart',
+        component: ReportDashboard,
+        props: { embedded: true }
       }
     ]
   },
@@ -178,7 +186,13 @@ const teacherGroups: ModuleGroup[] = [
         component: DashboardView,
         props: { embedded: true }
       },
-      { key: 'report', label: '报表驾驶舱', icon: 'chart', external: '/report.html' }
+      {
+        key: 'report',
+        label: '报表驾驶舱',
+        icon: 'chart',
+        component: ReportDashboard,
+        props: { embedded: true }
+      }
     ]
   },
   { key: 'access', label: '账号与权限', icon: 'lock', children: [permCatalog] }

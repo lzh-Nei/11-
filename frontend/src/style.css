@@ -5,7 +5,7 @@
    （与 teal 角色重复，色彩数量克制）、卡片 hover 光晕（dashboard 无卡片交互语义）。
    原 Vite 脚手架遗产段（.hero/#app 1126px/#next-steps/.ticks 等）零业务引用，已移除收敛。 */
 :root {
-  /* AIES 品牌 token（与 frontend/public/report.html v4 :root 同源） */
+  /* AIES 品牌 token（暖纸底/白卡/品牌琥珀） */
   --aies-paper: #f7f6f3;
   --aies-surface: #fff;
   --aies-border: #e7e4de;

@@ -10,7 +10,9 @@
         <el-button v-if="canRefreshReport" plain :loading="refreshing" @click="refreshReport">
           刷新报表缓存
         </el-button>
-        <el-button type="primary" @click="openWindow('/report.html')">报表驾驶舱</el-button>
+        <el-button type="primary" @click="router.push('/modules?group=analysis&child=report')">
+          报表驾驶舱
+        </el-button>
       </template>
       <el-button v-if="isAdmin" @click="router.push('/modules')">功能模块</el-button>
     </PageHeader>
@@ -122,7 +124,7 @@
         <button v-for="c in cards" :key="c.title" type="button" class="quick-card" @click="openCard(c)">
           <span class="quick-icon"><NavIcon :name="c.icon" /></span>
           <span class="quick-text">
-            <b>{{ c.title }}<i v-if="c.newWindow">↗</i></b>
+            <b>{{ c.title }}</b>
             <small>{{ c.desc }}</small>
           </span>
           <span class="quick-arrow">→</span>
@@ -155,14 +157,12 @@ import ChartPanel from '@/components/ui/ChartPanel.vue'
 import DimensionRadar from '@/components/ui/DimensionRadar.vue'
 import { reportApi, type ReportOverview } from '@/api/report'
 import { toast } from '@/utils/toast'
-import { openWindow } from '@/utils/window'
 
 interface QuickCard {
   title: string
   desc: string
   icon: string
   to: string
-  newWindow?: boolean
 }
 
 withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
@@ -190,7 +190,7 @@ const headerSubtitle = computed(() => {
 })
 const canRefreshReport = computed(() => (auth.me?.permissions ?? []).includes('report:refresh'))
 
-/* 统计卡派生（fromTasks 同 report.html v3 口径：真实 ReportOverviewDTO 无顶层标量） */
+/* 统计卡派生（ReportOverviewDTO 无顶层标量，由 tasks 数组聚合） */
 const stats = computed(() => {
   const tasks = overview.value?.tasks
   if (!Array.isArray(tasks)) return []
@@ -254,10 +254,9 @@ const cards = computed<QuickCard[]>(() => {
   if (isTeacherData.value) {
     list.push({
       title: '报表驾驶舱',
-      desc: '查看教学统计、导出报表（新窗口）',
+      desc: '查看教学统计、四类图表与任务表现',
       icon: 'chart',
-      to: '/report.html',
-      newWindow: true
+      to: '/modules?group=analysis&child=report'
     })
   }
   list.push({ title: '文件中心', desc: '查看已上传文件并下载', icon: 'files', to: '/files' })
@@ -301,10 +300,6 @@ async function refreshReport() {
 }
 
 function openCard(c: QuickCard) {
-  if (c.newWindow) {
-    openWindow(c.to)
-    return
-  }
   router.push(c.to)
 }
 

@@ -43,7 +43,6 @@ import { useAuthStore } from '@/stores/auth'
 import ScrollArea from '@/components/ui/ScrollArea.vue'
 import { permLabel, nsLabel, permEntry } from '@/constants/permissions'
 import { toast } from '@/utils/toast'
-import { openWindow } from '@/utils/window'
 
 withDefaults(defineProps<{ maxHeight?: string }>(), { maxHeight: '360px' })
 
@@ -161,7 +160,7 @@ function onPermClick(code: string) {
   }
   if (code.startsWith('report:')) {
     if (isStudent) {
-      router.push(analysisModule('overview'))
+      router.push(analysisModule('report'))
       return
     }
     if (isAdmin) {
@@ -183,9 +182,6 @@ function onPermClick(code: string) {
       break
     case 'profile':
       router.push('/account')
-      break
-    case 'dashboard':
-      openWindow('/report.html')
       break
   }
 }

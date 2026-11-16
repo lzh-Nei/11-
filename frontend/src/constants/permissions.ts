@@ -62,7 +62,7 @@ export function nsLabel(ns: string): string {
    kind: route=直达路由 / action=执行动作 / reserved=预留权限（端点未开放，如实告知） */
 export type PermEntry =
   | { kind: 'route'; to: string; hint: string }
-  | { kind: 'action'; act: 'logout' | 'profile' | 'dashboard'; hint: string }
+  | { kind: 'action'; act: 'logout' | 'profile'; hint: string }
   | { kind: 'reserved'; hint: string }
 
 export const PERM_ROUTE: Record<string, PermEntry> = {
@@ -92,14 +92,26 @@ export const PERM_ROUTE: Record<string, PermEntry> = {
     to: '/review',
     hint: '版本链在评价复核工作台内查看'
   },
-  'report:view': { kind: 'action', act: 'dashboard', hint: '打开报表驾驶舱（新窗口）' },
+  'report:view': {
+    kind: 'route',
+    to: '/modules?group=analysis&child=report',
+    hint: '进入功能模块 → 报表驾驶舱'
+  },
   'report:view:student': {
     kind: 'route',
-    to: '/',
-    hint: '工作台统计卡展示本人报表数据（提交/出分/待批阅）'
+    to: '/modules?group=analysis&child=report',
+    hint: '进入功能模块 → 学习分析 → 报表驾驶舱'
   },
-  'report:view:teacher': { kind: 'action', act: 'dashboard', hint: '打开教师聚合驾驶舱（新窗口）' },
-  'report:refresh': { kind: 'action', act: 'dashboard', hint: '工作台页头「刷新报表缓存」按钮' },
+  'report:view:teacher': {
+    kind: 'route',
+    to: '/modules?group=analysis&child=report',
+    hint: '进入功能模块 → 教学分析 → 报表驾驶舱'
+  },
+  'report:refresh': {
+    kind: 'route',
+    to: '/modules?group=analysis&child=report',
+    hint: '报表驾驶舱内刷新数据'
+  },
   'report:export': { kind: 'reserved', hint: '报表导出暂未开放' },
   'user:manage': { kind: 'route', to: '/modules?group=access&child=users', hint: '进入功能模块 → 用户管理' },
   'role:manage': { kind: 'route', to: '/modules?group=access&child=roles', hint: '进入功能模块 → 角色权限' },

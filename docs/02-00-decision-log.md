@@ -275,3 +275,10 @@
 - **修改密码**：`PageShell` 增加 `flush` 模式，修改密码页左右 margin 归零（实测 0px），保留内容宽度。
 - **报表页清理**：公开报表页移除“API 控制台/身份与权限/TOKEN/原始响应”等开发入口与文案；学生进入时自动切换个人 scope 并隐藏教师聚合按钮，403 自动回退个人报表。
 - 验证：后端全量 300 测试、checkstyle、spotbugs 全绿并部署；前端 `vue-tsc + vite build` 通过。三角色实测：教师任务卡/过滤器、文件中心上传者与最近上传、管理员移除文件、学生提交档案评价弹窗、学生/教师分析图表、学生文件中心 403、修改密码 margin=0、报表页学生个人数据。
+
+## 过程注记（C12 报表驾驶舱旧静态页拆分与删除，2026-11-17）
+
+- **功能拆分**：`frontend/public/report.html` 中的报表能力拆为 `ReportDashboard.vue`：KPI 四卡、任务提交统计、成绩分布、指标雷达、分差分布、任务明细表、缓存刷新（`report:refresh` 角色可见）。教师调用 `/reports/overview`，学生调用 `/reports/overview/me`，不再需要页面内教师/学生 scope 切换。
+- **模块嵌入**：教师 `教学分析 → 报表驾驶舱`、学生 `学习分析 → 报表驾驶舱` 均直接嵌入该组件；移除原“外部新窗口”二级/三级入口。Dashboard 页头与导览卡、权限清单的报表权限点全部改为深链 `?group=analysis&child=report`。
+- **旧页废弃**：不迁移报表页中的登录/TOKEN、API 控制台、身份权限、原始响应等开发功能；删除 `frontend/public/report.html` 源文件与构建产物。旧书签 `/report.html` 通过 Vue Router 重定向到新模块，避免 404。
+- 验证：教师端 4 KPI + 四图 + 任务明细正常，刷新按钮可见；学生端自动使用个人报表，四图与任务明细正常，不显示教师 scope 与刷新按钮；`/report.html` 实测重定向到 `/modules?group=analysis&child=report`；前端构建通过。
