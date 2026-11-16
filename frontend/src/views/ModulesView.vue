@@ -20,6 +20,9 @@
           <NavIcon :name="g.icon" />
           <span>{{ g.label }}</span>
         </button>
+        <div class="l2-user">
+          <UserBadge />
+        </div>
       </nav>
 
       <div class="browser-body" :class="{ 'no-l3': !hasChildren }">
@@ -57,6 +60,7 @@ import PageShell from '@/components/ui/PageShell.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import ScrollArea from '@/components/ui/ScrollArea.vue'
 import NavIcon from '@/components/ui/NavIcon.vue'
+import UserBadge from '@/components/layout/UserBadge.vue'
 import PermissionCatalog from '@/components/business/PermissionCatalog.vue'
 import ReportDashboard from '@/components/business/ReportDashboard.vue'
 import DashboardView from '@/views/DashboardView.vue'
@@ -363,6 +367,14 @@ function selectChild(child: ModuleChild) {
   color: var(--aies-brand);
   border-bottom-color: var(--aies-brand);
   font-weight: 600;
+}
+.l2-user {
+  margin-left: auto;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  flex: none;
+  padding: 0 6px 6px 14px;
 }
 .browser-body {
   margin: 0;

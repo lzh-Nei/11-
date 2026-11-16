@@ -28,20 +28,12 @@
           </router-link>
         </div>
       </nav>
-
-      <div class="side-foot">
-        <div class="me">
-          <div class="avatar">{{ initial }}</div>
-          <div class="me-meta">
-            <b>{{ auth.me?.realName || auth.me?.username }}</b>
-            <span>{{ roleLabel }} · {{ auth.me?.username }}</span>
-          </div>
-        </div>
-        <button type="button" class="logout" title="退出登录" @click="onLogout">退出</button>
-      </div>
     </aside>
 
     <main class="content">
+      <div v-if="!isModulesPage" class="content-topbar">
+        <UserBadge />
+      </div>
       <router-view />
     </main>
   </div>
@@ -49,9 +41,10 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import NavIcon from '@/components/ui/NavIcon.vue'
+import UserBadge from '@/components/layout/UserBadge.vue'
 
 interface ModuleItem {
   key: string
@@ -67,15 +60,8 @@ interface ModuleGroup {
 }
 
 const route = useRoute()
-const router = useRouter()
 const auth = useAuthStore()
-
-const roleLabel = computed(() => {
-  if (auth.role === 'ADMIN') return '管理员'
-  if (auth.role === 'TEACHER') return '教师'
-  return '学生'
-})
-const initial = computed(() => (auth.me?.realName || auth.me?.username || 'U').slice(0, 1))
+const isModulesPage = computed(() => route.path === '/modules')
 
 /** 左侧模块栏：功能模块 + 文件中心（仅管理员）+ 个人中心 */
 const groups = computed<ModuleGroup[]>(() => {
@@ -117,11 +103,6 @@ const groups = computed<ModuleGroup[]>(() => {
 
 function isActive(item: ModuleItem): boolean {
   return item.match(route.path)
-}
-
-async function onLogout() {
-  await auth.logout()
-  router.push('/login')
 }
 </script>
 
@@ -241,65 +222,10 @@ async function onLogout() {
   font-size: 11px;
   color: var(--aies-ink3);
 }
-.side-foot {
-  border-top: 1px solid var(--aies-border);
-  padding: 12px 14px;
+.content-topbar {
   display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.me {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-.avatar {
-  width: 30px;
-  height: 30px;
-  flex: none;
-  border-radius: 50%;
-  background: var(--aies-brand-soft, #f7ede6);
-  color: var(--aies-brand);
-  display: grid;
-  place-items: center;
-  font-size: 13px;
-  font-weight: 700;
-}
-.me-meta {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  line-height: 1.3;
-}
-.me-meta b {
-  font-size: 12.5px;
-  color: var(--aies-ink);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.me-meta span {
-  font-size: 11px;
-  color: var(--aies-ink3);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.logout {
-  border: 1px solid var(--aies-border);
-  background: transparent;
-  color: var(--aies-ink3);
-  border-radius: 6px;
-  font-size: 11.5px;
-  padding: 4px 8px;
-  cursor: pointer;
-  font-family: inherit;
-}
-.logout:hover {
-  border-color: var(--aies-brand);
-  color: var(--aies-brand);
+  justify-content: flex-end;
+  padding: 10px 18px 0;
 }
 .content {
   flex: 1;
@@ -319,8 +245,7 @@ async function onLogout() {
   .brand-text,
   .group-label,
   .nav-text,
-  .nav-ext,
-  .me-meta {
+  .nav-ext {
     display: none;
   }
   .nav {
@@ -330,15 +255,8 @@ async function onLogout() {
     justify-content: center;
     padding: 10px 0;
   }
-  .side-foot {
-    flex-direction: column;
-    padding: 10px 6px;
-  }
-  .me {
-    justify-content: center;
-  }
-  .logout {
-    width: 100%;
+  .content-topbar {
+    padding: 8px 10px 0;
   }
 }
 </style>
