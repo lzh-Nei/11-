@@ -37,6 +37,11 @@ public final class PermissionConstants {
     public static final String EVALUATION_RE_EVALUATE = "evaluation:re-evaluate";
     public static final String EVALUATION_HISTORY_VIEW = "evaluation:history:view";
 
+    /** 报表域（UC-25，V14 种子；管理员全局聚合=M3+ 候选留痕） */
+    public static final String REPORT_VIEW_TEACHER = "report:view:teacher";
+    public static final String REPORT_VIEW_STUDENT = "report:view:student";
+    public static final String REPORT_REFRESH = "report:refresh";
+
     /* ===== report（2） ===== */
     public static final String REPORT_VIEW = "report:view";
     public static final String REPORT_EXPORT = "report:export";

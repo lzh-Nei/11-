@@ -69,6 +69,7 @@ public class EvaluationCommandService {
     private final AuditLogMapper auditLogMapper;
     private final RabbitTemplate rabbitTemplate;
     private final ObjectMapper objectMapper;
+    private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     /** E-02 教师复核改分（UC-22：前置AI_DONE；同事务history新版本+result当前值更新） */
     @Transactional
@@ -108,6 +109,9 @@ public class EvaluationCommandService {
         }
         auditReEvaluate(evaluationId, result.getSubmissionId(), principal);
         sendEvalMessageAfterCommit(result.getSubmissionId());
+        // 报表缓存主动失效（D-36：重评会改变分差分布/均分，教师与学生 scope 双失效）
+        eventPublisher.publishEvent(new com.aies.common.ReportCacheEvictEvent(
+                ctx.submission().getTaskId(), ctx.submission().getStudentId()));
         log.info("重评已触发: evaluationId={} submissionId={} nextVersion={} operator={}",
                 evaluationId, result.getSubmissionId(), result.getCurrentVersionNo(), principal.userId());
     }
@@ -154,6 +158,9 @@ public class EvaluationCommandService {
         evaluationHistoryMapper.insert(history);
         log.info("复核完成: evaluationId={} version={} total={} reviewer={}",
                 evaluationId, nextVersion, cmd.getTotalScore(), principal.userId());
+        // 报表缓存主动失效（D-36：事件经 common 解耦，报表侧 AFTER_COMMIT 监听；review/manualScore 共用本尾部）
+        eventPublisher.publishEvent(new com.aies.common.ReportCacheEvictEvent(
+                ctx.submission().getTaskId(), ctx.submission().getStudentId()));
         return toVo(result, cmd.getMetricScores());
     }
 
