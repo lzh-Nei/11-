@@ -1,9 +1,12 @@
 package com.aies.mapper;
 
+import com.aies.dto.TaskOwnerVO;
 import com.aies.entity.Task;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+
+import java.util.List;
 
 /**
  * 任务数据访问（基础CRUD由 MyBatis-Plus BaseMapper 提供）。
@@ -21,4 +24,15 @@ public interface TaskMapper extends BaseMapper<Task> {
     /** 教师视角提交统计（UC-13：详情含提交数；submission 表 V3 迁移） */
     @Select("SELECT COUNT(*) FROM submission WHERE task_id = #{taskId}")
     long countSubmissions(@Param("taskId") Long taskId);
+
+    /** 任务所属班级名与教师名（列表批量装配，单条详情复用） */
+    @Select("<script>"
+            + "SELECT t.id AS taskId, c.class_name AS className, "
+            + "COALESCE(NULLIF(u.real_name, ''), u.username) AS teacherName "
+            + "FROM task t LEFT JOIN class c ON c.id = t.class_id "
+            + "LEFT JOIN sys_user u ON u.id = t.teacher_id "
+            + "WHERE t.id IN "
+            + "<foreach collection='taskIds' item='id' open='(' separator=',' close=')'>#{id}</foreach>"
+            + "</script>")
+    List<TaskOwnerVO> selectOwners(@Param("taskIds") List<Long> taskIds);
 }

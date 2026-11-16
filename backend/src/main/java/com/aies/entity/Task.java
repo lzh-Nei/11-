@@ -38,5 +38,8 @@ public class Task {
     /** 字典：DRAFT/PUBLISHED/CLOSED */
     private String status;
 
+    /** 发布时间（发布动作发生时刻；草稿为空） */
+    private LocalDateTime publishTime;
+
     private LocalDateTime createTime;
 }

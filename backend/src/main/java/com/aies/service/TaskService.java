@@ -4,6 +4,7 @@ import com.aies.common.BusinessException;
 import com.aies.common.ErrorCode;
 import com.aies.dto.TaskCreateRequest;
 import com.aies.dto.TaskMetricVO;
+import com.aies.dto.TaskOwnerVO;
 import com.aies.dto.TaskVO;
 import com.aies.entity.Submission;
 import com.aies.entity.Task;
@@ -31,7 +32,7 @@ import java.util.stream.Collectors;
 /**
  * 任务域业务（03-03 §五 T-01/T-04/T-05 / UC-10/13 / 04-04 S-05 IDOR清单）。
  *
- * <p>视角裁剪：学生=本班+PUBLISHED；教师=本人（teacher_id=本人）；管理员=全局。
+ * <p>视角裁剪：学生=本班任务（状态标签可筛）；教师=本人（teacher_id=本人）；管理员=全局。
  * 任务不存在与无权访问统一返回 40400（防探测：不向学生泄露未发布任务的存在性）。</p>
  */
 @Service
@@ -235,6 +236,7 @@ public class TaskService {
                     "仅草稿状态任务可发布，当前状态: " + task.getStatus());
         }
         task.setStatus(STATUS_PUBLISHED);
+        task.setPublishTime(LocalDateTime.now());
         taskMapper.updateById(task);
 
         List<TaskMetric> metrics = taskMetricMapper.selectList(
@@ -256,7 +258,31 @@ public class TaskService {
                         .eq(TaskMetric::getTaskId, taskId)
                         .orderByAsc(TaskMetric::getSortOrder)
                         .orderByAsc(TaskMetric::getId));
-        return toVO(task, metrics, teacherView);
+        TaskVO vo = toVO(task, metrics, teacherView);
+        fillOwnerNames(List.of(vo));
+        return vo;
+    }
+
+    /** 批量补班级名/教师名；测试 mock 返回 null 时保持原值（前端有空值兜底）。 */
+    private void fillOwnerNames(List<TaskVO> records) {
+        if (records.isEmpty()) {
+            return;
+        }
+        List<Long> taskIds = records.stream().map(TaskVO::getId).toList();
+        List<TaskOwnerVO> owners = taskMapper.selectOwners(taskIds);
+        if (owners == null) {
+            return;
+        }
+        Map<Long, TaskOwnerVO> ownerMap = owners.stream()
+                .collect(Collectors.toMap(TaskOwnerVO::getTaskId, owner -> owner,
+                        (left, right) -> left));
+        for (TaskVO vo : records) {
+            TaskOwnerVO owner = ownerMap.get(vo.getId());
+            if (owner != null) {
+                vo.setClassName(owner.getClassName());
+                vo.setTeacherName(owner.getTeacherName());
+            }
+        }
     }
 
     /**
@@ -286,8 +312,10 @@ public class TaskService {
         if (ROLE_STUDENT.equals(principal.role())) {
             User user = userMapper.selectById(principal.userId());
             Long myClassId = (user == null) ? null : user.getClassId();
-            wrapper.eq(Task::getClassId, myClassId == null ? -1L : myClassId)
-                    .eq(Task::getStatus, STATUS_PUBLISHED);
+            wrapper.eq(Task::getClassId, myClassId == null ? -1L : myClassId);
+            if (StringUtils.hasText(status)) {
+                wrapper.eq(Task::getStatus, status);
+            }
         } else {
             if (ROLE_TEACHER.equals(principal.role())) {
                 wrapper.eq(Task::getTeacherId, principal.userId());
@@ -307,6 +335,7 @@ public class TaskService {
         List<TaskVO> records = result.getRecords().stream()
                 .map(task -> toVO(task, metricMap.getOrDefault(task.getId(), List.of()), teacherView))
                 .toList();
+        fillOwnerNames(records);
         Page<TaskVO> voPage = new Page<>(result.getCurrent(), result.getSize(), result.getTotal());
         voPage.setRecords(records);
         return voPage;

@@ -21,8 +21,13 @@ public class TaskVO {
     private Long classId;
     private LocalDateTime deadline;
     private String status;
+    private LocalDateTime publishTime;
     private LocalDateTime createTime;
     private List<TaskMetricVO> metrics;
+
+    /** 班级名 / 教师名（列表与详情统一装配，避免前端再查管理接口） */
+    private String className;
+    private String teacherName;
 
     /** 提交统计（教师/管理员视角专有；学生不装配） */
     private Long submissionCount;
@@ -36,6 +41,7 @@ public class TaskVO {
         vo.setClassId(task.getClassId());
         vo.setDeadline(task.getDeadline());
         vo.setStatus(task.getStatus());
+        vo.setPublishTime(task.getPublishTime());
         vo.setCreateTime(task.getCreateTime());
         vo.setMetrics(metrics);
         return vo;

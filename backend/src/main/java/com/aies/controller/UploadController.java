@@ -4,6 +4,7 @@ import com.aies.model.BatchItemResult;
 import com.aies.model.ChunkResult;
 import com.aies.model.CompleteResponse;
 import com.aies.model.InitResponse;
+import com.aies.security.PrincipalUtils;
 import com.aies.service.FileStoreService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -36,7 +37,8 @@ public class UploadController {
                              @RequestParam long lastModified,
                              @RequestParam long chunkSize,
                              @RequestParam int totalChunks) throws IOException {
-        return store.initUpload(fileName, fileSize, lastModified, chunkSize, totalChunks);
+        return store.initUpload(fileName, fileSize, lastModified, chunkSize, totalChunks,
+                PrincipalUtils.current().userId());
     }
 
     /** 上传单个分片（服务端边收边算 MD5 并落盘记录） */
@@ -59,7 +61,7 @@ public class UploadController {
     @PreAuthorize("hasAuthority('submission:upload')")
     @PostMapping("/batch")
     public List<BatchItemResult> batch(@RequestParam("files") MultipartFile[] files) throws IOException {
-        return store.batchUpload(files);
+        return store.batchUpload(files, PrincipalUtils.current().userId());
     }
 
     /** 演示用：人为破坏一个已上传分片，用于展示"合并时检测坏块 → 通知重传"闭环 */

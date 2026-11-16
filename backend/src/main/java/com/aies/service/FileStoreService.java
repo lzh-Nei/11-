@@ -73,7 +73,8 @@ public class FileStoreService {
      * uploadId = md5(文件名|大小|最后修改时间|分片大小)：同一文件重复初始化会落到同一会话，
      * 从而扫描出“已上传分片”返回给客户端 —— 这就是上传断点续传的恢复依据。
      */
-    public InitResponse initUpload(String fileName, long fileSize, long lastModified, long chunkSize, int totalChunks)
+    public InitResponse initUpload(String fileName, long fileSize, long lastModified, long chunkSize,
+                                   int totalChunks, Long uploaderId)
             throws IOException {
         if (fileName == null || !SAFE_NAME.matcher(fileName).matches()) {
             throw new IllegalArgumentException("非法文件名");
@@ -86,7 +87,7 @@ public class FileStoreService {
         Path dir = chunkDir.resolve(uploadId);
         Files.createDirectories(dir);
         om.writeValue(dir.resolve("upload.json").toFile(),
-                new UploadSession(fileName, fileSize, totalChunks, chunkSize));
+                new UploadSession(fileName, fileSize, totalChunks, chunkSize, uploaderId));
 
         // 扫描已落盘且带校验元数据的分片序号
         List<Integer> uploaded = new ArrayList<>();
@@ -184,7 +185,7 @@ public class FileStoreService {
 
                 FileMeta meta = new FileMeta(fileId, session.fileName(), copied,
                         HexFormat.of().formatHex(totalMd5.digest()),
-                        LocalDateTime.now().withNano(0).toString());
+                        LocalDateTime.now().withNano(0).toString(), session.uploaderId());
                 om.writeValue(fileDir.resolve(fileId + ".meta.json").toFile(), meta);
 
                 deleteRecursively(dir);   // 合并成功后清理分片
@@ -217,7 +218,7 @@ public class FileStoreService {
      * 一次 HTTP 请求携带多个小文件，服务端逐个落盘并逐个返回结果：
      * 单个文件失败不影响同批其他文件。
      */
-    public List<BatchItemResult> batchUpload(MultipartFile[] files) throws IOException {
+    public List<BatchItemResult> batchUpload(MultipartFile[] files, Long uploaderId) throws IOException {
         ensureDirs();
         List<BatchItemResult> results = new ArrayList<>();
         for (MultipartFile f : files) {
@@ -228,7 +229,7 @@ public class FileStoreService {
                 continue;
             }
             try (InputStream in = f.getInputStream()) {
-                FileMeta meta = storeFile(name, in, f.getSize());
+                FileMeta meta = storeFile(name, in, f.getSize(), uploaderId);
                 results.add(new BatchItemResult(name, true, meta.id(), "上传成功"));
             } catch (Exception e) {
                 results.add(new BatchItemResult(name, false, null, "上传失败: " + e.getMessage()));
@@ -244,6 +245,12 @@ public class FileStoreService {
         List<FileMeta> list = new ArrayList<>();
         try (Stream<Path> list2 = Files.list(fileDir)) {
             list2.filter(p -> p.getFileName().toString().endsWith(".meta.json")).forEach(p -> {
+                String metaName = p.getFileName().toString();
+                String id = metaName.substring(0, metaName.length() - ".meta.json".length());
+                // 已被提交记录引用的文件采用“从文件中心移除”软删除，保留原件供下载。
+                if (Files.exists(fileDir.resolve(id + ".hidden"))) {
+                    return;
+                }
                 try {
                     list.add(om.readValue(p.toFile(), FileMeta.class));
                 } catch (IOException ignored) {
@@ -260,6 +267,20 @@ public class FileStoreService {
         return om.readValue(fileDir.resolve(id + ".meta.json").toFile(), FileMeta.class);
     }
 
+    /** 删除文件数据与元数据（管理端文件中心）。 */
+    public void delete(String id) throws IOException {
+        requireFile(id);
+        Files.deleteIfExists(fileDir.resolve(id + ".bin"));
+        Files.deleteIfExists(fileDir.resolve(id + ".meta.json"));
+        Files.deleteIfExists(fileDir.resolve(id + ".hidden"));
+    }
+
+    /** 从文件中心移除（软删除）：保留原件，避免已提交作业的下载链接失效。 */
+    public void hide(String id) throws IOException {
+        requireFile(id);
+        Files.createFile(fileDir.resolve(id + ".hidden"));
+    }
+
     public Path resolveFile(String id) {
         return requireFile(id);
     }
@@ -268,9 +289,9 @@ public class FileStoreService {
      * UC-16 提交域复用：单文件落盘+登记（UUID32 重命名，S-07 用户输入禁入 key）。
      * 与分片合并共用 files/ 目录与 meta 结构，桶化迁移时仅需替换本层实现。
      */
-    public FileMeta storeSingle(String name, InputStream in, long size) throws IOException {
+    public FileMeta storeSingle(String name, InputStream in, long size, Long uploaderId) throws IOException {
         ensureDirs();
-        return storeFile(name, in, size);
+        return storeFile(name, in, size, uploaderId);
     }
 
     /* ==================== 内部工具 ==================== */
@@ -281,13 +302,14 @@ public class FileStoreService {
         Files.createDirectories(fileDir);
     }
 
-    private FileMeta storeFile(String name, InputStream in, long size) throws IOException {
+    private FileMeta storeFile(String name, InputStream in, long size, Long uploaderId) throws IOException {
         String id = UUID.randomUUID().toString().replace("-", "");
         Path target = fileDir.resolve(id + ".bin");
         try (OutputStream out = new BufferedOutputStream(Files.newOutputStream(target), 1 << 16)) {
             in.transferTo(out);
         }
-        FileMeta meta = new FileMeta(id, name, size, null, LocalDateTime.now().withNano(0).toString());
+        FileMeta meta = new FileMeta(id, name, size, null,
+                LocalDateTime.now().withNano(0).toString(), uploaderId);
         om.writeValue(fileDir.resolve(id + ".meta.json").toFile(), meta);
         return meta;
     }
