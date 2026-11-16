@@ -191,6 +191,7 @@ services:
     volumes:
       - ./docker/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./docker/nginx/certs:/etc/nginx/certs:ro
+      - ./frontend/dist:/usr/share/nginx/html:ro   # 前端SPA托管（npm run build产物；W12运行形态：8082单入口=静态+API）
     depends_on:
       - app
     healthcheck:
