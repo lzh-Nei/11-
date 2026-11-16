@@ -134,3 +134,8 @@ git commit -m "docs: 更新 README，后端改为 Java Spring Boot"
 
 git push
 
+
+## CI 首跑登记（W9-M2）
+
+- 2026-11-16：GitHub 恢复信号确认，PR#1 素材（脚手架+CI workflow+COMPOSE-DEV）已推送 feature/QQ（b1673c6..74606a6）；本分支为 CI 首跑载体（pull_request 事件触发三绿验证：checkstyle/spotbugs/tests+coverage）。
+
