@@ -137,7 +137,7 @@ public class AdminController {
             @RequestParam(defaultValue = "10") @Min(value = 1, message = "每页条数最小为1")
             @Max(value = 100, message = "每页条数最大为100") long size,
             @RequestParam(required = false) String status) {
-        return Result.success(evaluationService.list(page, size, status));
+        return Result.success(evaluationService.list(page, size, status, PrincipalUtils.current()));
     }
 
     /* ==================== 角色权限管理（role:manage） ==================== */

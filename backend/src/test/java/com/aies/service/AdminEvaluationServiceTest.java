@@ -8,6 +8,7 @@ import com.aies.mapper.EvaluationResultMapper;
 import com.aies.mapper.SubmissionMapper;
 import com.aies.mapper.TaskMapper;
 import com.aies.mapper.UserMapper;
+import com.aies.security.LoginPrincipal;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,6 +21,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /** 管理端评价列表单测：evaluation+submission+task+user 聚合与空页。 */
@@ -95,5 +98,39 @@ class AdminEvaluationServiceTest {
 
         assertThat(result.getRecords()).isEmpty();
         assertThat(result.getTotal()).isZero();
+    }
+
+    @Test
+    void teacherListShouldScopeToOwnTasksAndSubmissions() {
+        LoginPrincipal teacher = new LoginPrincipal(2L, "jti", "token", "TEACHER", 0L);
+        Task ownTask = new Task();
+        ownTask.setId(20L);
+        when(taskMapper.selectList(any())).thenReturn(List.of(ownTask));
+
+        Submission ownSubmission = new Submission();
+        ownSubmission.setId(10L);
+        when(submissionMapper.selectList(any())).thenReturn(List.of(ownSubmission));
+
+        Page<EvaluationResult> page = new Page<>(1, 10, 0);
+        page.setRecords(List.of());
+        when(evaluationResultMapper.selectPage(any(), any())).thenReturn(page);
+
+        var result = service.list(1, 10, null, teacher);
+
+        assertThat(result.getRecords()).isEmpty();
+        verify(taskMapper).selectList(any());
+        verify(submissionMapper).selectList(any());
+        verify(evaluationResultMapper).selectPage(any(), any());
+    }
+
+    @Test
+    void studentListShouldReturnEmptyWithoutQueryingEvaluations() {
+        LoginPrincipal student = new LoginPrincipal(3L, "jti", "token", "STUDENT", 0L);
+
+        var result = service.list(1, 10, null, student);
+
+        assertThat(result.getRecords()).isEmpty();
+        assertThat(result.getTotal()).isZero();
+        verify(evaluationResultMapper, never()).selectPage(any(), any());
     }
 }

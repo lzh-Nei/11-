@@ -9,7 +9,9 @@ import com.aies.mapper.EvaluationResultMapper;
 import com.aies.mapper.SubmissionMapper;
 import com.aies.mapper.TaskMapper;
 import com.aies.mapper.UserMapper;
+import com.aies.security.LoginPrincipal;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -31,13 +33,45 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AdminEvaluationService {
 
+    private static final String ROLE_ADMIN = "ADMIN";
+    private static final String ROLE_TEACHER = "TEACHER";
+
     private final EvaluationResultMapper evaluationResultMapper;
     private final SubmissionMapper submissionMapper;
     private final TaskMapper taskMapper;
     private final UserMapper userMapper;
 
     public Page<AdminEvaluationVO> list(long page, long size, String status) {
+        return list(page, size, status, null);
+    }
+
+    /**
+     * 评价列表按角色收口：管理员全局；教师仅本人任务下的提交；其他角色空页。
+     * 教师复核页与管理员「评价与复核」共用本端点。
+     */
+    public Page<AdminEvaluationVO> list(long page, long size, String status, LoginPrincipal principal) {
         LambdaQueryWrapper<EvaluationResult> wrapper = new LambdaQueryWrapper<>();
+        if (principal != null && !ROLE_ADMIN.equals(principal.role())) {
+            if (!ROLE_TEACHER.equals(principal.role())) {
+                return emptyPage(page, size);
+            }
+            List<Long> ownTaskIds = taskMapper.selectList(new QueryWrapper<Task>()
+                            .select("id")
+                            .eq("teacher_id", principal.userId()))
+                    .stream().map(Task::getId).toList();
+            if (ownTaskIds.isEmpty()) {
+                return emptyPage(page, size);
+            }
+            List<Long> ownSubmissionIds = submissionMapper.selectList(
+                            new QueryWrapper<Submission>()
+                                    .select("id")
+                                    .in("task_id", ownTaskIds))
+                    .stream().map(Submission::getId).toList();
+            if (ownSubmissionIds.isEmpty()) {
+                return emptyPage(page, size);
+            }
+            wrapper.in(EvaluationResult::getSubmissionId, ownSubmissionIds);
+        }
         if (StringUtils.hasText(status)) {
             wrapper.eq(EvaluationResult::getStatus, status.trim());
         }
@@ -81,6 +115,10 @@ public class AdminEvaluationService {
         Page<AdminEvaluationVO> voPage = new Page<>(result.getCurrent(), result.getSize(), result.getTotal());
         voPage.setRecords(records);
         return voPage;
+    }
+
+    private Page<AdminEvaluationVO> emptyPage(long page, long size) {
+        return new Page<>(page, size, 0);
     }
 
     private String displayName(User user) {
