@@ -112,8 +112,13 @@ textarea{width:100%;min-height:64px;font-family:var(--mono);font-size:13px}
         <input id="account" placeholder="学号/工号" style="flex:1">
         <input id="pwd" type="password" placeholder="密码" style="flex:1">
       </div>
+      <div class="row" style="margin:0 0 10px">
+        <input id="capCode" placeholder="图形验证码" style="flex:1" maxlength="8" autocomplete="off">
+        <img id="capImg" alt="验证码" title="看不清？点击换一张" onclick="loadCaptcha()"
+             style="height:40px;border-radius:var(--r-md);border:1px solid var(--line2);cursor:pointer;background:var(--paper)">
+      </div>
       <button class="btn" style="width:100%" onclick="login()">密码登录</button>
-      <div class="sub" style="margin-top:8px">注：后端登录需图形验证码，本页密码登录路径未接 captcha——请先在主应用登录，本页将自动探测登录态；或使用 TOKEN 装载。</div>
+      <div class="sub" style="margin-top:8px">契约同源：本页验证码与主应用同一 /api/auth/captcha 端点（A-04，Redis TTL 5min）。</div>
       <div class="sep"></div>
       <div class="ovl">或使用 TOKEN</div>
       <div class="row" style="margin-top:8px">
@@ -173,9 +178,11 @@ textarea{width:100%;min-height:64px;font-family:var(--mono);font-size:13px}
      scoreDist:[{range,count}]×5, metricRadar:[{metricName,avgScore}], scoreGapDist:[{range,count}]×5}
    - 顶层无 KPI 标量 → kpiMode:'fromTasks' 由 tasks 数组派生四 KPI
    - task 图名键 = title（TaskStat.title）→ nameKey
-   - 登录契约：/api/auth/login 需 captchaId+captchaCode（V2 安全种子）→ 本页密码登录路径不可用，
-     走 token 装载 / 同源自动探测（主应用登录后同源 localStorage 存 JWT） */
+   - 登录契约（WP3-T2 2026-11-16 锁定后端真身）：GET /api/auth/captcha →
+     {captchaId, image(base64 data URI 可直接作 img src), expireSeconds}；
+     POST /api/auth/login {username,password,captchaId,captchaCode}（LoginRequest） */
 const CONFIG={
+  captchaPath:'/api/auth/captcha',
   loginPath:'/api/auth/login', loginMethod:'POST', tokenField:'data.accessToken',
   mePath:'/api/auth/me',
   overviewTeacher:'/api/reports/overview',
@@ -203,6 +210,11 @@ const PRESETS=[
   ['GET',CONFIG.overviewTeacher,'教师聚合报表'],
   ['GET',CONFIG.overviewMe,'学生个人报表'],
   ['POST',CONFIG.refreshPath,'刷新缓存（D-36）'],
+  /* WP3-T2 增补（演示高光：复核写入→主动失效→四图变化）；EvaluationController 真身 /api/evaluations */
+  ['PUT','/api/evaluations/{id}/review','E-02 教师复核改分（UC-22）',
+   '{"totalScore":88,"reviewComment":"教师复核：论证链完整但结论表达不足，微调2分"}'],
+  ['POST','/api/evaluations/{id}/re-evaluate','E-03 触发重评（UC-23）'],
+  ['GET','/api/evaluations/{id}/history','E-04 历史版本分页（UC-25）'],
 ];
 /* ══════════ 状态与工具 ══════════ */
 const S={token:localStorage.getItem('aies_ui_token')||'',identity:null,scope:'teacher',charts:[]};
@@ -254,18 +266,31 @@ async function afterAuth(){
 }
 function deauth(msg){S.token='';localStorage.removeItem('aies_ui_token');setAuthed(false);
   VIEWS.forEach(x=>$('view-'+x).classList.add('hidden'));$('view-login').classList.remove('hidden');
+  loadCaptcha();
   if(msg)toast(msg);}
+/* 拉取图形验证码（WP3-T2：契约真身 CaptchaResponse{captchaId,image,expireSeconds}）；
+   登录失败/点击图片均可换新码（旧码随 S.captchaId 覆盖作废） */
+async function loadCaptcha(){
+  const img=$('capImg');img.removeAttribute('src');S.captchaId=null;
+  try{
+    const r=await api(CONFIG.captchaPath);const d=payload(r);
+    if(r.status===200&&d&&d.captchaId&&d.image){S.captchaId=d.captchaId;img.src=d.image;}
+    else $('loginMsg').innerHTML=`<span class="err-t">验证码获取失败 ${r.status}</span>`;
+  }catch(e){$('loginMsg').innerHTML='<span class="err-t">后端不可达（验证码未加载）</span>';}
+}
 async function login(){
-  const a=$('account').value.trim(),p=$('pwd').value;
+  const a=$('account').value.trim(),p=$('pwd').value,c=$('capCode').value.trim();
   if(!a||!p){$('loginMsg').textContent='请输入账号与密码';return;}
-  /* 契约偏差登记（W12-D39）：后端 /api/auth/login 强制 captchaId+captchaCode（V2 安全种子），
-     本页无 captcha 输入 → 密码登录路径设计上不可用，保留代码仅为形态完整。
-     可用路径：① 主应用登录后同源自动探测 ② TOKEN 粘贴装载 */
-  const r=await api(CONFIG.loginPath,{method:CONFIG.loginMethod,body:{username:a,password:p}});
+  if(!S.captchaId){loadCaptcha();return;}
+  if(!c){$('loginMsg').textContent='请输入图形验证码';return;}
+  /* 登录载荷（LoginRequest 真身）：{username,password,captchaId,captchaCode} */
+  const r=await api(CONFIG.loginPath,{method:CONFIG.loginMethod,
+    body:{username:a,password:p,captchaId:S.captchaId,captchaCode:c}});
   const tok=r.status===200?(dig(r.json,CONFIG.tokenField)||dig(r.json,'token')):null;
   if(jwtLike(tok)){S.token=tok;localStorage.setItem('aies_ui_token',tok);afterAuth();}
   else if(r.status===200)$('loginMsg').textContent='返回 200 但未定位 token 字段：改 CONFIG.tokenField，或改用 token 粘贴';
-  else $('loginMsg').innerHTML=`<span class="err-t">登录失败 ${r.status}</span>（登录需图形验证码——请用主应用登录后回本页自动探测，或 TOKEN 装载）`;
+  else{$('loginMsg').innerHTML=`<span class="err-t">登录失败 ${r.status}</span> ${esc((r.json&&r.json.message)||'')}`;
+    loadCaptcha();$('capCode').value='';}
 }
 function useToken(){
   const t=$('tokenIn').value.trim().replace(/^Bearer\s+/i,'');
@@ -393,7 +418,10 @@ async function renderIdentity(){
 }
 /* ══════════ 控制台 ══════════ */
 function buildPresets(){$('presets').innerHTML=PRESETS.map((p,i)=>`<button class="ghost" style="margin:0 8px 8px 0" onclick="preset(${i})"><span class="mono">${p[0]}</span> ${esc(p[1])}</button>`).join('');}
-function preset(i){$('cMethod').value=PRESETS[i][0];$('cUrl').value=PRESETS[i][1];$('cBody').value='';sendConsole();}
+function preset(i){const p=PRESETS[i];
+  if(p[1].includes('{id}')){toast('请先把路径中 {id} 替换为真实评价ID（主应用报告页可复制）');}
+  $('cMethod').value=p[0];$('cUrl').value=p[1];$('cBody').value=p[3]||'';
+  if(!p[1].includes('{id}'))sendConsole();}
 async function sendConsole(){
   const method=$('cMethod').value,url=$('cUrl').value.trim(),raw=$('cBody').value.trim();
   if(!url){toast('请输入路径');return;}
@@ -418,7 +446,7 @@ function copyCurl(){
 (function init(){
   buildChartDom();buildPresets();syncScope();
   if(location.protocol==='file:')$('loginMsg').innerHTML='<span class="err-t">file:// 直开会跨域失败</span>，请访问 http://localhost:8082/report.html';
-  if(detectToken())afterAuth();else{setAuthed(false);$('view-login').classList.remove('hidden');}
+  if(detectToken())afterAuth();else{setAuthed(false);$('view-login').classList.remove('hidden');loadCaptcha();}
   window.addEventListener('resize',()=>S.charts.forEach(c=>c&&c.resize()));
 })();
 </script>
