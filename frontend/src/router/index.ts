@@ -82,17 +82,23 @@ const router = createRouter({
           meta: { roles: ['TEACHER', 'ADMIN'] }
         },
         { path: 'files', name: 'file-center', component: () => import('@/views/FileCenterView.vue') },
+        {
+          path: 'modules',
+          name: 'admin-modules',
+          component: () => import('@/views/AdminModulesView.vue'),
+          meta: { roles: ['ADMIN'] }
+        },
+        {
+          // 管理员功能模块页（旧 /system 书签兼容跳转）
+          path: 'system',
+          redirect: '/modules',
+          meta: { roles: ['ADMIN'] }
+        },
         { path: 'account', name: 'account', component: () => import('@/views/AccountView.vue') },
         {
           path: 'change-password',
           name: 'change-password',
           component: () => import('@/views/ChangePasswordView.vue')
-        },
-        {
-          path: 'system',
-          name: 'system-admin',
-          component: () => import('@/views/SystemAdminView.vue'),
-          meta: { roles: ['ADMIN'] }
         }
       ]
     },
@@ -149,6 +155,8 @@ router.beforeEach(async (to) => {
     }
   }
   if (to.path === '/login' && auth.accessToken) return { path: '/' }
+  // 管理员登录即进入功能模块（左侧仅保留 功能模块/文件中心/个人中心，不再有独立工作台）
+  if (to.path === '/' && auth.role === 'ADMIN') return { path: '/modules' }
   // 模块级角色门控（权限矩阵之外的角色硬边界，越权→403 页）
   const roles = to.meta.roles as string[] | undefined
   if (roles?.length && auth.me) {

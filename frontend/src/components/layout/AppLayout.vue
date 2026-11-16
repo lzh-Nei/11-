@@ -87,6 +87,42 @@ function can(perm: string): boolean {
 
 /** 模块导航：角色 + 权限双门控（权限矩阵为准，不展示无权模块） */
 const groups = computed<ModuleGroup[]>(() => {
+  // 系统管理员：左侧仅保留 功能模块 / 文件中心 / 个人中心（功能模块内再做二级/三级目录）
+  if (isAdmin.value) {
+    return [
+      {
+        label: '工作区',
+        items: [
+          {
+            key: 'modules',
+            label: '功能模块',
+            icon: 'dashboard',
+            to: '/modules',
+            match: (p) =>
+              p === '/modules' ||
+              p === '/tasks/manage' ||
+              p === '/review' ||
+              /^\/evaluations\/\d+\/review$/.test(p)
+          },
+          {
+            key: 'files',
+            label: '文件中心',
+            icon: 'files',
+            to: '/files',
+            match: (p) => p === '/files'
+          },
+          {
+            key: 'account',
+            label: '个人中心',
+            icon: 'user',
+            to: '/account',
+            match: (p) => p === '/account' || p === '/change-password'
+          }
+        ]
+      }
+    ]
+  }
+
   const result: ModuleGroup[] = []
 
   const study: ModuleItem[] = [
@@ -168,21 +204,6 @@ const groups = computed<ModuleGroup[]>(() => {
     }
   ]
   result.push({ label: '账号', items: account })
-
-  if (isAdmin.value) {
-    result.push({
-      label: '管理',
-      items: [
-        {
-          key: 'system',
-          label: '系统管理',
-          icon: 'system',
-          to: '/system',
-          match: (p) => p === '/system'
-        }
-      ]
-    })
-  }
 
   return result.filter((g) => g.items.length > 0)
 })

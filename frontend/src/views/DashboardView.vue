@@ -8,7 +8,7 @@
         </el-button>
         <el-button type="primary" @click="openWindow('/report.html')">报表驾驶舱</el-button>
       </template>
-      <el-button v-if="isAdmin" @click="router.push('/system')">系统管理</el-button>
+      <el-button v-if="isAdmin" @click="router.push('/modules')">功能模块</el-button>
     </PageHeader>
 
     <el-alert v-if="auth.firstLogin" type="warning" show-icon :closable="false" class="first-login">
@@ -161,7 +161,12 @@ const cards = computed<QuickCard[]>(() => {
   }
   list.push({ title: '文件中心', desc: '分片上传产物清单与流式下载', icon: 'files', to: '/files' })
   if (isAdmin.value) {
-    list.push({ title: '系统管理', desc: '用户/角色/班级/配置（M3 预留）', icon: 'system', to: '/system' })
+    list.push({
+      title: '功能模块',
+      desc: '用户/权限/班级/AI/审计（二级+三级目录）',
+      icon: 'system',
+      to: '/modules'
+    })
   }
   return list
 })

@@ -1,7 +1,8 @@
 <template>
-  <!-- 个人中心（模块）：账号档案 + 安全操作 + 权限清单（权限点来自 /me，可点即导航） -->
+  <!-- 个人中心：账号档案 + 安全操作；权限清单统一收口到功能模块（管理员）/
+       保留在个人中心（教师、学生） -->
   <PageShell>
-    <PageHeader title="个人中心" subtitle="账号档案、安全操作与功能权限（GET /api/auth/me）">
+    <PageHeader title="个人中心" subtitle="账号档案与安全操作（GET /api/auth/me）">
       <el-button size="small" :loading="reloading" @click="reloadMe">刷新用户信息</el-button>
     </PageHeader>
 
@@ -52,34 +53,8 @@
       </section>
     </div>
 
-    <section class="card perm-card">
-      <div class="perm-head">
-        <h3>功能权限（{{ auth.me?.permissions?.length ?? 0 }} 项）</h3>
-        <span class="dim">点击权限点直达对应模块；虚线为 M3 预留</span>
-      </div>
-      <ScrollArea max-height="360px" padded>
-        <div v-for="(perms, ns) in permGroups" :key="ns" class="perm-group">
-          <div class="ns-title">{{ nsLabel(ns) }} · {{ perms.length }}</div>
-          <div class="perm-list">
-            <el-tooltip v-for="p in perms" :key="p" :content="permTooltip(p)" placement="top">
-              <button
-                type="button"
-                class="perm-chip"
-                :class="{
-                  reserved: permEntry(p)?.kind === 'reserved',
-                  action: permEntry(p)?.kind === 'action'
-                }"
-                @click="onPermClick(p)"
-              >
-                {{ permLabel(p) }}
-                <i v-if="permEntry(p)?.kind === 'route'" class="chip-arrow">→</i>
-                <i v-else-if="permEntry(p)?.kind === 'reserved'" class="chip-lock">预留</i>
-              </button>
-            </el-tooltip>
-          </div>
-        </div>
-      </ScrollArea>
-    </section>
+    <!-- 教师/学生保留权限清单；管理员统一在「功能模块 → 用户与权限 → 权限清单」 -->
+    <PermissionCatalog v-if="!isAdmin" class="perm-block" />
   </PageShell>
 </template>
 
@@ -89,29 +64,18 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import PageShell from '@/components/ui/PageShell.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
-import ScrollArea from '@/components/ui/ScrollArea.vue'
-import { permLabel, nsLabel, permEntry } from '@/constants/permissions'
+import PermissionCatalog from '@/components/business/PermissionCatalog.vue'
 import { toast } from '@/utils/toast'
-import { openWindow } from '@/utils/window'
 
 const router = useRouter()
 const auth = useAuthStore()
 const reloading = ref(false)
 
+const isAdmin = computed(() => auth.role === 'ADMIN')
 const roleTagType = computed(() => {
   if (auth.role === 'ADMIN') return 'danger'
   if (auth.role === 'TEACHER') return 'warning'
   return 'success'
-})
-
-/* 权限清单：中文化 + 命名空间分组（禁裸英文权限点） */
-const permGroups = computed<Record<string, string[]>>(() => {
-  const groups: Record<string, string[]> = {}
-  for (const p of auth.me?.permissions ?? []) {
-    const ns = String(p).split(':')[0]
-    ;(groups[ns] = groups[ns] || []).push(String(p))
-  }
-  return groups
 })
 
 function roleName(code: string): string {
@@ -141,73 +105,6 @@ async function reloadMe() {
 async function onLogout() {
   await auth.logout()
   router.push('/login')
-}
-
-function permTooltip(code: string): string {
-  const entry = permEntry(code)
-  if (!entry) return String(code)
-  return `${entry.hint}（${code}）`
-}
-
-/** 权限即导航：角色相关的入口在常量映射之上做少量覆盖，避免进入无权模块 */
-function onPermClick(code: string) {
-  const isStudent = auth.role === 'STUDENT'
-
-  if (code === 'task:view' || code === 'task:mine') {
-    router.push(isStudent ? '/tasks' : '/tasks/manage')
-    return
-  }
-  if (code === 'submission:view' || code === 'submission:mine' || code === 'submission:upload') {
-    router.push(isStudent ? '/submissions' : '/review')
-    return
-  }
-  if (code === 'evaluation:view') {
-    router.push(isStudent ? '/my-evaluations' : '/review')
-    return
-  }
-  if (
-    code === 'evaluation:review' ||
-    code === 'evaluation:re-evaluate' ||
-    code === 'evaluation:history:view'
-  ) {
-    router.push('/review')
-    return
-  }
-  if (code.startsWith('report:')) {
-    if (isStudent) {
-      router.push('/')
-      return
-    }
-    // C1 裁决：管理员暂不开放全局聚合，管理员点击报表权限给出明确说明而非打开 403 页面
-    if (!(auth.me?.permissions ?? []).includes('report:view:teacher')) {
-      toast.warning('管理员暂不开放全局聚合报表（C1 范围收敛）')
-      return
-    }
-    openWindow('/report.html')
-    return
-  }
-
-  const entry = permEntry(code)
-  if (!entry) return
-  if (entry.kind === 'route') {
-    router.push(entry.to)
-    return
-  }
-  if (entry.kind === 'reserved') {
-    toast.warning(`预留权限：${entry.hint}`)
-    return
-  }
-  switch (entry.act) {
-    case 'logout':
-      onLogout()
-      break
-    case 'profile':
-      document.querySelector('.card')?.scrollIntoView({ behavior: 'smooth' })
-      break
-    case 'dashboard':
-      openWindow('/report.html')
-      break
-  }
 }
 </script>
 
@@ -269,83 +166,7 @@ function onPermClick(code: string) {
   font-size: 12px;
   color: var(--aies-brand);
 }
-.perm-card {
+.perm-block {
   margin-top: var(--aies-gap);
-}
-.perm-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.dim {
-  font-size: 12px;
-  color: var(--aies-ink3);
-}
-.perm-group + .perm-group {
-  margin-top: 14px;
-}
-.ns-title {
-  font-size: 11.5px;
-  color: var(--aies-ink3);
-  letter-spacing: 0.06em;
-  margin-bottom: 6px;
-}
-.perm-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.perm-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 11px;
-  border-radius: var(--aies-radius-pill);
-  border: 1px solid var(--aies-border);
-  background: var(--aies-surface);
-  color: var(--aies-ink2);
-  font-size: 12.5px;
-  font-family: inherit;
-  cursor: pointer;
-  transition:
-    box-shadow var(--aies-t),
-    transform var(--aies-t),
-    border-color var(--aies-t),
-    color var(--aies-t);
-}
-.perm-chip:hover {
-  border-color: var(--aies-brand);
-  color: var(--aies-brand);
-  box-shadow: var(--aies-shadow-hover);
-  transform: var(--aies-lift);
-}
-.perm-chip.action {
-  border-style: solid;
-}
-.perm-chip.reserved {
-  border-style: dashed;
-  color: var(--aies-ink3);
-  cursor: help;
-}
-.perm-chip.reserved:hover {
-  border-color: var(--aies-ink3);
-  color: var(--aies-ink3);
-  box-shadow: none;
-  transform: none;
-}
-.chip-arrow {
-  font-style: normal;
-  font-size: 11px;
-  color: var(--aies-brand);
-}
-.chip-lock {
-  font-style: normal;
-  font-size: 10px;
-  color: var(--aies-ink3);
-  border: 1px dashed var(--aies-border);
-  border-radius: 999px;
-  padding: 0 5px;
 }
 </style>

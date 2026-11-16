@@ -92,14 +92,22 @@ export const PERM_ROUTE: Record<string, PermEntry> = {
   'report:view:teacher': { kind: 'action', act: 'dashboard', hint: '打开教师聚合驾驶舱（新窗口）' },
   'report:refresh': { kind: 'action', act: 'dashboard', hint: '工作台页头「刷新报表缓存」按钮' },
   'report:export': { kind: 'reserved', hint: '导出端点预留，M3 报表导出规划' },
-  'user:manage': { kind: 'reserved', hint: '用户管理端点为 M3 管理端规划' },
-  'class:manage': { kind: 'reserved', hint: '班级管理端点预留，M3 规划' },
-  'role:manage': { kind: 'reserved', hint: '管理端预留，M3 规划' },
-  'system:config': { kind: 'reserved', hint: '管理端预留，M3 规划' },
-  'audit:view': { kind: 'reserved', hint: '审计查询预留，M3 规划' },
-  'llm:config': { kind: 'reserved', hint: 'LLM 配置预留，M3 规划' },
-  'prompt:manage': { kind: 'reserved', hint: 'Prompt 管理预留，M3 规划' },
-  'golden:manage': { kind: 'reserved', hint: '黄金集管理预留，M3 规划' }
+  'user:manage': { kind: 'route', to: '/modules?group=access&child=users', hint: '进入功能模块 → 用户管理' },
+  'role:manage': { kind: 'route', to: '/modules?group=access&child=roles', hint: '进入功能模块 → 角色权限' },
+  'class:manage': { kind: 'route', to: '/modules?group=data&child=classes', hint: '进入功能模块 → 班级管理' },
+  'audit:view': { kind: 'route', to: '/modules?group=ops&child=audit', hint: '进入功能模块 → 审计日志' },
+  'llm:config': { kind: 'route', to: '/modules?group=ai&child=llm', hint: '进入功能模块 → LLM 参数' },
+  'prompt:manage': {
+    kind: 'route',
+    to: '/modules?group=ai&child=prompts',
+    hint: '进入功能模块 → Prompt 模板'
+  },
+  'golden:manage': {
+    kind: 'route',
+    to: '/modules?group=data&child=golden',
+    hint: '进入功能模块 → 黄金数据集'
+  },
+  'system:config': { kind: 'route', to: '/modules?group=ops&child=config', hint: '进入功能模块 → 系统配置' }
 }
 
 export function permEntry(code: string): PermEntry | null {

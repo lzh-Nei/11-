@@ -1,8 +1,12 @@
 <template>
-  <PageShell>
-    <PageHeader title="任务管理" subtitle="教师视角：创建 / 发布 / 全状态跟踪（T-01/T-03，复核域 W8）" />
+  <PageShell :bare="embedded">
+    <PageHeader
+      v-if="!embedded"
+      title="任务管理"
+      subtitle="教师视角：创建 / 发布 / 全状态跟踪（T-01/T-03，复核域 W8）"
+    />
 
-    <ScrollArea max-height="calc(100vh - 220px)" padded>
+    <ScrollArea :max-height="embedded ? 'none' : 'calc(100vh - 220px)'" padded>
       <el-alert
         title="发布不可逆：DRAFT → PUBLISHED 后指标集与截止时间锁定，学生立即可见"
         type="warning"
@@ -136,6 +140,8 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import ScrollArea from '@/components/ui/ScrollArea.vue'
 import ConfirmAction from '@/components/ui/ConfirmAction.vue'
 import { ElMessageBox } from 'element-plus'
+
+withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 
 const loading = ref(false)
 const error = ref<string | null>(null)

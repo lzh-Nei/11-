@@ -1,8 +1,12 @@
 <template>
   <!-- 评价复核（教师模块）：复核工作台入口（按评价编号，新窗口）+ 本机最近打开记录
        后端暂无教师待复核列表端点（#14 发现项），如实说明，不伪造列表 -->
-  <PageShell>
-    <PageHeader title="评价复核" subtitle="复核工作台入口 · 改分 / 重评 / 版本链（UC-22/23/24/25）">
+  <PageShell :bare="embedded">
+    <PageHeader
+      v-if="!embedded"
+      title="评价复核"
+      subtitle="复核工作台入口 · 改分 / 重评 / 版本链（UC-22/23/24/25）"
+    >
       <el-button @click="router.push('/tasks/manage')">去任务管理</el-button>
     </PageHeader>
 
@@ -57,7 +61,7 @@
     <section class="card task-card">
       <div class="recent-head">
         <h3>我的任务（{{ tasks.length }}）</h3>
-        <el-button link type="primary" size="small" @click="router.push('/tasks/manage')">
+        <el-button v-if="!embedded" link type="primary" size="small" @click="router.push('/tasks/manage')">
           进入任务管理 →
         </el-button>
       </div>
@@ -97,6 +101,8 @@ import AppSkeleton from '@/components/ui/AppSkeleton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
 import ScrollArea from '@/components/ui/ScrollArea.vue'
+
+withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 
 interface RecentReview {
   id: number
