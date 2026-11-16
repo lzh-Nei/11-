@@ -5,19 +5,20 @@
       <div class="user-zone">
         <span class="hello">{{ auth.me?.realName }}（{{ auth.me?.username }}）</span>
         <el-tag :type="roleTagType" effect="dark">{{ auth.role }}</el-tag>
+        <el-button size="small" @click="router.push('/change-password')">修改密码</el-button>
         <el-button size="small" @click="onLogout">登出</el-button>
       </div>
     </el-header>
 
     <el-main class="main">
-      <el-alert
-        v-if="auth.firstLogin"
-        title="首次登录：请尽快修改初始密码（UC-07，改密引导开发中）"
-        type="warning"
-        show-icon
-        :closable="false"
-        class="first-login"
-      />
+      <el-alert v-if="auth.firstLogin" type="warning" show-icon :closable="false" class="first-login">
+        <template #title>
+          首次登录：请尽快修改初始密码（UC-07）
+          <el-button link type="primary" size="small" @click="router.push('/change-password')">
+            去修改 →
+          </el-button>
+        </template>
+      </el-alert>
 
       <PageHeader
         :title="`欢迎，${auth.me?.realName || auth.me?.username || ''}`"

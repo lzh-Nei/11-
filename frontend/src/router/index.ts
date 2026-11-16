@@ -48,6 +48,12 @@ const router = createRouter({
       name: 'file-center',
       component: () => import('@/views/FileCenterView.vue')
     },
+    // WP8-B8 登录后自助改密（UC-07：A-06 邮箱码 → A-10 重置，成功清态回登录）
+    {
+      path: '/change-password',
+      name: 'change-password',
+      component: () => import('@/views/ChangePasswordView.vue')
+    },
     // WP8-B6 全局错误页（#02）：403/500 直达 + history 兜底 404
     {
       path: '/403',

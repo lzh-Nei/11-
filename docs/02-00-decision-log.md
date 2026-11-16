@@ -55,7 +55,7 @@
   （V7→V8→V9→V10→V11回滚），详见 golden-eval-report-W7C2.md W9-M2 附录 §四——
   三选项（例外登记/P2技术路径/样本调整）待 PM 裁决。
 
-## 待裁决（WP8-B6 前端验收发现，2026-11-16）
+## 待裁决（WP8-B6/B8 前端验收发现，2026-11-16）
 
 - **学生端评价历史版本（02-05 #08，P0）与权限矩阵冲突**：V1__rbac.sql 的 STUDENT 角色
   未授予 `evaluation:history:view`（D-36 矩阵 STUDENT=7 项口径），E-04/E-05 对学生会返回
@@ -69,4 +69,8 @@
   `list/nextCursor/hasMore`，列表项仅 `versionNo/source/totalScore/reviewerName/createTime`；
   `teacherComment/metricScores/aiComment/traceId` 仅 E-05 快照返回。前端曾按
   `items/operatorName/createdAt` 实现（渲染崩溃根因），B6 已校正——建议 03-API 回写该细节。
+- **A-10 重置密码不清 `first_login`（UC-07 遗留）**：登录后自助改密页（B8，A-06 邮箱码 →
+  A-10 重置）实测成功（重置→强制重登→新密码登录闭环），但 `sys_user.first_login` 仍为 1，
+  "首次登录请改密"提示在改密后持续存在。建议认证域微修：`AuthService.resetPassword`
+  成功后同置 `first_login=0`（或登录成功后按 `password_changed_at` 推导）；前端不做本地掩盖。
 
