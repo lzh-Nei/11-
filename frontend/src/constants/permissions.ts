@@ -51,3 +51,42 @@ export function permLabel(code: string): string {
 export function nsLabel(ns: string): string {
   return NS_MAP[ns] ?? ns
 }
+
+/* ══════════ 权限点 → 功能入口映射（WP8-B4 权限即导航）
+   kind: route=直达路由 / action=执行动作 / reserved=预留权限（端点未开放，如实告知） */
+export type PermEntry =
+  | { kind: 'route'; to: string; hint: string }
+  | { kind: 'action'; act: 'logout' | 'profile' | 'dashboard'; hint: string }
+  | { kind: 'reserved'; hint: string }
+
+export const PERM_ROUTE: Record<string, PermEntry> = {
+  'auth:logout': { kind: 'action', act: 'logout', hint: '退出登录' },
+  'user:me': { kind: 'action', act: 'profile', hint: '定位到个人信息卡' },
+  'task:create': { kind: 'route', to: '/tasks/manage', hint: '进入任务管理创建' },
+  'task:publish': { kind: 'route', to: '/tasks/manage', hint: '进入任务管理发布草稿' },
+  'task:edit': { kind: 'reserved', hint: '编辑端点为 V1 预留（T-02 未开放），M3 管理端规划' },
+  'task:view': { kind: 'route', to: '/tasks', hint: '进入任务列表' },
+  'task:mine': { kind: 'route', to: '/tasks', hint: '进入我的任务' },
+  'submission:upload': { kind: 'route', to: '/tasks', hint: '选择任务提交作业' },
+  'submission:view': { kind: 'route', to: '/submissions', hint: '进入提交记录' },
+  'submission:mine': { kind: 'route', to: '/submissions', hint: '进入我的提交' },
+  'evaluation:view': { kind: 'route', to: '/submissions', hint: '从提交记录进入评价报告' },
+  'evaluation:review': { kind: 'action', act: 'dashboard', hint: '复核工作台按评价进入：驾驶舱看数据 → 打开评价报告' },
+  'evaluation:re-evaluate': { kind: 'action', act: 'dashboard', hint: '重评在复核工作台内操作（按评价进入）' },
+  'evaluation:history:view': { kind: 'action', act: 'dashboard', hint: '版本链在复核工作台内查看（按评价进入）' },
+  'report:view': { kind: 'action', act: 'dashboard', hint: '打开报表驾驶舱' },
+  'report:view:teacher': { kind: 'action', act: 'dashboard', hint: '打开教师聚合驾驶舱' },
+  'report:refresh': { kind: 'action', act: 'dashboard', hint: '刷新按钮在驾驶舱内' },
+  'report:export': { kind: 'reserved', hint: '导出端点预留，M3 报表导出规划' },
+  'class:manage': { kind: 'reserved', hint: '班级管理端点预留，M3 规划' },
+  'role:manage': { kind: 'reserved', hint: '管理端预留，M3 规划' },
+  'system:config': { kind: 'reserved', hint: '管理端预留，M3 规划' },
+  'audit:view': { kind: 'reserved', hint: '审计查询预留，M3 规划' },
+  'llm:config': { kind: 'reserved', hint: 'LLM 配置预留，M3 规划' },
+  'prompt:manage': { kind: 'reserved', hint: 'Prompt 管理预留，M3 规划' },
+  'golden:manage': { kind: 'reserved', hint: '黄金集管理预留，M3 规划' }
+}
+
+export function permEntry(code: string): PermEntry | null {
+  return PERM_ROUTE[code] ?? null
+}

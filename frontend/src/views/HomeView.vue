@@ -61,12 +61,32 @@
       </el-card>
 
       <el-card class="section-card">
-        <template #header>权限清单（{{ auth.me?.permissions?.length ?? 0 }} 项 · 按命名空间分组）</template>
+        <template #header>
+          <div class="perm-head">
+            <span>权限清单（{{ auth.me?.permissions?.length ?? 0 }} 项 · 点击直达功能）</span>
+          </div>
+        </template>
         <div class="perm-groups">
           <div v-for="(perms, ns) in permGroups" :key="ns" class="perm-group">
             <div class="ns-title">{{ nsLabel(ns) }} · {{ perms.length }}</div>
             <div class="perm-list">
-              <span v-for="p in perms" :key="p" class="perm-chip" :title="p">{{ permLabel(p) }}</span>
+              <el-tooltip
+                v-for="p in perms"
+                :key="p"
+                :content="permTooltip(p)"
+                placement="top"
+              >
+                <button
+                  class="perm-chip"
+                  :class="{ reserved: permEntry(p)?.kind === 'reserved', action: permEntry(p)?.kind === 'action' }"
+                  type="button"
+                  @click="onPermClick(p)"
+                >
+                  {{ permLabel(p) }}
+                  <i v-if="permEntry(p)?.kind === 'route'" class="chip-arrow">→</i>
+                  <i v-else-if="permEntry(p)?.kind === 'reserved'" class="chip-lock">预留</i>
+                </button>
+              </el-tooltip>
             </div>
           </div>
         </div>
@@ -85,7 +105,8 @@ import AppSkeleton from '@/components/ui/AppSkeleton.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import { reportApi, type ReportOverview } from '@/api/report'
-import { permLabel, nsLabel } from '@/constants/permissions'
+import { permLabel, nsLabel, permEntry } from '@/constants/permissions'
+import { toast } from '@/utils/toast'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -140,6 +161,38 @@ async function loadOverview() {
 }
 
 function noop() {}
+
+/* 权限即导航（WP8-B4）：route 直达 / action 执行 / reserved 如实告知预留状态 */
+function permTooltip(code: string): string {
+  const entry = permEntry(code)
+  if (!entry) return String(code)
+  return `${entry.hint}（${code}）`
+}
+
+function onPermClick(code: string) {
+  const entry = permEntry(code)
+  if (!entry) return
+  if (entry.kind === 'route') {
+    router.push(entry.to)
+    return
+  }
+  if (entry.kind === 'reserved') {
+    toast.warning(`预留权限：${entry.hint}`)
+    return
+  }
+  switch (entry.act) {
+    case 'logout':
+      auth.logout()
+      router.push('/login')
+      break
+    case 'profile':
+      document.querySelector('.section-card')?.scrollIntoView({ behavior: 'smooth' })
+      break
+    case 'dashboard':
+      window.open('/report.html', '_blank', 'noopener')
+      break
+  }
+}
 
 async function onLogout() {
   await auth.logout()
@@ -214,11 +267,43 @@ onMounted(loadOverview)
 }
 .perm-chip {
   display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 4px 12px;
   border-radius: var(--aies-radius-pill);
   background: var(--aies-paper);
   border: 1px solid var(--aies-border);
   font-size: 12.5px;
   color: var(--aies-ink2);
+  cursor: pointer;
+  font-family: inherit;
+  transition: box-shadow var(--aies-t), transform var(--aies-t), border-color var(--aies-t), color var(--aies-t);
+}
+.perm-chip:hover {
+  border-color: var(--aies-brand);
+  color: var(--aies-brand-ink, #78350f);
+  box-shadow: var(--aies-shadow-hover);
+  transform: var(--aies-lift);
+}
+.perm-chip.reserved {
+  border-style: dashed;
+  opacity: 0.75;
+}
+.perm-chip.action {
+  background: #f7ede6;
+}
+.chip-arrow {
+  font-style: normal;
+  color: var(--aies-brand);
+  font-weight: 600;
+}
+.chip-lock {
+  font-style: normal;
+  font-size: 10px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--aies-paper);
+  border: 1px solid var(--aies-border);
+  color: var(--aies-ink3);
 }
 </style>
