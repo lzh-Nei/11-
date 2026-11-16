@@ -232,10 +232,15 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #1f2d3d 0%, #2b4a6f 100%);
+  background: var(--aies-paper);
+  padding: 24px;
 }
 .forgot-card {
-  width: 380px;
+  width: 400px;
+  max-width: 100%;
+  border-radius: var(--aies-radius-lg);
+  box-shadow: var(--aies-shadow);
+  border: 1px solid var(--aies-border);
 }
 .title {
   text-align: center;
