@@ -209,3 +209,22 @@
   姓名改为“示例学生·资料测试”保存后基础信息与侧栏即时更新，随后恢复“示例学生”；
   手机号 13800000002 保留；审计留痕写入成功。
 
+## 过程注记（WP8-C9 用户管理增删改查，2026-11-16）
+
+- **后端**：用户管理补齐 CRUD（权限点 `user:manage`）：
+  - `POST /api/admin/users`：账号唯一、密码强度、邮箱/手机格式；角色仅 STUDENT/TEACHER
+    （禁止创建 ADMIN），班级可选；初始 `first_login=1` 强制首登改密。
+  - `PUT /api/admin/users/{id}`：编辑姓名/邮箱/手机/班级；用户名、角色、状态不走此接口
+    （角色/启停沿用已有端点）；ADMIN 账号保护（资料请走个人中心）。
+  - `DELETE /api/admin/users/{id}`：禁止自删/删除 ADMIN；存在提交、任务、班级、评价历史/结果
+    或审计记录（operator）时拒绝并提示改为禁用；删除前清理 sys_user_role 与权限缓存，
+    另有 DataIntegrityViolation 兜底。
+  - 全部写操作审计 CREATE_USER/UPDATE_USER/DELETE_USER，邮箱/手机脱敏留痕。
+- **前端**：用户管理工具栏新增“新建用户”，行操作扩展为 编辑 / 角色 / 禁用启用 / 删除；
+  新建弹窗含账号/姓名/初始密码/邮箱/手机/班级/角色，编辑弹窗账号只读；删除二次确认并提示
+  依赖数据将拒绝。ADMIN 与当前登录账号保持全操作禁用（防锁死）。
+- **隔离构建**：`../11-exec-user-crud` worktree 实现并 ff-merge；AdminServiceTest 增补 8 例，
+  全量 292 测试、checkstyle、spotbugs 全绿；jar 已部署重启。
+- 验证：界面新建 `crud_e2e_01`（学生），列表 7→8；编辑为“CRUD测试改”/crud2@aies.local
+  即时生效；删除后回到 7 条，数据库确认无残留；audit_log 中 CREATE/UPDATE/DELETE_USER 各 1 条。
+

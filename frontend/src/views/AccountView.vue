@@ -1,7 +1,10 @@
 <template>
   <!-- 个人中心：基础信息展示 + 修改用户信息（自助，姓名/手机号）+ 安全操作 -->
   <PageShell>
-    <PageHeader title="个人中心" subtitle="账号基础信息展示与自助资料维护（GET /api/auth/me · PUT /api/profile）">
+    <PageHeader
+      title="个人中心"
+      subtitle="账号基础信息展示与自助资料维护（GET /api/auth/me · PUT /api/profile）"
+    >
       <el-button size="small" :loading="reloading" @click="reloadMe">刷新用户信息</el-button>
     </PageHeader>
 
@@ -107,9 +110,7 @@ const roleTagType = computed(() => {
 
 const phoneValid = computed(() => !form.phone.trim() || /^1[3-9]\d{9}$/.test(form.phone.trim()))
 const dirty = computed(
-  () =>
-    form.realName.trim() !== (auth.me?.realName ?? '') ||
-    form.phone.trim() !== (auth.me?.phone ?? '')
+  () => form.realName.trim() !== (auth.me?.realName ?? '') || form.phone.trim() !== (auth.me?.phone ?? '')
 )
 const canSave = computed(() => form.realName.trim().length > 0 && phoneValid.value && dirty.value)
 const errorTip = computed(() => {

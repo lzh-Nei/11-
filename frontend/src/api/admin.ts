@@ -122,6 +122,25 @@ export interface AdminClassPayload {
   teacherId: number
 }
 
+/** 管理员新建用户（roleCodes 仅 STUDENT/TEACHER；初始强制改密） */
+export interface AdminUserCreatePayload {
+  username: string
+  realName: string
+  password: string
+  email: string
+  phone: string
+  classId: number | null
+  roleCodes: string[]
+}
+
+/** 管理员编辑用户基础资料（用户名/角色/状态不走此载荷） */
+export interface AdminUserUpdatePayload {
+  realName: string
+  email: string
+  phone: string
+  classId: number | null
+}
+
 export const adminApi = {
   /* 用户管理 */
   async users(params: {
@@ -138,6 +157,15 @@ export const adminApi = {
   },
   async updateUserRoles(id: number, roleCodes: string[]): Promise<void> {
     await request.put(`/admin/users/${id}/roles`, { roleCodes })
+  },
+  async createUser(payload: AdminUserCreatePayload): Promise<AdminUser> {
+    return (await request.post('/admin/users', payload)) as unknown as AdminUser
+  },
+  async updateUser(id: number, payload: AdminUserUpdatePayload): Promise<AdminUser> {
+    return (await request.put(`/admin/users/${id}`, payload)) as unknown as AdminUser
+  },
+  async deleteUser(id: number): Promise<void> {
+    await request.delete(`/admin/users/${id}`)
   },
   async teachers(): Promise<AdminTeacher[]> {
     return (await request.get('/admin/teachers')) as unknown as AdminTeacher[]
