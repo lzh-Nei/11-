@@ -354,7 +354,7 @@ function renderAll(data){
   S.charts.forEach(c=>c.dispose());S.charts=[];
   drawBar('task',toNameValue(dig(data,CONFIG.fields.task),CONFIG.keys.task));
   drawBar('dist',toNameValue(dig(data,CONFIG.fields.dist),CONFIG.keys.dist));
-  drawRadar(dig(data,CONFIG.fields.radar));
+  drawRadar(dig(data,CONFIG.fields.radar),CONFIG.keys.radar);
   drawBar('gap',toNameValue(dig(data,CONFIG.fields.gap),CONFIG.keys.gap));
 }
 function drawBar(k,nv){
@@ -366,9 +366,9 @@ function drawBar(k,nv){
     yAxis:{type:'value',axisLabel:{color:INK.axisSoft,fontFamily:'ui-monospace,Consolas,monospace'},splitLine:{lineStyle:{color:INK.split}}},
     series:[{type:'bar',data:nv.map(x=>x.value),itemStyle:{color:CHART_COLORS[k],borderRadius:[3,3,0,0]},barMaxWidth:40,animationDuration:INK.anim}]});
 }
-function drawRadar(v){
+function drawRadar(v,ck=null){
   const el=$('ch-radar');if(!el)return;
-  const nv=toNameValue(v,null,['indicators','axes','metrics','dimensions']);
+  const nv=toNameValue(v,ck,['indicators','axes','metrics','dimensions']);
   if(!nv||nv.length<3){el.innerHTML=emptyBox();return;}
   const max=niceMax(Math.max(...nv.map(x=>x.value)));
   const c=echarts.init(el);S.charts.push(c);
