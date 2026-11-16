@@ -19,7 +19,6 @@
         >
           <NavIcon :name="g.icon" />
           <span>{{ g.label }}</span>
-          <i v-if="g.external" class="ext">↗</i>
         </button>
       </nav>
 
@@ -36,19 +35,12 @@
           >
             <NavIcon :name="c.icon" />
             <span>{{ c.label }}</span>
-            <i v-if="c.external" class="ext">↗</i>
           </button>
         </aside>
 
         <section class="content">
           <ScrollArea fill padded>
-            <div v-if="pageExternal" class="launch">
-              <NavIcon :name="selectedGroup?.icon ?? 'chart'" class="launch-icon" />
-              <h3>{{ selectedChild?.label ?? selectedGroup?.label }}</h3>
-              <p>该功能将在新窗口打开。</p>
-              <el-button type="primary" @click="openWindow(pageExternal)">在新窗口打开 ↗</el-button>
-            </div>
-            <component :is="pageComponent" v-else-if="pageComponent" v-bind="pageProps ?? {}" />
+            <component :is="pageComponent" v-if="pageComponent" v-bind="pageProps ?? {}" />
             <div v-else class="placeholder">请选择左侧三级目录</div>
           </ScrollArea>
         </section>
@@ -84,7 +76,6 @@ import LlmConfigPanel from '@/components/admin/LlmConfigPanel.vue'
 import PromptPanel from '@/components/admin/PromptPanel.vue'
 import GoldenPanel from '@/components/admin/GoldenPanel.vue'
 import ConfigPanel from '@/components/admin/ConfigPanel.vue'
-import { openWindow } from '@/utils/window'
 
 interface ModuleChild {
   key: string
@@ -92,7 +83,6 @@ interface ModuleChild {
   icon: string
   component?: Component
   props?: Record<string, unknown>
-  external?: string
 }
 interface ModuleGroup {
   key: string
@@ -101,7 +91,6 @@ interface ModuleGroup {
   children?: ModuleChild[]
   component?: Component
   props?: Record<string, unknown>
-  external?: string
 }
 
 const auth = useAuthStore()
@@ -302,7 +291,6 @@ const selectedChild = computed(
 const hasChildren = computed(() => (selectedGroup.value?.children?.length ?? 0) > 0)
 const pageComponent = computed(() => selectedChild.value?.component ?? selectedGroup.value?.component ?? null)
 const pageProps = computed(() => selectedChild.value?.props ?? selectedGroup.value?.props ?? null)
-const pageExternal = computed(() => selectedChild.value?.external ?? selectedGroup.value?.external ?? '')
 
 function writeQuery(groupKey: string, childKey: string) {
   router.replace({ query: childKey ? { group: groupKey, child: childKey } : { group: groupKey } })
@@ -312,13 +300,11 @@ function selectGroup(group: ModuleGroup) {
   activeGroupKey.value = group.key
   activeChildKey.value = group.children?.[0]?.key ?? ''
   writeQuery(group.key, activeChildKey.value)
-  if (group.external) openWindow(group.external)
 }
 
 function selectChild(child: ModuleChild) {
   activeChildKey.value = child.key
   writeQuery(activeGroupKey.value, child.key)
-  if (child.external) openWindow(child.external)
 }
 </script>
 
@@ -374,11 +360,6 @@ function selectChild(child: ModuleChild) {
   color: var(--aies-brand);
   border-bottom-color: var(--aies-brand);
   font-weight: 600;
-}
-.ext {
-  font-style: normal;
-  font-size: 11px;
-  color: var(--aies-ink3);
 }
 .browser-body {
   margin: 0;
@@ -448,30 +429,6 @@ function selectChild(child: ModuleChild) {
   display: flex;
   flex-direction: column;
   padding: 12px 14px 10px;
-}
-.launch {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 60px 20px;
-  text-align: center;
-}
-.launch-icon {
-  width: 34px;
-  height: 34px;
-  color: var(--aies-brand);
-}
-.launch h3 {
-  margin: 0;
-  font-size: 17px;
-  color: var(--aies-ink);
-}
-.launch p {
-  margin: 0 0 6px;
-  font-size: 12.5px;
-  color: var(--aies-ink3);
 }
 .placeholder {
   padding: 40px 0;
