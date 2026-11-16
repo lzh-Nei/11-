@@ -42,6 +42,9 @@ public class EvaluationHistory {
     /** AI评语快照 */
     private String aiComment;
 
+    /** AI 版本模型标识（教师版本为空） */
+    private String aiModel;
+
     /** 复核理由（TEACHER_REVIEW时必填≥10字→应用层30007） */
     private String teacherComment;
 

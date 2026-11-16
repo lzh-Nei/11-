@@ -5,8 +5,10 @@ import com.aies.common.Result;
 import com.aies.dto.EvaluationHistoryPageVO;
 import com.aies.dto.EvaluationHistoryVO;
 import com.aies.dto.EvaluationVO;
+import com.aies.dto.EvaluationAppealRequest;
 import com.aies.dto.ReviewEvaluationRequest;
 import com.aies.security.LoginPrincipal;
+import com.aies.service.EvaluationAppealService;
 import com.aies.service.EvaluationCommandService;
 import com.aies.service.EvaluationQueryService;
 import jakarta.validation.Valid;
@@ -35,6 +37,7 @@ public class EvaluationController {
 
     private final EvaluationQueryService evaluationQueryService;
     private final EvaluationCommandService evaluationCommandService;
+    private final EvaluationAppealService evaluationAppealService;
 
     /** E-01 评价当前值：STUDENT限本人(40400同形)；教师视角另含trace_id */
     @PreAuthorize("hasAuthority('" + PermissionConstants.EVALUATION_VIEW + "')")
@@ -82,6 +85,15 @@ public class EvaluationController {
     public Result<EvaluationVO> manualScore(@PathVariable long id,
                                             @Valid @RequestBody ReviewEvaluationRequest request) {
         return Result.success(evaluationCommandService.manualScore(id, request, currentPrincipal()));
+    }
+
+    /** 学生对已复核评价发起申诉：随机改派其他教师复评。 */
+    @PreAuthorize("hasAuthority('" + PermissionConstants.SUBMISSION_UPLOAD + "')")
+    @PostMapping("/{id}/appeal")
+    public Result<EvaluationAppealService.AppealResult> appeal(
+            @PathVariable long id,
+            @Valid @RequestBody EvaluationAppealRequest request) {
+        return Result.success(evaluationAppealService.appeal(id, request.getReason(), currentPrincipal()));
     }
 
     /** 当前主体（JWT过滤器装配；未登录时此路径不可达） */

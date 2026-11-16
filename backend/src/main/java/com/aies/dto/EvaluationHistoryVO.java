@@ -28,6 +28,9 @@ public class EvaluationHistoryVO {
     /** 操作人姓名（AI版本为null；TEACHER_REVIEW/RE_EVALUATE为教师real_name） */
     private String reviewerName;
 
+    /** AI 版本模型标识（教师版本为空） */
+    private String aiModel;
+
     /** 版本生成时间 */
     private LocalDateTime createTime;
 

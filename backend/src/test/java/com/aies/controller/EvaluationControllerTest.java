@@ -7,6 +7,7 @@ import com.aies.dto.EvaluationHistoryVO;
 import com.aies.dto.EvaluationVO;
 import com.aies.exception.ApiExceptionHandler;
 import com.aies.security.LoginPrincipal;
+import com.aies.service.EvaluationAppealService;
 import com.aies.service.EvaluationCommandService;
 import com.aies.service.EvaluationQueryService;
 import org.junit.jupiter.api.AfterEach;
@@ -45,14 +46,17 @@ class EvaluationControllerTest {
 
     private EvaluationQueryService evaluationQueryService;
     private EvaluationCommandService evaluationCommandService;
+    private EvaluationAppealService evaluationAppealService;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         evaluationQueryService = mock(EvaluationQueryService.class);
         evaluationCommandService = mock(EvaluationCommandService.class);
+        evaluationAppealService = mock(EvaluationAppealService.class);
         mockMvc = MockMvcBuilders.standaloneSetup(
-                        new EvaluationController(evaluationQueryService, evaluationCommandService))
+                        new EvaluationController(evaluationQueryService, evaluationCommandService,
+                                evaluationAppealService))
                 .setControllerAdvice(new ApiExceptionHandler())
                 .build();
     }

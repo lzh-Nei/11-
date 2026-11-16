@@ -37,6 +37,12 @@ public class EvaluationVO {
     /** AI评语 */
     private String aiComment;
 
+    /** 最近 AI 评价模型 */
+    private String aiModel;
+
+    /** 最近复核教师姓名 */
+    private String reviewerName;
+
     /** 失败码（FAILED时40003） */
     private Integer errorCode;
 

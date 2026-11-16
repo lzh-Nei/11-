@@ -6,12 +6,14 @@ import com.aies.config.RabbitConfig;
 import com.aies.dto.EvaluationVO;
 import com.aies.dto.ReviewEvaluationRequest;
 import com.aies.entity.AuditLog;
+import com.aies.entity.EvaluationAppeal;
 import com.aies.entity.EvaluationHistory;
 import com.aies.entity.EvaluationResult;
 import com.aies.entity.Submission;
 import com.aies.entity.Task;
 import com.aies.entity.TaskMetric;
 import com.aies.mapper.AuditLogMapper;
+import com.aies.mapper.EvaluationAppealMapper;
 import com.aies.mapper.EvaluationHistoryMapper;
 import com.aies.mapper.EvaluationResultMapper;
 import com.aies.mapper.SubmissionMapper;
@@ -19,6 +21,7 @@ import com.aies.mapper.TaskMapper;
 import com.aies.model.EvalMessage;
 import com.aies.security.LoginPrincipal;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
@@ -63,6 +66,7 @@ public class EvaluationCommandService {
 
     private final EvaluationResultMapper evaluationResultMapper;
     private final EvaluationHistoryMapper evaluationHistoryMapper;
+    private final EvaluationAppealMapper appealMapper;
     private final SubmissionMapper submissionMapper;
     private final TaskMapper taskMapper;
     private final TaskService taskService;
@@ -81,6 +85,70 @@ public class EvaluationCommandService {
     @Transactional
     public EvaluationVO manualScore(long evaluationId, ReviewEvaluationRequest cmd, LoginPrincipal principal) {
         return doReview(evaluationId, cmd, principal, EvaluationService.STATUS_FAILED);
+    }
+
+    /** 教师提交队列：手动触发 AI 初评（创建/重置 PENDING 后投递 MQ）。 */
+    @Transactional
+    public void triggerAiEvaluation(long submissionId, LoginPrincipal principal) {
+        Submission submission = submissionMapper.selectById(submissionId);
+        if (submission == null || Integer.valueOf(1).equals(submission.getCanceled())) {
+            throw new BusinessException(ErrorCode.NOT_FOUND);
+        }
+        Task task = taskMapper.selectById(submission.getTaskId());
+        if (task == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND);
+        }
+        if (ROLE_TEACHER.equals(principal.role()) && task.getTeacherId() != principal.userId()) {
+            throw new BusinessException(ErrorCode.NOT_FOUND);
+        }
+        if (ROLE_STUDENT.equals(principal.role())) {
+            throw new BusinessException(ErrorCode.NOT_FOUND);
+        }
+        if (!"SUCCESS".equals(submission.getParseStatus()) || submission.getParsedTextKey() == null) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "文件尚未解析完成，暂不能发起 AI 评价");
+        }
+        EvaluationResult existing = evaluationResultMapper.selectOne(
+                new LambdaQueryWrapper<EvaluationResult>()
+                        .eq(EvaluationResult::getSubmissionId, submissionId));
+        if (existing != null && (EvaluationService.STATUS_AI_DONE.equals(existing.getStatus())
+                || EvaluationService.STATUS_REVIEWED.equals(existing.getStatus()))) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "该提交已完成 AI 评价，无需重复发起");
+        }
+        if (existing == null) {
+            EvaluationResult result = new EvaluationResult();
+            result.setSubmissionId(submissionId);
+            result.setStatus(EvaluationService.STATUS_PENDING);
+            result.setCurrentVersionNo(1);
+            evaluationResultMapper.insert(result);
+        } else {
+            existing.setStatus(EvaluationService.STATUS_PENDING);
+            existing.setErrorCode(null);
+            evaluationResultMapper.updateById(existing);
+        }
+        sendEvalMessageAfterCommit(submissionId);
+    }
+
+    /** 教师复核队列：一键通过 AI 结果（生成教师复核版本并归档）。 */
+    @Transactional
+    public EvaluationVO approveAi(long evaluationId, LoginPrincipal principal) {
+        AccessContext ctx = requireAccessible(evaluationId, principal);
+        EvaluationResult result = ctx.result();
+        if (!EvaluationService.STATUS_AI_DONE.equals(result.getStatus())) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "仅待教师复核的 AI 评价可以一键通过");
+        }
+        Map<String, BigDecimal> scores;
+        try {
+            scores = result.getMetricScores() == null ? Map.of()
+                    : objectMapper.readValue(result.getMetricScores(),
+                    new TypeReference<Map<String, BigDecimal>>() {
+                    });
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "AI 指标分读取失败，请手动复核");
+        }
+        ReviewEvaluationRequest request = new ReviewEvaluationRequest();
+        request.setMetricScores(scores);
+        request.setReviewComment("教师一键通过 AI 评价结果");
+        return doReview(evaluationId, request, principal, EvaluationService.STATUS_AI_DONE);
     }
 
     /** E-03 触发重评（UC-23：前置REVIEWED/FAILED；置PENDING→MQ→管道写source=RE_EVALUATE新版本） */
@@ -122,7 +190,10 @@ public class EvaluationCommandService {
                                   LoginPrincipal principal, String expectedStatus) {
         AccessContext ctx = requireAccessible(evaluationId, principal);
         EvaluationResult result = ctx.result();
-        if (!expectedStatus.equals(result.getStatus())) {
+        boolean appealReview = EvaluationService.STATUS_REVIEWED.equals(result.getStatus())
+                && EvaluationService.STATUS_AI_DONE.equals(expectedStatus)
+                && hasPendingAppeal(evaluationId, principal);
+        if (!expectedStatus.equals(result.getStatus()) && !appealReview) {
             throw new BusinessException(ErrorCode.PARAM_ERROR,
                     "评价状态不允许该操作（当前" + result.getStatus()
                             + "，要求" + expectedStatus + "）");
@@ -156,12 +227,42 @@ public class EvaluationCommandService {
         history.setTeacherComment(comment);
         history.setReviewerId(principal.userId());
         evaluationHistoryMapper.insert(history);
+        resolveAppeal(evaluationId, principal);
         log.info("复核完成: evaluationId={} version={} total={} reviewer={}",
                 evaluationId, nextVersion, total, principal.userId());
         // 报表缓存主动失效（D-36：事件经 common 解耦，报表侧 AFTER_COMMIT 监听；review/manualScore 共用本尾部）
         eventPublisher.publishEvent(new com.aies.common.ReportCacheEvictEvent(
                 ctx.submission().getTaskId(), ctx.submission().getStudentId()));
         return toVo(result, cmd.getMetricScores());
+    }
+
+    /** 当前教师是否有该评价的待处理申诉改派。 */
+    private boolean hasPendingAppeal(long evaluationId, LoginPrincipal principal) {
+        Long count = appealMapper.selectCount(new LambdaQueryWrapper<EvaluationAppeal>()
+                .eq(EvaluationAppeal::getEvaluationId, evaluationId)
+                .eq(EvaluationAppeal::getAssignedTeacherId, principal.userId())
+                .eq(EvaluationAppeal::getStatus, "PENDING"));
+        return count != null && count > 0;
+    }
+
+    /** 申诉复评完成后关闭申诉单。 */
+    private void resolveAppeal(long evaluationId, LoginPrincipal principal) {
+        EvaluationAppeal appeal = appealMapper.selectOne(
+                new LambdaQueryWrapper<EvaluationAppeal>()
+                        .eq(EvaluationAppeal::getEvaluationId, evaluationId)
+                        .eq(EvaluationAppeal::getStatus, "PENDING")
+                        .last("LIMIT 1"));
+        if (appeal == null) {
+            return;
+        }
+        boolean assigned = appeal.getAssignedTeacherId() != null
+                && appeal.getAssignedTeacherId() == principal.userId();
+        if (!assigned && !"ADMIN".equals(principal.role())) {
+            return;
+        }
+        appeal.setStatus("RESOLVED");
+        appeal.setResolvedTime(LocalDateTime.now());
+        appealMapper.updateById(appeal);
     }
 
     /** 教师输入校验：键集=任务指标集，逐项非负；总分由指标分自动求和，Σ>100 直接拒绝。 */
@@ -259,9 +360,18 @@ public class EvaluationCommandService {
         }
         if (ROLE_TEACHER.equals(principal.role())) {
             Task task = taskMapper.selectById(submission.getTaskId());
-            if (task == null || task.getTeacherId() == null
-                    || task.getTeacherId() != principal.userId()) {
-                throw new BusinessException(ErrorCode.NOT_FOUND);
+            boolean owner = task != null && task.getTeacherId() != null
+                    && task.getTeacherId() == principal.userId();
+            if (!owner) {
+                EvaluationAppeal appeal = appealMapper.selectOne(
+                        new LambdaQueryWrapper<EvaluationAppeal>()
+                                .eq(EvaluationAppeal::getEvaluationId, evaluationId)
+                                .eq(EvaluationAppeal::getAssignedTeacherId, principal.userId())
+                                .eq(EvaluationAppeal::getStatus, "PENDING")
+                                .last("LIMIT 1"));
+                if (appeal == null) {
+                    throw new BusinessException(ErrorCode.NOT_FOUND);
+                }
             }
         }
         return new AccessContext(result, submission);
@@ -288,6 +398,7 @@ public class EvaluationCommandService {
         vo.setTotalScore(result.getTotalScore());
         vo.setMetricScores(metricScores);
         vo.setAiComment(result.getAiComment());
+        vo.setAiModel(result.getAiModel());
         vo.setErrorCode(result.getErrorCode());
         vo.setUpdateTime(result.getUpdateTime());
         vo.setTraceId(result.getTraceId());

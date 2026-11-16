@@ -40,6 +40,9 @@ public class EvaluationResult {
     /** AI评语 */
     private String aiComment;
 
+    /** 最近一次 AI 评价模型标识 */
+    private String aiModel;
+
     /** 最近复核教师 */
     private Long reviewerId;
 

@@ -9,6 +9,7 @@ import com.aies.entity.EvaluationResult;
 import com.aies.entity.Submission;
 import com.aies.entity.Task;
 import com.aies.entity.User;
+import com.aies.mapper.EvaluationAppealMapper;
 import com.aies.mapper.EvaluationHistoryMapper;
 import com.aies.mapper.EvaluationResultMapper;
 import com.aies.mapper.SubmissionMapper;
@@ -53,7 +54,8 @@ class EvaluationQueryServiceTest {
         taskMapper = mock(TaskMapper.class);
         userMapper = mock(UserMapper.class);
         service = new EvaluationQueryService(evaluationResultMapper, evaluationHistoryMapper,
-                submissionMapper, taskMapper, userMapper, new ObjectMapper());
+                submissionMapper, taskMapper, userMapper, mock(EvaluationAppealMapper.class),
+                new ObjectMapper());
     }
 
     private LoginPrincipal principal(long userId, String role) {

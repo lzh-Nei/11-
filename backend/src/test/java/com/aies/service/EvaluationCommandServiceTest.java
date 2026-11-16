@@ -9,6 +9,7 @@ import com.aies.entity.Submission;
 import com.aies.entity.Task;
 import com.aies.entity.TaskMetric;
 import com.aies.mapper.AuditLogMapper;
+import com.aies.mapper.EvaluationAppealMapper;
 import com.aies.mapper.EvaluationHistoryMapper;
 import com.aies.mapper.EvaluationResultMapper;
 import com.aies.mapper.SubmissionMapper;
@@ -62,8 +63,9 @@ class EvaluationCommandServiceTest {
         auditLogMapper = mock(AuditLogMapper.class);
         rabbitTemplate = mock(RabbitTemplate.class);
         service = new EvaluationCommandService(evaluationResultMapper, evaluationHistoryMapper,
-                submissionMapper, taskMapper, taskService, auditLogMapper, rabbitTemplate,
-                new ObjectMapper(), mock(org.springframework.context.ApplicationEventPublisher.class));
+                mock(EvaluationAppealMapper.class), submissionMapper, taskMapper, taskService,
+                auditLogMapper, rabbitTemplate, new ObjectMapper(),
+                mock(org.springframework.context.ApplicationEventPublisher.class));
     }
 
     private LoginPrincipal principal(long userId, String role) {

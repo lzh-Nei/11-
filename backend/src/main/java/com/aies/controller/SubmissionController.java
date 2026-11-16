@@ -71,6 +71,14 @@ public class SubmissionController {
                 .build();
     }
 
+    /** 学生取消本人尚未完成评价的提交。 */
+    @PreAuthorize("hasAuthority('" + PermissionConstants.SUBMISSION_UPLOAD + "')")
+    @PostMapping("/{id}/cancel")
+    public Result<Void> cancel(@PathVariable long id) {
+        submissionService.cancel(id, currentPrincipal());
+        return Result.success();
+    }
+
     /** 当前主体（JWT过滤器装配；未登录时此路径不可达） */
     private LoginPrincipal currentPrincipal() {
         var auth = SecurityContextHolder.getContext().getAuthentication();

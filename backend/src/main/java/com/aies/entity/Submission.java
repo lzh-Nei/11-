@@ -50,5 +50,10 @@ public class Submission {
     /** 提取文本对象key（W7解析域写入） */
     private String parsedTextKey;
 
+    /** 1=学生取消本次提交（不进入教师队列） */
+    private Integer canceled;
+
+    private LocalDateTime cancelTime;
+
     private LocalDateTime createTime;
 }

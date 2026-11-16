@@ -160,6 +160,8 @@ public class SubmissionService {
                 new LambdaQueryWrapper<Submission>()
                         .eq(Submission::getStudentId, studentId)
                         .eq(taskId != null, Submission::getTaskId, taskId)
+                        .and(w -> w.eq(Submission::getCanceled, 0)
+                                .or().isNull(Submission::getCanceled))
                         .orderByAsc(Submission::getTaskId)
                         .orderByDesc(Submission::getVersionNo));
         Map<Long, EvaluationResult> evalMap = evaluationResultMap(result.getRecords());
@@ -172,6 +174,26 @@ public class SubmissionService {
                 })
                 .toList());
         return vos;
+    }
+
+    /** 取消提交：本人且尚未完成 AI/教师评价；仅软取消，保留原始证据链。 */
+    @Transactional
+    public void cancel(long submissionId, LoginPrincipal principal) {
+        Submission submission = requireOwned(submissionId, principal);
+        if (Integer.valueOf(1).equals(submission.getCanceled())) {
+            return;
+        }
+        EvaluationResult eval = evaluationResultMapper.selectOne(
+                new LambdaQueryWrapper<EvaluationResult>()
+                        .eq(EvaluationResult::getSubmissionId, submissionId));
+        if (eval != null && ("AI_DONE".equals(eval.getStatus())
+                || "REVIEWED".equals(eval.getStatus()))) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR,
+                    "该提交已进入评价或已归档，不能取消；如对结果有异议请申请复核");
+        }
+        submission.setCanceled(1);
+        submission.setCancelTime(LocalDateTime.now());
+        submissionMapper.updateById(submission);
     }
 
     /** S-03 提交详情（UC-18）：归属校验(40400同形) + 签名URL(5min) + 提取文本预览 + 评价状态 */

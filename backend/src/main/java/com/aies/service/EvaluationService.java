@@ -173,6 +173,7 @@ public class EvaluationService {
             result.setTotalScore(null);
             result.setMetricScores(null);
             result.setAiComment(null);
+            result.setAiModel(outcome.modelVersion());
             result.setTraceId(traceId);
             if (isNew) {
                 evaluationResultMapper.insert(result);
@@ -187,6 +188,7 @@ public class EvaluationService {
         result.setTotalScore(outcome.totalScore());
         result.setMetricScores(outcome.metricScoresJson());
         result.setAiComment(outcome.aiComment());
+        result.setAiModel(outcome.modelVersion());
         result.setTraceId(traceId);
         result.setCurrentVersionNo(versionNo);
         if (isNew) {
@@ -202,6 +204,7 @@ public class EvaluationService {
         history.setTotalScore(outcome.totalScore());
         history.setMetricScores(outcome.metricScoresJson());
         history.setAiComment(outcome.aiComment());
+        history.setAiModel(outcome.modelVersion());
         history.setTraceId(traceId);
         evaluationHistoryMapper.insert(history);
         log.info("评价落库完成: submissionId={} version={} total={} historyId={}",

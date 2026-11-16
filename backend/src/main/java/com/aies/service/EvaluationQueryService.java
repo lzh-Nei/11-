@@ -10,6 +10,8 @@ import com.aies.entity.EvaluationResult;
 import com.aies.entity.Submission;
 import com.aies.entity.Task;
 import com.aies.entity.User;
+import com.aies.entity.EvaluationAppeal;
+import com.aies.mapper.EvaluationAppealMapper;
 import com.aies.mapper.EvaluationHistoryMapper;
 import com.aies.mapper.EvaluationResultMapper;
 import com.aies.mapper.SubmissionMapper;
@@ -56,6 +58,7 @@ public class EvaluationQueryService {
     private final SubmissionMapper submissionMapper;
     private final TaskMapper taskMapper;
     private final UserMapper userMapper;
+    private final EvaluationAppealMapper appealMapper;
     private final ObjectMapper objectMapper;
 
     /** E-01 评价当前值查询 */
@@ -80,6 +83,11 @@ public class EvaluationQueryService {
         vo.setTotalScore(result.getTotalScore());
         vo.setMetricScores(parseMetrics(result.getMetricScores()));
         vo.setAiComment(result.getAiComment());
+        vo.setAiModel(result.getAiModel());
+        if (result.getReviewerId() != null) {
+            User reviewer = userMapper.selectById(result.getReviewerId());
+            vo.setReviewerName(reviewer == null ? null : reviewer.getRealName());
+        }
         vo.setErrorCode(result.getErrorCode());
         vo.setUpdateTime(result.getUpdateTime());
         // 教师视角另含trace_id（E-01响应要点）
@@ -165,9 +173,18 @@ public class EvaluationQueryService {
         }
         if (ROLE_TEACHER.equals(principal.role())) {
             Task task = taskMapper.selectById(submission.getTaskId());
-            if (task == null || task.getTeacherId() == null
-                    || task.getTeacherId() != principal.userId()) {
-                throw new BusinessException(ErrorCode.NOT_FOUND);
+            boolean owner = task != null && task.getTeacherId() != null
+                    && task.getTeacherId() == principal.userId();
+            if (!owner) {
+                EvaluationAppeal appeal = appealMapper.selectOne(
+                        new LambdaQueryWrapper<EvaluationAppeal>()
+                                .eq(EvaluationAppeal::getEvaluationId, evaluationId)
+                                .eq(EvaluationAppeal::getAssignedTeacherId, principal.userId())
+                                .eq(EvaluationAppeal::getStatus, "PENDING")
+                                .last("LIMIT 1"));
+                if (appeal == null) {
+                    throw new BusinessException(ErrorCode.NOT_FOUND);
+                }
             }
         }
     }
@@ -196,6 +213,7 @@ public class EvaluationQueryService {
         vo.setVersionNo(row.getVersionNo());
         vo.setSource(row.getSource());
         vo.setTotalScore(row.getTotalScore());
+        vo.setAiModel(row.getAiModel());
         vo.setCreateTime(row.getCreateTime());
         if (row.getReviewerId() != null) {
             User reviewer = userMapper.selectById(row.getReviewerId());

@@ -28,4 +28,12 @@ public interface RbacMapper {
     @Insert("INSERT INTO sys_user_role (user_id, role_id) "
             + "SELECT #{userId}, id FROM sys_role WHERE role_code = #{roleCode}")
     int insertUserRole(@Param("userId") Long userId, @Param("roleCode") String roleCode);
+
+    /** 可受理申诉的教师（启用状态，排除原评教师/班主任） */
+    @Select("SELECT DISTINCT u.id FROM sys_user u "
+            + "JOIN sys_user_role ur ON ur.user_id = u.id "
+            + "JOIN sys_role r ON r.id = ur.role_id "
+            + "WHERE r.role_code = 'TEACHER' AND u.status = 1 "
+            + "AND (#{excludeId} IS NULL OR u.id <> #{excludeId})")
+    List<Long> selectAvailableTeacherIds(@Param("excludeId") Long excludeId);
 }
