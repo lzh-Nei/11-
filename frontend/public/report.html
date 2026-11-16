@@ -24,6 +24,7 @@ body{background:var(--paper);color:var(--ink);font:14px/1.6 var(--sans)}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 button{font:inherit;cursor:pointer;transition:background var(--t),border-color var(--t),color var(--t)}
 input,select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line2);border-radius:var(--r-md);padding:9px 12px;transition:border-color var(--t)}
+input::placeholder,textarea::placeholder{color:#78716c;opacity:1}
 input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px solid var(--brand2);outline-offset:2px}
 .hidden{display:none!important}
 /* ===== 壳层 ===== */
@@ -68,9 +69,7 @@ body:not(.authed) .nav-btn{opacity:.35;pointer-events:none}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(460px,1fr));gap:16px}
 @media(max-width:1020px){.grid{grid-template-columns:1fr}}
 .chart{height:290px;margin-top:10px}
-.skel{position:relative;overflow:hidden;background:#edebe6;border-radius:var(--r-md)}
-.skel::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent);animation:sh 1.2s infinite}
-@keyframes sh{to{transform:translateX(100%)}}
+.skel{background:#edebe6;border-radius:var(--r-md)}
 /* 控制台 */
 pre{background:#171412;color:#e7e5e4;padding:14px;border-radius:var(--r-md);overflow:auto;max-height:400px;font:12.5px/1.55 var(--mono);margin:0}
 textarea{width:100%;min-height:64px;font-family:var(--mono);font-size:13px}
