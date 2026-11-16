@@ -185,8 +185,11 @@ const CONFIG={
   fields:{task:'tasks',dist:'scoreDist',radar:'metricRadar',gap:'scoreGapDist'},
   /* T3 契约校准（2026-11-16 实弹响应锁定）：keys 为四图 name/value 字段映射——
      metricRadar 元素 {metricName,avgScore} 双键均不在通用候选链（原雷达图空态根因），
-     scoreDist/scoreGapDist {range,count}×5，tasks nameKey=title */
-  keys:{task:{nameKey:'title',valueKey:null},
+     scoreDist/scoreGapDist {range,count}×5，tasks nameKey=title。
+     WP3-T1（2026-11-16）：task valueKey=submitted 锁定——tasks 元素的 submitted/scored/
+     rate 均不在通用取值链（value/count/avg/score/ratio/percent/num/total 全不命中），
+     任务统计语义取"已提交数"（PM 裁决建议采纳） */
+  keys:{task:{nameKey:'title',valueKey:'submitted'},
         dist:{nameKey:'range',valueKey:'count'},
         radar:{nameKey:'metricName',valueKey:'avgScore'},
         gap:{nameKey:'range',valueKey:'count'}},
