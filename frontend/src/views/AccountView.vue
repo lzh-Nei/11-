@@ -52,9 +52,6 @@
         <p v-if="auth.firstLogin" class="first-tip">首次登录：建议先修改初始密码（UC-07）。</p>
       </section>
     </div>
-
-    <!-- 教师/学生保留权限清单；管理员统一在「功能模块 → 用户与权限 → 权限清单」 -->
-    <PermissionCatalog v-if="!isAdmin" class="perm-block" />
   </PageShell>
 </template>
 
@@ -64,14 +61,12 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import PageShell from '@/components/ui/PageShell.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
-import PermissionCatalog from '@/components/business/PermissionCatalog.vue'
 import { toast } from '@/utils/toast'
 
 const router = useRouter()
 const auth = useAuthStore()
 const reloading = ref(false)
 
-const isAdmin = computed(() => auth.role === 'ADMIN')
 const roleTagType = computed(() => {
   if (auth.role === 'ADMIN') return 'danger'
   if (auth.role === 'TEACHER') return 'warning'
@@ -165,8 +160,5 @@ async function onLogout() {
   margin: 12px 0 0;
   font-size: 12px;
   color: var(--aies-brand);
-}
-.perm-block {
-  margin-top: var(--aies-gap);
 }
 </style>

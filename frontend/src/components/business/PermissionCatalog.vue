@@ -65,28 +65,32 @@ async function onLogout() {
   router.push('/login')
 }
 
-/** 权限即导航：角色相关的入口在常量映射之上覆盖，避免进入无权模块 */
+/** 权限即导航：角色相关入口统一落到功能模块的二级/三级深链 */
 function onPermClick(code: string) {
   const isStudent = auth.role === 'STUDENT'
   const isAdmin = auth.role === 'ADMIN'
-  const adminModule = (group: string, child: string) => `/modules?group=${group}&child=${child}`
+  const toModule = (group: string, child?: string) =>
+    `/modules?group=${group}${child ? `&child=${child}` : ''}`
+  const studyModule = (child: string) => toModule('study', child)
+  const teachingModule = (child: string) => toModule('teaching', child)
+
+  // 真正未开放的权限（task:edit / report:export）优先如实告知，不做导航
+  const entry = permEntry(code)
+  if (entry?.kind === 'reserved') {
+    toast.warning(`预留权限：${entry.hint}`)
+    return
+  }
 
   if (code === 'task:create' || code === 'task:publish' || code === 'task:view' || code === 'task:mine') {
-    if (isStudent) router.push('/tasks')
-    else if (isAdmin) router.push(adminModule('teaching', 'tasks'))
-    else router.push('/tasks/manage')
+    router.push(isStudent ? studyModule('tasks') : teachingModule('tasks'))
     return
   }
   if (code === 'submission:view' || code === 'submission:mine' || code === 'submission:upload') {
-    if (isStudent) router.push('/submissions')
-    else if (isAdmin) router.push(adminModule('teaching', 'review'))
-    else router.push('/review')
+    router.push(isStudent ? studyModule('submissions') : teachingModule('review'))
     return
   }
   if (code === 'evaluation:view') {
-    if (isStudent) router.push('/my-evaluations')
-    else if (isAdmin) router.push(adminModule('teaching', 'review'))
-    else router.push('/review')
+    router.push(isStudent ? studyModule('evaluations') : teachingModule('review'))
     return
   }
   if (
@@ -94,31 +98,30 @@ function onPermClick(code: string) {
     code === 'evaluation:re-evaluate' ||
     code === 'evaluation:history:view'
   ) {
-    router.push(isAdmin ? adminModule('teaching', 'review') : '/review')
+    router.push(teachingModule('review'))
+    return
+  }
+  if (code === 'class:manage') {
+    if (isAdmin) router.push(toModule('data', 'classes'))
+    else toast.warning('班级管理入口当前仅在管理端开放')
     return
   }
   if (code.startsWith('report:')) {
     if (isStudent) {
-      router.push('/')
+      router.push(toModule('overview'))
       return
     }
-    // C1 裁决：管理员暂不开放全局聚合，管理员点击报表权限给出明确说明而非 403 页面
-    if (!(auth.me?.permissions ?? []).includes('report:view:teacher')) {
+    if (isAdmin) {
       toast.warning('管理员暂不开放全局聚合报表（C1 范围收敛）')
       return
     }
-    openWindow('/report.html')
+    router.push(toModule('report'))
     return
   }
 
-  const entry = permEntry(code)
   if (!entry) return
   if (entry.kind === 'route') {
     router.push(entry.to)
-    return
-  }
-  if (entry.kind === 'reserved') {
-    toast.warning(`预留权限：${entry.hint}`)
     return
   }
   switch (entry.act) {

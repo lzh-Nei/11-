@@ -1,7 +1,11 @@
 <template>
   <!-- 我的评价（学生模块）：以提交为索引汇总评价状态，报告在新窗口打开（同左右布局） -->
-  <PageShell>
-    <PageHeader title="我的评价" subtitle="本人每次提交对应的 AI / 教师评价状态与报告入口（E-01）">
+  <PageShell :bare="embedded">
+    <PageHeader
+      v-if="!embedded"
+      title="我的评价"
+      subtitle="本人每次提交对应的 AI / 教师评价状态与报告入口（E-01）"
+    >
       <el-button size="small" :loading="loading" @click="load">刷新</el-button>
     </PageHeader>
 
@@ -78,6 +82,8 @@ import PageHeader from '@/components/ui/PageHeader.vue'
 import DataTableShell from '@/components/ui/DataTableShell.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
 import FileLink from '@/components/ui/FileLink.vue'
+
+withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 
 const router = useRouter()
 const loading = ref(false)

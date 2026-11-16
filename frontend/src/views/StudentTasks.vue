@@ -1,6 +1,6 @@
 <template>
-  <PageShell>
-    <PageHeader title="任务中心" subtitle="学生视角：本班已发布任务（GET /api/tasks）">
+  <PageShell :bare="embedded">
+    <PageHeader v-if="!embedded" title="任务中心" subtitle="学生视角：本班已发布任务（GET /api/tasks）">
       <el-button size="small" :loading="loading" @click="load">刷新</el-button>
     </PageHeader>
 
@@ -48,6 +48,8 @@ import AppSkeleton from '@/components/ui/AppSkeleton.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ScrollArea from '@/components/ui/ScrollArea.vue'
+
+withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 
 const loading = ref(false)
 const error = ref<string | null>(null)

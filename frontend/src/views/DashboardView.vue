@@ -1,7 +1,11 @@
 <template>
   <!-- 工作台（模块首页）：角色总览统计 + 功能模块导览 -->
-  <PageShell>
-    <PageHeader :title="`欢迎，${auth.me?.realName || auth.me?.username || ''}`" :subtitle="headerSubtitle">
+  <PageShell :bare="embedded">
+    <PageHeader
+      v-if="!embedded"
+      :title="`欢迎，${auth.me?.realName || auth.me?.username || ''}`"
+      :subtitle="headerSubtitle"
+    >
       <template v-if="isTeacherData">
         <el-button v-if="canRefreshReport" plain :loading="refreshing" @click="refreshReport">
           刷新报表缓存
@@ -11,7 +15,13 @@
       <el-button v-if="isAdmin" @click="router.push('/modules')">功能模块</el-button>
     </PageHeader>
 
-    <el-alert v-if="auth.firstLogin" type="warning" show-icon :closable="false" class="first-login">
+    <el-alert
+      v-if="auth.firstLogin && !embedded"
+      type="warning"
+      show-icon
+      :closable="false"
+      class="first-login"
+    >
       <template #title>
         首次登录：请尽快修改初始密码（UC-07）
         <el-button link type="primary" size="small" @click="router.push('/change-password')">
@@ -48,7 +58,7 @@
       </div>
     </template>
 
-    <section class="section">
+    <section v-if="!embedded" class="section">
       <div class="section-head">
         <h2>功能模块</h2>
         <span class="section-hint">点击进入模块；带 ↗ 的模块在新窗口打开</span>
@@ -65,7 +75,7 @@
       </div>
     </section>
 
-    <section class="account-line">
+    <section v-if="!embedded" class="account-line">
       <span>
         当前角色 <b class="role-name">{{ roleLabel }}</b> · 已授予权限
         {{ auth.me?.permissions?.length ?? 0 }} 项
@@ -97,6 +107,8 @@ interface QuickCard {
   to: string
   newWindow?: boolean
 }
+
+withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 
 const router = useRouter()
 const auth = useAuthStore()

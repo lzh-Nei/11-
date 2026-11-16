@@ -4,7 +4,6 @@ import LoginView from '@/views/LoginView.vue'
 import RegisterView from '@/views/RegisterView.vue'
 import ForgotPasswordView from '@/views/ForgotPasswordView.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
-import DashboardView from '@/views/DashboardView.vue'
 import StudentTasks from '@/views/StudentTasks.vue'
 import StudentSubmit from '@/views/StudentSubmit.vue'
 import StudentSubmissions from '@/views/StudentSubmissions.vue'
@@ -37,7 +36,7 @@ const router = createRouter({
       path: '/',
       component: AppLayout,
       children: [
-        { path: '', name: 'dashboard', component: DashboardView },
+        { path: '', name: 'home', redirect: '/modules' },
         {
           path: 'tasks',
           name: 'student-tasks',
@@ -84,12 +83,11 @@ const router = createRouter({
         { path: 'files', name: 'file-center', component: () => import('@/views/FileCenterView.vue') },
         {
           path: 'modules',
-          name: 'admin-modules',
-          component: () => import('@/views/AdminModulesView.vue'),
-          meta: { roles: ['ADMIN'] }
+          name: 'modules',
+          component: () => import('@/views/ModulesView.vue')
         },
         {
-          // 管理员功能模块页（旧 /system 书签兼容跳转）
+          // 旧 /system 书签兼容跳转（管理端能力已并入功能模块）
           path: 'system',
           redirect: '/modules',
           meta: { roles: ['ADMIN'] }
@@ -154,9 +152,7 @@ router.beforeEach(async (to) => {
       if (needAuth) return { path: '/login' }
     }
   }
-  if (to.path === '/login' && auth.accessToken) return { path: '/' }
-  // 管理员登录即进入功能模块（左侧仅保留 功能模块/文件中心/个人中心，不再有独立工作台）
-  if (to.path === '/' && auth.role === 'ADMIN') return { path: '/modules' }
+  if (to.path === '/login' && auth.accessToken) return { path: '/modules' }
   // 模块级角色门控（权限矩阵之外的角色硬边界，越权→403 页）
   const roles = to.meta.roles as string[] | undefined
   if (roles?.length && auth.me) {

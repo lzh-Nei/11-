@@ -53,7 +53,6 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import NavIcon from '@/components/ui/NavIcon.vue'
-import { openWindow } from '@/utils/window'
 
 interface ModuleItem {
   key: string
@@ -72,8 +71,6 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 
-const isStudent = computed(() => auth.role === 'STUDENT')
-const isAdmin = computed(() => auth.role === 'ADMIN')
 const roleLabel = computed(() => {
   if (auth.role === 'ADMIN') return '管理员'
   if (auth.role === 'TEACHER') return '教师'
@@ -81,142 +78,49 @@ const roleLabel = computed(() => {
 })
 const initial = computed(() => (auth.me?.realName || auth.me?.username || 'U').slice(0, 1))
 
-function can(perm: string): boolean {
-  return (auth.me?.permissions ?? []).includes(perm)
-}
-
-/** 模块导航：角色 + 权限双门控（权限矩阵为准，不展示无权模块） */
-const groups = computed<ModuleGroup[]>(() => {
-  // 系统管理员：左侧仅保留 功能模块 / 文件中心 / 个人中心（功能模块内再做二级/三级目录）
-  if (isAdmin.value) {
-    return [
+/** 三角色统一左侧模块栏：功能模块（二级/三级目录） / 文件中心 / 个人中心 */
+const groups = computed<ModuleGroup[]>(() => [
+  {
+    label: '工作区',
+    items: [
       {
-        label: '工作区',
-        items: [
-          {
-            key: 'modules',
-            label: '功能模块',
-            icon: 'dashboard',
-            to: '/modules',
-            match: (p) =>
-              p === '/modules' ||
-              p === '/tasks/manage' ||
-              p === '/review' ||
-              /^\/evaluations\/\d+\/review$/.test(p)
-          },
-          {
-            key: 'files',
-            label: '文件中心',
-            icon: 'files',
-            to: '/files',
-            match: (p) => p === '/files'
-          },
-          {
-            key: 'account',
-            label: '个人中心',
-            icon: 'user',
-            to: '/account',
-            match: (p) => p === '/account' || p === '/change-password'
-          }
-        ]
+        key: 'modules',
+        label: '功能模块',
+        icon: 'dashboard',
+        to: '/modules',
+        match: (p) =>
+          p === '/modules' ||
+          p === '/tasks' ||
+          p === '/tasks/manage' ||
+          p === '/submissions' ||
+          p === '/my-evaluations' ||
+          p === '/review' ||
+          /^\/tasks\/\d+\/submit$/.test(p) ||
+          /^\/evaluations\/\d+(\/review)?$/.test(p)
+      },
+      {
+        key: 'files',
+        label: '文件中心',
+        icon: 'files',
+        to: '/files',
+        match: (p) => p === '/files'
+      },
+      {
+        key: 'account',
+        label: '个人中心',
+        icon: 'user',
+        to: '/account',
+        match: (p) => p === '/account' || p === '/change-password'
       }
     ]
   }
-
-  const result: ModuleGroup[] = []
-
-  const study: ModuleItem[] = [
-    { key: 'dashboard', label: '工作台', icon: 'dashboard', to: '/', match: (p) => p === '/' }
-  ]
-  if (isStudent.value) {
-    if (can('task:view')) {
-      study.push({
-        key: 'tasks',
-        label: '任务中心',
-        icon: 'tasks',
-        to: '/tasks',
-        match: (p) => p === '/tasks' || /^\/tasks\/\d+\/submit$/.test(p)
-      })
-    }
-    if (can('submission:view')) {
-      study.push({
-        key: 'submissions',
-        label: '提交档案',
-        icon: 'archive',
-        to: '/submissions',
-        match: (p) => p === '/submissions'
-      })
-    }
-    if (can('evaluation:view')) {
-      study.push({
-        key: 'my-evaluations',
-        label: '我的评价',
-        icon: 'evaluation',
-        to: '/my-evaluations',
-        match: (p) => p === '/my-evaluations' || /^\/evaluations\/\d+$/.test(p)
-      })
-    }
-  } else {
-    if (can('task:create') || can('task:publish') || can('task:view')) {
-      study.push({
-        key: 'manage',
-        label: '任务管理',
-        icon: 'manage',
-        to: '/tasks/manage',
-        match: (p) => p === '/tasks/manage'
-      })
-    }
-    if (can('evaluation:review')) {
-      study.push({
-        key: 'review',
-        label: '评价复核',
-        icon: 'review',
-        to: '/review',
-        match: (p) => p === '/review' || /^\/evaluations\/\d+(\/review)?$/.test(p)
-      })
-    }
-  }
-  result.push({ label: isStudent.value ? '学习' : '教学', items: study })
-
-  const data: ModuleItem[] = []
-  /* 报表驾驶舱仅对具备教师聚合权限的角色展示（C1：管理员暂不开放全局聚合） */
-  if (can('report:view:teacher')) {
-    data.push({
-      key: 'report',
-      label: '报表驾驶舱',
-      icon: 'chart',
-      to: '/report.html',
-      newWindow: true,
-      match: () => false
-    })
-  }
-  data.push({ key: 'files', label: '文件中心', icon: 'files', to: '/files', match: (p) => p === '/files' })
-  result.push({ label: '数据', items: data })
-
-  const account: ModuleItem[] = [
-    { key: 'account', label: '个人中心', icon: 'user', to: '/account', match: (p) => p === '/account' },
-    {
-      key: 'password',
-      label: '账号安全',
-      icon: 'lock',
-      to: '/change-password',
-      match: (p) => p === '/change-password'
-    }
-  ]
-  result.push({ label: '账号', items: account })
-
-  return result.filter((g) => g.items.length > 0)
-})
+])
 
 function isActive(item: ModuleItem): boolean {
   return item.match(route.path)
 }
 
 function go(item: ModuleItem) {
-  if (item.newWindow) {
-    openWindow(item.to)
-    return
-  }
   if (route.path !== item.to) router.push(item.to)
 }
 

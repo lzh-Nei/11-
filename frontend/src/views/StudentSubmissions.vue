@@ -1,6 +1,10 @@
 <template>
-  <PageShell>
-    <PageHeader title="提交档案" subtitle="学生视角：本人全部提交（S-02 服务端过滤 + S-03 详情）">
+  <PageShell :bare="embedded">
+    <PageHeader
+      v-if="!embedded"
+      title="提交档案"
+      subtitle="学生视角：本人全部提交（S-02 服务端过滤 + S-03 详情）"
+    >
       <el-button size="small" :loading="loading" @click="load">刷新</el-button>
     </PageHeader>
 
@@ -147,6 +151,8 @@ import ErrorState from '@/components/ui/ErrorState.vue'
 import ScoreDisplay from '@/components/ui/ScoreDisplay.vue'
 import DimensionRadar from '@/components/ui/DimensionRadar.vue'
 import SuggestionList from '@/components/ui/SuggestionList.vue'
+
+withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 
 const router = useRouter()
 const loading = ref(false)
