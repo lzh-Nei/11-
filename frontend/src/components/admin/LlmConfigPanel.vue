@@ -7,12 +7,12 @@
       show-icon
       :closable="false"
       class="tip"
-      title="运行参数来自 llm_config 表（R4：禁止硬编码）；temperature 锁定 0 以保证评分复现性，仅模型名/超时/重试次数可调。"
+      title="可调整模型名称、调用超时与重试次数；为保证评分稳定，温度参数固定不可修改。"
     />
 
     <AppSkeleton v-if="loading" :rows="3" :row-height="56" />
     <ErrorState v-else-if="error" :message="error" @retry="load" />
-    <EmptyState v-else-if="!config" description="尚无 LLM 配置行（llm_config 为空，请先执行数据初始化）" />
+    <EmptyState v-else-if="!config" description="暂无模型配置" />
     <div v-else class="cards">
       <section class="card form-card">
         <h3>运行参数</h3>
@@ -20,7 +20,7 @@
           <el-form-item label="模型名" required>
             <el-input v-model="form.modelName" placeholder="如：qwen2.5:7b" maxlength="64" />
           </el-form-item>
-          <el-form-item label="temperature（锁定，不可修改）">
+          <el-form-item label="评分随机度（固定，不可修改）">
             <el-input :model-value="String(config.temperature)" disabled />
           </el-form-item>
           <el-form-item label="调用超时（秒，10-300）" required>
@@ -32,7 +32,7 @@
               controls-position="right"
             />
           </el-form-item>
-          <el-form-item label="Schema 校验失败重试上限（0-5）" required>
+          <el-form-item label="结果格式校验失败重试次数（0-5）" required>
             <el-input-number v-model="form.maxRetry" :min="0" :max="5" controls-position="right" />
           </el-form-item>
           <el-button type="primary" :loading="saving" @click="save">保存运行参数</el-button>
@@ -40,11 +40,10 @@
       </section>
 
       <section class="card">
-        <h3>当前快照</h3>
+        <h3>当前设置</h3>
         <el-descriptions :column="1" border>
-          <el-descriptions-item label="配置行">#{{ config.id }}</el-descriptions-item>
           <el-descriptions-item label="模型">{{ config.modelName }}</el-descriptions-item>
-          <el-descriptions-item label="temperature">{{ config.temperature }}</el-descriptions-item>
+          <el-descriptions-item label="评分随机度">{{ config.temperature }}</el-descriptions-item>
           <el-descriptions-item label="超时">{{ config.timeoutSeconds }} 秒</el-descriptions-item>
           <el-descriptions-item label="重试上限">{{ config.maxRetry }} 次</el-descriptions-item>
           <el-descriptions-item label="最近更新">{{
@@ -52,8 +51,8 @@
           }}</el-descriptions-item>
         </el-descriptions>
         <p class="dim">
-          注：模型名需与 Ollama 已拉取模型一致；参数保存后在下一次 AI 评价调用时读取生效，
-          不影响进行中的排队任务。
+          注：模型名需与已部署的模型服务一致；保存后在下一次 AI 评价时生效，
+          不影响正在进行的评价。
         </p>
       </section>
     </div>
@@ -87,7 +86,7 @@ async function load() {
       form.maxRetry = config.value.maxRetry
     }
   } catch (e) {
-    error.value = (e as { message?: string })?.message || 'LLM 配置加载失败，请稍后重试'
+    error.value = (e as { message?: string })?.message || '模型配置加载失败，请稍后重试'
   } finally {
     loading.value = false
   }

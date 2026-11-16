@@ -3,7 +3,7 @@
     <PageHeader
       v-if="!embedded"
       title="提交档案"
-      subtitle="学生视角：本人全部提交（S-02 服务端过滤 + S-03 详情）"
+      subtitle="查看本人提交记录与评价结果"
     >
       <el-button size="small" :loading="loading" @click="load">刷新</el-button>
     </PageHeader>
@@ -32,10 +32,10 @@
             <span class="mono">v{{ row.versionNo }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="解析状态" width="110">
+        <el-table-column label="文件处理" width="110">
           <template #default="{ row }"><StatusTag :status="row.parseStatus" /></template>
         </el-table-column>
-        <el-table-column label="评价状态" width="110">
+        <el-table-column label="评分状态" width="110">
           <template #default="{ row }"><StatusTag :status="row.evaluationStatus" /></template>
         </el-table-column>
         <el-table-column label="提交时间" width="170">
@@ -59,7 +59,7 @@
     </DataTableShell>
 
     <!-- UC-18 提交详情抽屉：签名URL下载 + 提取文本预览 -->
-    <el-drawer v-model="drawer" title="提交详情（S-03）" size="45%">
+    <el-drawer v-model="drawer" title="提交详情" size="45%">
       <el-descriptions v-if="detail" :column="2" border>
         <el-descriptions-item label="文件名" :span="2">
           <FileLink
@@ -69,11 +69,11 @@
           />
         </el-descriptions-item>
         <el-descriptions-item label="版本">v{{ detail.versionNo }}</el-descriptions-item>
-        <el-descriptions-item label="类型">{{ detail.fileType }}</el-descriptions-item>
-        <el-descriptions-item label="解析状态"
+        <el-descriptions-item label="类型">{{ fileKind(detail.fileName) }}</el-descriptions-item>
+        <el-descriptions-item label="文件处理"
           ><StatusTag :status="detail.parseStatus"
         /></el-descriptions-item>
-        <el-descriptions-item label="评价状态"
+        <el-descriptions-item label="评分状态"
           ><StatusTag :status="detail.evaluationStatus"
         /></el-descriptions-item>
       </el-descriptions>
@@ -85,7 +85,7 @@
           :disabled="!detail?.downloadUrl"
           @click="download(detail!.downloadUrl)"
         >
-          下载原件（签名URL 5分钟有效）
+          下载原件（链接 5 分钟内有效）
         </el-button>
         <!-- UC-21（W7-C2）：评价报告下钻页（新窗口，保留左右模块布局） -->
         <el-button
@@ -101,7 +101,7 @@
       <!-- UC-18/21：评价结果内嵌（E-01 真实数据，完整报告另开页） -->
       <section v-if="detail?.evaluationId" class="eval-block">
         <div class="eval-head">
-          <h4>评价结果（E-01 · 当前生效）</h4>
+          <h4>评价结果（当前生效）</h4>
           <el-button link type="primary" @click="openReport(detail.evaluationId)"> 完整报告 ↗ </el-button>
         </div>
         <AppSkeleton v-if="evalLoading" :rows="2" :row-height="56" />
@@ -125,10 +125,10 @@
       </section>
 
       <template v-if="detail?.textPreview">
-        <div class="preview-title">提取文本预览（{{ detail.textChars }} 字符，展示前2000）</div>
+        <div class="preview-title">作业文本预览（共 {{ detail.textChars }} 字，最多展示前 2000 字）</div>
         <el-input type="textarea" :model-value="detail.textPreview" :rows="14" readonly />
       </template>
-      <el-empty v-else-if="detail" description="暂无提取文本（解析未完成或失败）" :image-size="80" />
+      <el-empty v-else-if="detail" description="暂无可预览的文本（文件仍在处理或处理失败）" :image-size="80" />
     </el-drawer>
   </PageShell>
 </template>
@@ -188,6 +188,11 @@ async function loadEvaluation(evaluationId: number | null) {
   } finally {
     evalLoading.value = false
   }
+}
+
+function fileKind(name: string): string {
+  const ext = name.split('.').pop()?.toUpperCase()
+  return ext && ext !== name.toUpperCase() ? ext : '—'
 }
 
 function download(url: string) {

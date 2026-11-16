@@ -23,11 +23,11 @@
           type="warning"
           show-icon
           :closable="false"
-          title="内置管理员角色权限只读（防锁死）：如需调整请直接操作数据库并由 DBA 审核。"
+          title="管理员角色的权限为系统保护项，不能在页面修改。"
           class="mb"
         />
         <div class="matrix-head">
-          <h3>{{ selected ? `${roleLabel(selected.roleCode)} · 权限矩阵` : '选择角色' }}</h3>
+          <h3>{{ selected ? `${roleLabel(selected.roleCode)} · 权限设置` : '选择角色' }}</h3>
           <div class="actions">
             <el-button size="small" :disabled="!dirty" @click="resetDraft">重置</el-button>
             <el-button
@@ -66,13 +66,12 @@
                   class="perm-check"
                 >
                   {{ p.permName }}
-                  <code>{{ p.permCode }}</code>
                 </el-checkbox>
               </el-checkbox-group>
             </div>
           </div>
         </ScrollArea>
-        <p v-if="dirty" class="dirty-hint">有未保存的变更（保存后该角色全部用户的权限缓存立即失效）</p>
+        <p v-if="dirty" class="dirty-hint">有未保存的变更（保存后立即生效）</p>
       </div>
     </div>
   </section>
@@ -180,8 +179,8 @@ async function save() {
   if (!selected.value) return
   try {
     await ElMessageBox.confirm(
-      `保存后 ${roleLabel(selected.value.roleCode)} 角色全部用户权限即时刷新（缓存失效，30min TTL 兜底）。`,
-      '保存权限矩阵',
+      `保存后，${roleLabel(selected.value.roleCode)}角色的用户权限将立即更新。`,
+      '保存权限设置',
       { type: 'warning', confirmButtonText: '确认保存', cancelButtonText: '取消' }
     )
   } catch {
@@ -190,7 +189,7 @@ async function save() {
   saving.value = true
   try {
     await adminApi.updateRolePermissions(selected.value.id, draftPerms.value)
-    toast.success('权限矩阵已保存')
+    toast.success('权限设置已保存')
     await load()
   } catch {
     // 拦截器已提示

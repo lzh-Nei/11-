@@ -61,7 +61,7 @@
           />
         </el-form-item>
         <el-form-item label="授课教师" required>
-          <el-select v-model="form.teacherId" placeholder="选择具备 TEACHER 角色的账号" style="width: 100%">
+          <el-select v-model="form.teacherId" placeholder="选择授课教师" style="width: 100%">
             <el-option
               v-for="t in teachers"
               :key="t.id"

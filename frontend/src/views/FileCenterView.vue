@@ -2,7 +2,7 @@
   <!-- 文件中心（WP8-B6）：分片上传产物清单 + 流式直下（Range 断点续传）
        数据真身：GET /api/files（FileController） → GET /api/download/{id}（DownloadController） -->
   <PageShell>
-    <PageHeader title="文件中心" subtitle="分片上传产物 · 流式下载（支持 HTTP Range 断点续传）">
+    <PageHeader title="文件中心" subtitle="查看已上传文件并下载">
       <el-button size="small" :loading="loading" @click="load">刷新清单</el-button>
     </PageHeader>
 
@@ -26,7 +26,7 @@
       :closable="false"
       show-icon
       class="source-tip"
-      title="这里列出的是文件存储产物（分片上传链路 init/chunk/complete 的落库文件）。作业提交原件请到「提交记录 → 详情」下载，两套存储口径不同。"
+      title="这里列出的是上传到文件存储中的文件。作业原件请到「提交档案 → 详情」下载。"
     />
 
     <div class="toolbar">
@@ -45,7 +45,7 @@
       :total="filtered.length"
       :page="page"
       :page-size="size"
-      empty-text="还没有可下载的文件——走一次分片上传后，产物会出现在这里"
+      empty-text="还没有上传记录"
       empty-action-text="去任务列表提交作业"
       @retry="load"
       @page-change="(p: number) => (page = p)"
@@ -56,7 +56,6 @@
           <tr>
             <th>文件名</th>
             <th style="width: 110px">大小</th>
-            <th style="width: 190px">MD5（点击复制）</th>
             <th style="width: 160px">上传时间</th>
             <th style="width: 120px">操作</th>
           </tr>
@@ -67,13 +66,6 @@
               <span class="file-name" :title="f.name">{{ f.name }}</span>
             </td>
             <td class="mono dim">{{ formatBytes(f.size) }}</td>
-            <td>
-              <el-tooltip :content="f.md5 || '无 MD5（历史文件）'" placement="top">
-                <button class="md5" type="button" @click="copyMd5(f.md5)">
-                  {{ f.md5 ? maskId(f.md5, 8, 6) : '—' }}
-                </button>
-              </el-tooltip>
-            </td>
             <td>
               <el-tooltip :content="formatDateTime(f.uploadTime)" placement="top">
                 <span>{{ formatRelative(f.uploadTime) }}</span>
@@ -96,8 +88,7 @@
     </DataTableShell>
 
     <p class="foot-note">
-      下载通道：<code>/api/download/{id}</code> · 服务端按 64KB 缓冲流式写出，不占内存；带
-      <code>Range</code> 头返回 206 Partial Content，可用于断点续传/分段下载。
+      文件下载支持断点续传；网络中断后可继续下载。
     </p>
   </PageShell>
 </template>
@@ -107,7 +98,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { fileApi, type FileMeta } from '@/api/file'
 import { downloadApi } from '@/api/download'
-import { formatBytes, formatDateTime, formatRelative, maskId } from '@/utils/format'
+import { formatBytes, formatDateTime, formatRelative } from '@/utils/format'
 import { saveBlob } from '@/utils/file'
 import { toast } from '@/utils/toast'
 import PageShell from '@/components/ui/PageShell.vue'
@@ -169,16 +160,6 @@ async function download(f: FileMeta) {
     toast.error((e as { message?: string })?.message || '下载失败', '请稍后重试')
   } finally {
     downloadingId.value = null
-  }
-}
-
-async function copyMd5(md5: string) {
-  if (!md5) return
-  try {
-    await navigator.clipboard.writeText(md5)
-    toast.success('MD5 已复制')
-  } catch {
-    toast.warning('浏览器未放行剪贴板，请从 tooltip 手动复制')
   }
 }
 
@@ -259,17 +240,6 @@ onMounted(load)
   vertical-align: bottom;
   color: var(--aies-ink);
   font-weight: 500;
-}
-.md5 {
-  border: none;
-  background: transparent;
-  padding: 0;
-  cursor: pointer;
-  font: 12px var(--aies-mono, monospace);
-  color: var(--aies-ink3);
-}
-.md5:hover {
-  color: var(--aies-brand);
 }
 .mono {
   font-family: var(--aies-mono, monospace);

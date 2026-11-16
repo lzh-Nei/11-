@@ -4,7 +4,7 @@
   <PageShell fill fluid>
     <PageHeader
       title="功能模块"
-      :subtitle="`${roleTitle} · 二级模块（顶部横向） / 三级目录（左侧纵向） / 功能页面`"
+      :subtitle="`${roleTitle} · 集中管理教学、数据与账号功能`"
     />
 
     <div class="browser">
@@ -45,7 +45,7 @@
             <div v-if="pageExternal" class="launch">
               <NavIcon :name="selectedGroup?.icon ?? 'chart'" class="launch-icon" />
               <h3>{{ selectedChild?.label ?? selectedGroup?.label }}</h3>
-              <p>该模块以独立窗口展示（报表驾驶舱为独立静态页面）。</p>
+              <p>该功能将在新窗口打开。</p>
               <el-button type="primary" @click="openWindow(pageExternal)">在新窗口打开 ↗</el-button>
             </div>
             <component :is="pageComponent" v-else-if="pageComponent" v-bind="pageProps ?? {}" />
@@ -70,8 +70,12 @@ import DashboardView from '@/views/DashboardView.vue'
 import StudentTasks from '@/views/StudentTasks.vue'
 import StudentSubmissions from '@/views/StudentSubmissions.vue'
 import MyEvaluationsView from '@/views/MyEvaluationsView.vue'
-import Check from '@/views/Check.vue'
+import TaskListPanel from '@/components/tasks/TaskListPanel.vue'
+import TaskCreatePanel from '@/components/tasks/TaskCreatePanel.vue'
+import TaskEditPanel from '@/components/tasks/TaskEditPanel.vue'
+import TaskDeletePanel from '@/components/tasks/TaskDeletePanel.vue'
 import ReviewHubView from '@/views/ReviewHubView.vue'
+import AdminEvaluationsView from '@/components/admin/AdminEvaluationsView.vue'
 import UsersPanel from '@/components/admin/UsersPanel.vue'
 import RolesPanel from '@/components/admin/RolesPanel.vue'
 import ClassesPanel from '@/components/admin/ClassesPanel.vue'
@@ -157,10 +161,13 @@ const teacherGroups: ModuleGroup[] = [
     label: '教学任务',
     icon: 'manage',
     children: [
-      { key: 'tasks', label: '任务管理', icon: 'manage', component: Check, props: { embedded: true } },
+      { key: 'task-list', label: '任务列表', icon: 'tasks', component: TaskListPanel },
+      { key: 'task-create', label: '新建任务', icon: 'manage', component: TaskCreatePanel },
+      { key: 'task-edit', label: '编辑任务', icon: 'manage', component: TaskEditPanel },
+      { key: 'task-delete', label: '删除任务', icon: 'archive', component: TaskDeletePanel },
       {
         key: 'review',
-        label: '评价复核',
+        label: '评价与复核',
         icon: 'review',
         component: ReviewHubView,
         props: { embedded: true }
@@ -201,14 +208,14 @@ const adminGroups: ModuleGroup[] = [
     label: '教学管理',
     icon: 'manage',
     children: [
-      { key: 'tasks', label: '任务管理', icon: 'manage', component: Check, props: { embedded: true } },
       {
-        key: 'review',
-        label: '评价复核',
-        icon: 'review',
-        component: ReviewHubView,
-        props: { embedded: true }
-      }
+        key: 'task-overview',
+        label: '任务概览',
+        icon: 'tasks',
+        component: TaskListPanel,
+        props: { readonly: true }
+      },
+      { key: 'evaluations', label: '评价与复核', icon: 'review', component: AdminEvaluationsView }
     ]
   },
   {
@@ -217,7 +224,7 @@ const adminGroups: ModuleGroup[] = [
     icon: 'archive',
     children: [
       { key: 'classes', label: '班级管理', icon: 'tasks', component: ClassesPanel },
-      { key: 'golden', label: '黄金数据集', icon: 'evaluation', component: GoldenPanel }
+      { key: 'golden', label: '基准样本', icon: 'evaluation', component: GoldenPanel }
     ]
   },
   {
@@ -225,8 +232,8 @@ const adminGroups: ModuleGroup[] = [
     label: 'AI 配置',
     icon: 'chart',
     children: [
-      { key: 'llm', label: 'LLM 参数', icon: 'chart', component: LlmConfigPanel },
-      { key: 'prompts', label: 'Prompt 模板', icon: 'manage', component: PromptPanel }
+      { key: 'llm', label: '模型参数', icon: 'chart', component: LlmConfigPanel },
+      { key: 'prompts', label: '评分提示词', icon: 'manage', component: PromptPanel }
     ]
   },
   {

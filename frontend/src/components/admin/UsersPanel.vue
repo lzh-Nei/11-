@@ -11,12 +11,12 @@
         @keyup.enter="reload"
         @clear="reload"
       />
-      <el-select v-model="statusFilter" style="width: 130px" @change="reload">
+      <el-select v-model="statusFilter" placeholder="全部状态" style="width: 130px" @change="reload">
         <el-option label="全部状态" value="" />
         <el-option label="正常" value="1" />
         <el-option label="已禁用" value="0" />
       </el-select>
-      <el-select v-model="roleFilter" style="width: 140px" @change="reload">
+      <el-select v-model="roleFilter" placeholder="全部角色" style="width: 140px" @change="reload">
         <el-option label="全部角色" value="" />
         <el-option v-for="r in roles" :key="r.roleCode" :label="roleLabel(r.roleCode)" :value="r.roleCode" />
       </el-select>
@@ -51,7 +51,7 @@
               size="small"
               :type="roleTagType(code)"
               class="mr"
-              :title="code"
+
             >
               {{ roleLabel(code) }}
             </el-tag>
@@ -194,7 +194,7 @@
         v-if="editing"
         :closable="false"
         type="info"
-        :title="`账号：${editing.username}（${editing.realName}）· 角色变更会立即刷新该用户权限缓存`"
+        :title="`账号：${editing.username}（${editing.realName}）· 角色变更保存后立即生效`"
         class="mb"
       />
       <el-checkbox-group v-model="draftRoles">
@@ -418,7 +418,7 @@ async function toggleStatus(row: AdminUser) {
   try {
     await ElMessageBox.confirm(
       next === 0
-        ? `禁用 ${row.username} 后：登录被拒（40103），刷新令牌立即作废；访问令牌最多 2 小时自然过期。`
+        ? `禁用 ${row.username} 后：该账号将无法登录，已登录的会话也会失效。`
         : `启用 ${row.username} 后可正常登录。`,
       next === 0 ? '禁用账号' : '启用账号',
       { type: 'warning', confirmButtonText: '确认', cancelButtonText: '取消' }
@@ -470,7 +470,7 @@ async function saveRoles() {
   saving.value = true
   try {
     await adminApi.updateUserRoles(editing.value.id, draftRoles.value)
-    toast.success('角色已更新，权限缓存已刷新')
+    toast.success('角色已更新')
     roleDialog.value = false
     await load()
   } catch {

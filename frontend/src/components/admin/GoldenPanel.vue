@@ -6,7 +6,7 @@
       show-icon
       :closable="false"
       class="tip"
-      title="黄金样本用于 AI 评分一致率回归（NFR-03）。新增样本需先把文件入库并补教师标注（M3+ 管理端延后），当前支持查看与启停。"
+      title="基准样本用于检查 AI 评分与教师评分是否一致。当前可查看样本并控制是否参与校验。"
     />
 
     <div class="toolbar">
@@ -21,15 +21,15 @@
       :total="total"
       :page="page"
       :page-size="size"
-      empty-text="还没有黄金样本"
+      empty-text="还没有基准样本"
       @retry="load"
       @page-change="(p: number) => ((page = p), load())"
     >
       <el-table :data="rows" stripe>
-        <el-table-column label="样本对象" min-width="240">
-          <template #default="{ row }"
-            ><code class="mono">{{ row.sampleFileKey }}</code></template
-          >
+        <el-table-column label="样本文件" min-width="240">
+          <template #default="{ row }">
+            <span>{{ sampleName(row.sampleFileKey) }}</span>
+          </template>
         </el-table-column>
         <el-table-column label="教师总分" width="100">
           <template #default="{ row }"
@@ -42,20 +42,20 @@
               <template #reference>
                 <el-button size="small" text type="primary">查看标注</el-button>
               </template>
-              <pre class="detail">{{ pretty(row.teacherMetrics) }}</pre>
+              <pre class="detail">{{ metricLines(row.teacherMetrics) }}</pre>
             </el-popover>
             <span v-else class="dim">—</span>
           </template>
         </el-table-column>
-        <el-table-column label="最近一致率" width="120">
+        <el-table-column label="最近符合度" width="120">
           <template #default="{ row }">
-            <span v-if="row.lastConsistency == null" class="dim">未回归</span>
+            <span v-if="row.lastConsistency == null" class="dim">未校验</span>
             <el-tag v-else :type="row.lastConsistency >= 0.7 ? 'success' : 'warning'" size="small">
               {{ (row.lastConsistency * 100).toFixed(1) }}%
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="参与回归" width="110">
+        <el-table-column label="参与校验" width="110">
           <template #default="{ row }">
             <el-tag :type="row.active === 1 ? 'success' : 'info'" size="small">
               {{ row.active === 1 ? '参与' : '停用' }}
@@ -88,8 +88,14 @@ const total = ref(0)
 const page = ref(1)
 const size = 10
 
-function pretty(metrics: Record<string, number>): string {
-  return JSON.stringify(metrics, null, 2)
+function sampleName(key: string): string {
+  return key.substring(key.lastIndexOf('/') + 1) || key
+}
+
+function metricLines(metrics: Record<string, number> | null): string {
+  return Object.entries(metrics ?? {})
+    .map(([name, score]) => `${name}：${score} 分`)
+    .join('\n')
 }
 
 async function load() {
@@ -100,7 +106,7 @@ async function load() {
     rows.value = result.records
     total.value = result.total
   } catch (e) {
-    error.value = (e as { message?: string })?.message || '黄金样本加载失败，请稍后重试'
+    error.value = (e as { message?: string })?.message || '基准样本加载失败，请稍后重试'
   } finally {
     loading.value = false
   }
@@ -111,9 +117,9 @@ async function toggle(row: AdminGoldenSample) {
   try {
     await ElMessageBox.confirm(
       next === 0
-        ? `停用样本 ${row.sampleFileKey} 后，NFR-03 一致率回归不再计入该样本。`
-        : `启用样本 ${row.sampleFileKey} 后，将纳入下一轮一致率回归。`,
-      next === 0 ? '停用黄金样本' : '启用黄金样本',
+        ? `停用样本 ${sampleName(row.sampleFileKey)} 后，后续评分一致性校验不再统计该样本。`
+        : `启用样本 ${sampleName(row.sampleFileKey)} 后，将参与下一轮评分一致性校验。`,
+      next === 0 ? '停用基准样本' : '启用基准样本',
       { type: 'warning', confirmButtonText: '确认', cancelButtonText: '取消' }
     )
   } catch {

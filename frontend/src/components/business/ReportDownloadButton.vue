@@ -8,7 +8,7 @@
     :disabled="!submissionId"
     @click="download(submissionId)"
   >
-    下载提交原件（签名URL 5分钟有效）
+    下载提交原件（链接 5 分钟内有效）
   </el-button>
 </template>
 

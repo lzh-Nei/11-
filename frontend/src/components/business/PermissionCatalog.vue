@@ -3,12 +3,12 @@
        点击权限点按角色分流到对应二级/三级模块 -->
   <section class="catalog">
     <div class="catalog-head">
-      <h3>功能权限（{{ totalCount }} 项 · 已落地 {{ implementedCount }} 项）</h3>
+      <h3>功能权限（{{ totalCount }} 项 · 已开通 {{ implementedCount }} 项）</h3>
       <span class="dim">
         <template v-if="reservedCount"
-          >点击权限点直达对应模块；预留 {{ reservedCount }} 项以虚线标注</template
+          >点击可直接进入对应功能；暂未开放的 {{ reservedCount }} 项以虚线标注</template
         >
-        <template v-else>点击权限点直达对应模块；当前角色权限点均已落地</template>
+        <template v-else>点击可直接进入对应功能；当前角色的功能均已开通</template>
       </span>
     </div>
     <ScrollArea :max-height="maxHeight" padded>
@@ -27,7 +27,7 @@
             >
               {{ permLabel(p) }}
               <i v-if="permEntry(p)?.kind === 'route'" class="chip-arrow">→</i>
-              <i v-else-if="permEntry(p)?.kind === 'reserved'" class="chip-lock">预留</i>
+              <i v-else-if="permEntry(p)?.kind === 'reserved'" class="chip-lock">暂未开放</i>
             </button>
           </el-tooltip>
         </div>
@@ -90,8 +90,8 @@ const permGroups = computed<Record<string, string[]>>(() => {
 
 function permTooltip(code: string): string {
   const entry = permEntry(code)
-  if (!entry) return String(code)
-  return `${entry.hint}（${code}）`
+  if (!entry) return '功能入口'
+  return entry.hint
 }
 
 async function onLogout() {
@@ -109,28 +109,41 @@ function onPermClick(code: string) {
   const teachingModule = (child: string) => toModule('teaching', child)
   const analysisModule = (child: string) => toModule('analysis', child)
 
-  // 真正未开放的权限（task:edit / report:export）优先如实告知，不做导航
+  // 仍未开放的权限（报表导出等）优先如实告知，不做导航
   const entry = permEntry(code)
   if (entry?.kind === 'reserved') {
-    toast.warning(`预留权限：${entry.hint}`)
+    toast.warning(`暂未开放：${entry.hint}`)
     return
   }
 
   if (code === 'submission:upload') {
     // 上传动作发生在任务中心（选任务 → 提交）
-    router.push(isStudent ? studyModule('tasks') : teachingModule('tasks'))
+    if (isStudent) router.push(studyModule('tasks'))
+    else if (isAdmin) router.push(teachingModule('task-overview'))
+    else router.push(teachingModule('task-list'))
+    return
+  }
+  if (code === 'task:edit') {
+    if (isAdmin) router.push(teachingModule('task-overview'))
+    else router.push(teachingModule('task-edit'))
     return
   }
   if (code === 'task:create' || code === 'task:publish' || code === 'task:view' || code === 'task:mine') {
-    router.push(isStudent ? studyModule('tasks') : teachingModule('tasks'))
+    if (isStudent) router.push(studyModule('tasks'))
+    else if (isAdmin) router.push(teachingModule('task-overview'))
+    else router.push(code === 'task:create' ? teachingModule('task-create') : teachingModule('task-list'))
     return
   }
   if (code === 'submission:view' || code === 'submission:mine') {
-    router.push(isStudent ? studyModule('submissions') : teachingModule('review'))
+    if (isStudent) router.push(studyModule('submissions'))
+    else if (isAdmin) router.push(teachingModule('evaluations'))
+    else router.push(teachingModule('review'))
     return
   }
   if (code === 'evaluation:view') {
-    router.push(isStudent ? studyModule('evaluations') : teachingModule('review'))
+    if (isStudent) router.push(studyModule('evaluations'))
+    else if (isAdmin) router.push(teachingModule('evaluations'))
+    else router.push(teachingModule('review'))
     return
   }
   if (
@@ -138,7 +151,7 @@ function onPermClick(code: string) {
     code === 'evaluation:re-evaluate' ||
     code === 'evaluation:history:view'
   ) {
-    router.push(teachingModule('review'))
+    router.push(isAdmin ? teachingModule('evaluations') : teachingModule('review'))
     return
   }
   if (code === 'class:manage') {
@@ -152,7 +165,7 @@ function onPermClick(code: string) {
       return
     }
     if (isAdmin) {
-      toast.warning('管理员暂不开放全局聚合报表（C1 范围收敛）')
+      toast.warning('管理员暂不开放全局报表')
       return
     }
     router.push(analysisModule('report'))

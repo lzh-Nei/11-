@@ -62,6 +62,20 @@ export interface AdminAuditLog {
   createTime: string
 }
 
+/** 管理端评价列表行（管理员查看教师评价/复核历史入口） */
+export interface AdminEvaluation {
+  id: number
+  submissionId: number
+  taskId: number | null
+  taskTitle: string | null
+  studentName: string | null
+  teacherName: string | null
+  status: string
+  totalScore: number | null
+  currentVersionNo: number | null
+  updateTime: string
+}
+
 export interface AdminSystemConfig {
   counts: {
     users: number
@@ -211,6 +225,15 @@ export const adminApi = {
   /* 系统配置（只读快照） */
   async systemConfig(): Promise<AdminSystemConfig> {
     return (await request.get('/admin/system/config')) as unknown as AdminSystemConfig
+  },
+
+  /* 管理端评价列表（管理员查看教师评价/复核历史） */
+  async evaluations(params: {
+    page: number
+    size: number
+    status?: string
+  }): Promise<PageResult<AdminEvaluation>> {
+    return (await request.get('/admin/evaluations', { params })) as unknown as PageResult<AdminEvaluation>
   },
 
   /* LLM 参数 */

@@ -16,19 +16,7 @@ const router = createRouter({
     { path: '/login', name: 'login', component: LoginView, meta: { public: true } },
     // W8-C3 UC-43/44：注册与找回密码（公开路由，与/login同级）
     { path: '/register', name: 'register', component: RegisterView, meta: { public: true } },
-    {
-      path: '/forgot-password',
-      name: 'forgot-password',
-      component: ForgotPasswordView,
-      meta: { public: true }
-    },
-    // WP8-B0 设计系统样板页（风格裁决门，公开路由；全站唯一允许 mock 处）
-    {
-      path: '/style-guide',
-      name: 'style-guide',
-      component: () => import('@/views/StyleGuideView.vue'),
-      meta: { public: true }
-    },
+    { path: '/forgot-password', name: 'forgot-password', component: ForgotPasswordView, meta: { public: true } },
 
     /* ══════════ 应用外壳（WP8-C1）：左侧模块导航 + 右侧模块页面
        下钻页（提交作业/评价报告/复核台）同样挂在外壳下，新窗口打开时保持左右布局 ══════════ */
@@ -46,7 +34,7 @@ const router = createRouter({
         {
           path: 'tasks/manage',
           name: 'teacher-tasks',
-          component: () => import('@/views/Check.vue'),
+          redirect: '/modules?group=teaching&child=task-list',
           meta: { roles: ['TEACHER', 'ADMIN'] }
         },
         {
@@ -110,7 +98,7 @@ const router = createRouter({
         public: true,
         code: 403,
         errorTitle: '无权限访问',
-        errorDesc: '当前账号没有访问该页面的权限。若认为这是误判，请联系授课教师核对角色与权限点。'
+        errorDesc: '当前账号没有访问该页面的权限。若认为这是误判，请联系授课教师核对角色与权限。'
       }
     },
     {
@@ -121,7 +109,7 @@ const router = createRouter({
         public: true,
         code: 500,
         errorTitle: '服务暂时不可用',
-        errorDesc: '服务端处理请求时出现异常，请稍后重试；若持续出现，请把时间和操作路径反馈给管理员。'
+        errorDesc: '服务暂时不可用，请稍后重试；若持续出现，请把时间和操作步骤反馈给管理员。'
       }
     },
     {

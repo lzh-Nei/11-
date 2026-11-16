@@ -6,7 +6,7 @@
       show-icon
       :closable="false"
       class="tip"
-      title="模板必须包含 {metrics} 与 {parsed_text} 两个占位符；全局仅一个启用版（启用新版本会自动停用旧版）。新建版本默认不启用。"
+      title="评分提示词需要保留「评分指标」和「作业文本」两处内容位置；启用新版本会自动停用旧版本，新版本默认不启用。"
     />
 
     <div class="toolbar">
@@ -57,7 +57,7 @@
       </ScrollArea>
       <EmptyState
         v-if="!list.length"
-        description="还没有 Prompt 模板版本"
+        description="还没有评分提示词版本"
         action-text="新建模板版本"
         @action="openCreate"
       />
@@ -65,7 +65,7 @@
 
     <el-drawer
       v-model="drawer"
-      :title="detail ? `Prompt 模板 v${detail.versionNo}` : 'Prompt 模板'"
+      :title="detail ? `评分提示词 v${detail.versionNo}` : '评分提示词'"
       size="55%"
     >
       <AppSkeleton v-if="detailLoading" :rows="6" />
@@ -80,15 +80,15 @@
       </template>
     </el-drawer>
 
-    <el-dialog v-model="createDialog" title="新建 Prompt 模板版本" width="620px">
+    <el-dialog v-model="createDialog" title="新建评分提示词版本" width="620px">
       <el-alert
         type="warning"
         show-icon
         :closable="false"
-        title="必须包含 {metrics}（指标清单）与 {parsed_text}（作业提取文本）占位符；新版本默认不启用。"
+        title="必须保留「评分指标」和「作业文本」两处内容位置；新版本默认不启用。"
         class="mb"
       />
-      <el-input v-model="draftContent" type="textarea" :rows="14" placeholder="粘贴完整评分 Prompt 模板…" />
+      <el-input v-model="draftContent" type="textarea" :rows="14" placeholder="粘贴完整的评分提示词…" />
       <template #footer>
         <el-button @click="createDialog = false">取消</el-button>
         <el-button type="primary" :loading="creating" @click="create">创建版本</el-button>
@@ -124,7 +124,7 @@ async function load() {
   try {
     list.value = await adminApi.prompts()
   } catch (e) {
-    error.value = (e as { message?: string })?.message || 'Prompt 模板加载失败，请稍后重试'
+    error.value = (e as { message?: string })?.message || '评分提示词加载失败，请稍后重试'
   } finally {
     loading.value = false
   }
@@ -170,7 +170,7 @@ async function enable(p: AdminPrompt) {
   try {
     await ElMessageBox.confirm(
       `启用 v${p.versionNo} 后，旧启用版立即停用；后续 AI 评价全部使用该模板。`,
-      '启用 Prompt 版本',
+      '启用评分提示词',
       { type: 'warning', confirmButtonText: '确认启用', cancelButtonText: '取消' }
     )
   } catch {

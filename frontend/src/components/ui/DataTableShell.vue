@@ -73,7 +73,7 @@ const emit = defineEmits<{ retry: []; pageChange: [p: number]; emptyAction: [] }
 :deep(.el-scrollbar__wrap) {
   max-height: calc(var(--table-scroll-max, 62vh) - 56px);
   overflow-y: auto;
-  overscroll-behavior: contain;
+  overscroll-behavior: auto;
 }
 .pager {
   display: flex;

@@ -68,7 +68,7 @@ request.interceptors.response.use(
     } else if (status === 403) {
       ElMessage.error(body?.message || '无操作权限')
     } else {
-      ElMessage.error(body?.message || `请求异常（${status ?? '网络错误'}）`)
+      ElMessage.error(body?.message || '网络或服务暂时不可用，请稍后重试')
     }
     return Promise.reject(error)
   }
@@ -85,7 +85,7 @@ export async function fetchBlob(url: string): Promise<Blob> {
     headers: auth.accessToken ? { Authorization: `Bearer ${auth.accessToken}` } : undefined
   })
   if (resp.status === 401 || resp.status === 403) {
-    throw new Error(`下载失败（${resp.status}，登录态可能已过期）`)
+    throw new Error('下载失败，请重新登录后再试')
   }
   const contentType = resp.headers.get('content-type') ?? ''
   if (contentType.includes('application/json')) {

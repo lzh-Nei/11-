@@ -1,15 +1,19 @@
 <template>
-  <PageShell>
-    <PageHeader title="复核工作台" :subtitle="`教师视角 · 评价 #${route.params.id}（UC-22/23/24/25）`" />
+  <PageShell :bare="embedded">
+    <PageHeader v-if="!embedded" title="复核工作台" subtitle="查看评分、调整分数与历史版本" />
 
-    <ScrollArea max-height="calc(100vh - 220px)" padded>
+    <ScrollArea
+      :passthrough="embedded"
+      :max-height="embedded ? 'none' : 'calc(100vh - 220px)'"
+      padded
+    >
       <AppSkeleton v-if="loading && !evaluation" :rows="3" :row-height="80" />
       <ErrorState v-else-if="error" :message="error" @retry="load" />
 
       <template v-else-if="evaluation">
         <el-alert
           v-if="evaluation.status === 'PENDING'"
-          title="评价进行中（AI 管道排队/评分中）——出分后本页 10 秒内自动刷新，可手动点刷新"
+          title="AI 正在评价，页面会自动刷新，也可以手动刷新查看最新结果"
           type="info"
           show-icon
           :closable="false"
@@ -23,21 +27,20 @@
             <span class="dim"
               >当前生效 v{{ evaluation.currentVersionNo }} · {{ formatDateTime(evaluation.updateTime) }}</span
             >
-            <span v-if="evaluation.traceId" class="mono dim">trace {{ maskId(evaluation.traceId) }}</span>
           </div>
           <div class="band-actions">
             <el-button size="small" @click="load">刷新</el-button>
-            <!-- E-03 重评：REVIEWED/FAILED→PENDING 走 MQ 重走管道（不可逆确认） -->
+            <!-- 重评：已复核/失败状态可重新发起 AI 评价 -->
             <ConfirmAction
-              v-if="evaluation.status === 'REVIEWED' || evaluation.status === 'FAILED'"
-              title="触发重评"
-              message="当前评分将被标记为 PENDING 并重新走 AI 评价管道（旧版本保留可追溯）。确认重评？"
-              confirm-text="确认重评"
+              v-if="!readonly && (evaluation.status === 'REVIEWED' || evaluation.status === 'FAILED')"
+              title="重新评价"
+              message="当前评分将进入重新评价流程，旧版本保留可追溯。确认重新评价？"
+              confirm-text="确认重新评价"
               @execute="onReEvaluate"
             >
               <template #default="{ trigger, loading }">
                 <el-button size="small" type="warning" plain :loading="loading" @click="trigger"
-                  >重评（E-03）</el-button
+                  >重新评价</el-button
                 >
               </template>
             </ConfirmAction>
@@ -51,7 +54,7 @@
             evaluation.status === 'FAILED'
           "
         >
-          <section class="review-grid">
+          <section class="review-grid" :class="{ readonly }">
             <!-- 左：AI 原判（只读参照） -->
             <div class="panel">
               <h3>AI 评价参照</h3>
@@ -59,9 +62,9 @@
               <SuggestionList :comment="evaluation.aiComment" />
             </div>
 
-            <!-- 右：教师复核表单（ReviewWorkbench 语义落位） -->
-            <div class="panel">
-              <h3>{{ isManual ? '手动评分（E-06 / UC-24）' : '教师复核（E-02 / UC-22）' }}</h3>
+            <!-- 右：教师复核表单（只读模式隐藏） -->
+            <div v-if="!readonly" class="panel">
+              <h3>{{ isManual ? '手动评分' : '教师复核' }}</h3>
               <el-form label-position="top">
                 <el-form-item label="总分（0-100）" required>
                   <el-input-number
@@ -84,19 +87,19 @@
                     size="small"
                   />
                 </el-form-item>
-                <el-form-item label="复核意见（≥10 字，留痕进历史版本）" required>
+                <el-form-item label="复核意见（不少于10字，会留入历史记录）" required>
                   <el-input
                     v-model="form.reviewComment"
                     type="textarea"
                     :rows="3"
                     maxlength="300"
                     show-word-limit
-                    placeholder="说明改分/确认理由：依据、偏差、处理方式……"
+                    placeholder="说明改分或确认理由：依据、偏差、处理方式……"
                   />
                 </el-form-item>
                 <ConfirmAction
                   :title="isManual ? '提交手动评分' : '提交复核'"
-                  message="评分将写入新历史版本并触发报表缓存主动失效（D-36），旧版本保留可追溯。确认提交？"
+                  message="评分将保存为新版本，旧版本保留可追溯。确认提交？"
                   confirm-text="确认提交"
                   @execute="onSubmitReview"
                 >
@@ -107,14 +110,14 @@
                   </template>
                 </ConfirmAction>
                 <span v-if="form.reviewComment && form.reviewComment.length < 10" class="dim"
-                  >意见不足 10 字（后端将拒绝）</span
+                  >意见不足 10 字</span
                 >
               </el-form>
             </div>
           </section>
         </template>
 
-        <!-- 历史版本（E-04 分页 + E-05 单版本快照）：共用组件，独立容错 -->
+        <!-- 历史版本（只读） -->
         <EvaluationHistoryPanel ref="historyPanel" :evaluation-id="id" />
       </template>
     </ScrollArea>
@@ -125,7 +128,7 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { evaluationApi, type EvaluationVO } from '@/api/evaluation'
-import { formatDateTime, maskId } from '@/utils/format'
+import { formatDateTime } from '@/utils/format'
 import { toast } from '@/utils/toast'
 import PageShell from '@/components/ui/PageShell.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
@@ -136,8 +139,13 @@ import ScrollArea from '@/components/ui/ScrollArea.vue'
 import ConfirmAction from '@/components/ui/ConfirmAction.vue'
 import EvaluationHistoryPanel from '@/components/business/EvaluationHistoryPanel.vue'
 
+const props = withDefaults(
+  defineProps<{ evaluationId?: number; embedded?: boolean; readonly?: boolean }>(),
+  { evaluationId: undefined, embedded: false, readonly: false }
+)
+
 const route = useRoute()
-const id = Number(route.params.id)
+const id = computed(() => props.evaluationId ?? Number(route.params.id))
 
 const loading = ref(false)
 const error = ref<string | null>(null)
@@ -179,7 +187,7 @@ async function load() {
   loading.value = true
   error.value = null
   try {
-    evaluation.value = await evaluationApi.detail(id)
+    evaluation.value = await evaluationApi.detail(id.value)
     mirrorForm()
     if (evaluation.value.status === 'PENDING') {
       if (timer === undefined) timer = window.setInterval(load, 10000)
@@ -204,14 +212,14 @@ async function onSubmitReview(done: () => void) {
   }
   try {
     const vo = isManual.value
-      ? await evaluationApi.manualScore(id, payload)
-      : await evaluationApi.review(id, payload)
+      ? await evaluationApi.manualScore(id.value, payload)
+      : await evaluationApi.review(id.value, payload)
     evaluation.value = vo
     mirrorForm()
-    toast.success(`已提交：生效 v${vo.currentVersionNo}，报表缓存已主动失效`)
+    toast.success(`已提交，当前生效版本 v${vo.currentVersionNo}`)
     await historyPanel.value?.reload()
   } catch (e) {
-    toast.error((e as { message?: string })?.message || '提交失败', '请检查意见长度与分数范围')
+    toast.error((e as { message?: string })?.message || '提交失败', '请检查意见长度与分数')
   } finally {
     done()
   }
@@ -220,8 +228,8 @@ async function onSubmitReview(done: () => void) {
 /** E-03 重评（REVIEWED/FAILED→PENDING 走 MQ） */
 async function onReEvaluate(done: () => void) {
   try {
-    await evaluationApi.reEvaluate(id)
-    toast.success('重评已触发：状态转 PENDING，AI 管道重新排队')
+    await evaluationApi.reEvaluate(id.value)
+    toast.success('已重新发起评价，请稍后刷新查看结果')
     await load()
   } catch (e) {
     toast.error((e as { message?: string })?.message || '重评触发失败', '请重试')
@@ -267,6 +275,9 @@ onBeforeUnmount(() => {
   grid-template-columns: 1fr 1fr;
   gap: var(--aies-gap);
   margin-top: var(--aies-gap);
+}
+.review-grid.readonly {
+  grid-template-columns: 1fr;
 }
 @media (max-width: 900px) {
   .review-grid {

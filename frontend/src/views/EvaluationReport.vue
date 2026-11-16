@@ -1,6 +1,6 @@
 <template>
   <PageShell :width="860">
-    <PageHeader title="评价报告" :subtitle="`UC-21 · 评价 #${route.params.id}（E-01 当前值）`">
+    <PageHeader title="评价报告" subtitle="查看本次作业的评分、评语与历史版本">
       <el-button size="small" :loading="loading" @click="load">刷新</el-button>
     </PageHeader>
 
@@ -12,14 +12,14 @@
         <!-- PENDING：评价进行中（10s 轮询，LLD §4.3 步骤7 学生端刷新口径） -->
         <EmptyState
           v-if="evaluation.status === 'PENDING'"
-          description="AI 评价进行中，页面每 10 秒自动刷新（评价管道：解析 → qwen2.5:7b 评分 → 校验落库）"
+          description="AI 正在评阅作业，页面每 10 秒自动刷新"
         />
 
         <!-- FAILED：40003 重试耗尽（UC-24 教师人工评分旁路 E-06） -->
         <ErrorState
           v-else-if="evaluation.status === 'FAILED'"
-          title="AI 评价失败（40003）"
-          message="模型输出多次未通过格式校验，已登记留痕；教师可在复核工作台手动评分（UC-24 / E-06）。"
+          title="AI 评价未完成"
+          message="本次 AI 评价未能生成有效结果，教师可以在评价与复核中手动评分。"
           :retryable="false"
         />
 
@@ -32,7 +32,7 @@
             </div>
             <div class="radar-block">
               <DimensionRadar :scores="metricRecord" :size="280" />
-              <span class="radar-label">维度雷达（指标均分 / 100）</span>
+              <span class="radar-label">各指标得分（满分 100）</span>
             </div>
           </section>
 
@@ -49,14 +49,11 @@
             <el-descriptions-item label="更新时间">{{
               formatDateTime(evaluation.updateTime)
             }}</el-descriptions-item>
-            <el-descriptions-item v-if="evaluation.traceId" label="TraceID（教师可见）" :span="3">
-              <span class="mono">{{ maskId(evaluation.traceId) }}</span>
-            </el-descriptions-item>
           </el-descriptions>
 
           <div class="foot-actions">
             <ReportDownloadButton :submission-id="evaluation.submissionId" />
-            <span class="dim">复核流转：教师确认/改分走 UC-22（E-02），历史版本 UC-25（E-04/E-05）</span>
+            <span class="dim">教师复核后可在此查看最新结果与历史版本</span>
           </div>
 
           <!-- 历史版本链（E-04/E-05）：权限矩阵授予 evaluation:history:view 的角色可见 -->
@@ -71,7 +68,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { evaluationApi, type EvaluationVO } from '@/api/evaluation'
-import { formatDateTime, maskId } from '@/utils/format'
+import { formatDateTime } from '@/utils/format'
 import { useAuthStore } from '@/stores/auth'
 import PageShell from '@/components/ui/PageShell.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'

@@ -6,22 +6,24 @@
       show-icon
       :closable="false"
       class="tip"
-      title="审计日志仅追加不可篡改（S-09）：本页只读。记录登录、复核、重评与管理端写操作。"
+      title="审计日志用于追溯关键操作，只读不可修改。"
     />
 
     <div class="toolbar">
-      <el-select v-model="moduleFilter" style="width: 140px" @change="reload">
+      <el-select v-model="moduleFilter" placeholder="全部模块" style="width: 140px" @change="reload">
         <el-option label="全部模块" value="" />
         <el-option v-for="m in AUDIT_MODULES" :key="m" :label="permModuleLabel(m)" :value="m" />
       </el-select>
-      <el-input
+      <el-select
         v-model="actionFilter"
         class="search"
-        placeholder="动作关键字（如 REVIEW / UPDATE）"
+        placeholder="全部动作"
         clearable
-        @keyup.enter="reload"
-        @clear="reload"
-      />
+        @change="reload"
+      >
+        <el-option label="全部动作" value="" />
+        <el-option v-for="a in actionOptions" :key="a.value" :label="a.label" :value="a.value" />
+      </el-select>
       <el-button :loading="loading" @click="reload">查询</el-button>
       <span class="dim">共 {{ total }} 条</span>
     </div>
@@ -48,26 +50,13 @@
           <template #default="{ row }">{{ permModuleLabel(row.module) }}</template>
         </el-table-column>
         <el-table-column label="动作" width="190">
-          <template #default="{ row }"
-            ><code class="mono">{{ row.action }}</code></template
-          >
+          <template #default="{ row }">{{ actionLabel(row.action) }}</template>
         </el-table-column>
         <el-table-column label="对象" min-width="160">
-          <template #default="{ row }">{{ row.target ?? '—' }}</template>
+          <template #default="{ row }">{{ targetLabel(row.target) }}</template>
         </el-table-column>
         <el-table-column label="IP" width="130">
           <template #default="{ row }">{{ row.ip ?? '—' }}</template>
-        </el-table-column>
-        <el-table-column label="明细" width="100">
-          <template #default="{ row }">
-            <el-popover v-if="row.detail" placement="left" :width="420" trigger="click">
-              <template #reference>
-                <el-button size="small" text type="primary">查看</el-button>
-              </template>
-              <pre class="detail">{{ pretty(row.detail) }}</pre>
-            </el-popover>
-            <span v-else class="dim">—</span>
-          </template>
         </el-table-column>
       </el-table>
     </DataTableShell>
@@ -77,7 +66,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { adminApi, type AdminAuditLog } from '@/api/admin'
-import { AUDIT_MODULES, permModuleLabel } from '@/constants/admin'
+import { AUDIT_MODULES, permModuleLabel, roleLabel } from '@/constants/admin'
 import { formatDateTime } from '@/utils/format'
 import DataTableShell from '@/components/ui/DataTableShell.vue'
 
@@ -90,12 +79,43 @@ const size = 20
 const moduleFilter = ref('')
 const actionFilter = ref('')
 
-function pretty(detail: string): string {
-  try {
-    return JSON.stringify(JSON.parse(detail), null, 2)
-  } catch {
-    return detail
-  }
+const ACTION_LABELS: Record<string, string> = {
+  CREATE_USER: '新建用户',
+  UPDATE_USER: '编辑用户',
+  DELETE_USER: '删除用户',
+  ASSIGN_ROLES: '分配角色',
+  ENABLE_USER: '启用账号',
+  DISABLE_USER: '禁用账号',
+  UPDATE_PROFILE: '修改个人资料',
+  UPDATE_ROLE_PERMISSIONS: '修改角色权限',
+  CREATE_CLASS: '新建班级',
+  UPDATE_CLASS: '编辑班级',
+  DELETE_CLASS: '删除班级',
+  UPDATE_LLM_CONFIG: '修改模型参数',
+  CREATE_PROMPT: '新建评分提示词',
+  ENABLE_PROMPT: '启用评分提示词',
+  ENABLE_GOLDEN: '启用基准样本',
+  DISABLE_GOLDEN: '停用基准样本',
+  RE_EVALUATE: '重新评价'
+}
+
+const actionOptions = Object.entries(ACTION_LABELS).map(([value, label]) => ({ value, label }))
+
+function actionLabel(action: string): string {
+  return ACTION_LABELS[action] ?? '其他操作'
+}
+
+function targetLabel(target: string | null): string {
+  if (!target) return '—'
+  const [kind, value] = target.split(':')
+  if (kind === 'user') return `用户 #${value}`
+  if (kind === 'role') return `角色 ${roleLabel(value)}`
+  if (kind === 'class') return `班级 #${value}`
+  if (kind === 'llm_config') return '模型配置'
+  if (kind === 'golden') return `样本 #${value}`
+  if (kind === 'prompt') return `提示词 ${value}`
+  if (kind === 'evaluation') return `评价 #${value}`
+  return '其他对象'
 }
 
 async function load() {
@@ -140,18 +160,5 @@ onMounted(load)
 .dim {
   font-size: 12px;
   color: var(--aies-ink3);
-}
-.mono {
-  font-family: var(--aies-mono, monospace);
-  font-size: 12px;
-}
-.detail {
-  margin: 0;
-  max-height: 320px;
-  overflow: auto;
-  font: 11.5px/1.7 var(--aies-mono, monospace);
-  color: var(--aies-ink2);
-  white-space: pre-wrap;
-  word-break: break-all;
 }
 </style>

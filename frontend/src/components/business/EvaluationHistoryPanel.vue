@@ -6,7 +6,7 @@
     <AppSkeleton v-if="loading && !items.length" :rows="3" />
     <el-alert
       v-else-if="denied"
-      title="历史版本无权查看（E-04 归属校验：仅限本人任务；或当前角色未授予 evaluation:history:view）"
+      title="当前账号无权查看该评价的历史版本"
       type="info"
       show-icon
       :closable="false"
@@ -21,8 +21,7 @@
         </el-table-column>
         <el-table-column label="来源" width="120">
           <template #default="{ row }"><StatusTag :status="row.source" /></template>
-        </el-table-column>
-        <el-table-column label="总分" width="90">
+        </el-table-column>        <el-table-column label="总分" width="90">
           <template #default="{ row }">
             <span class="mono">{{ row.totalScore ?? '—' }}</span>
           </template>
@@ -33,21 +32,21 @@
         <el-table-column label="时间" width="160">
           <template #default="{ row }">{{ formatDateTime(row.createTime) }}</template>
         </el-table-column>
-        <el-table-column label="快照" width="90">
+        <el-table-column label="详情" width="90">
           <template #default="{ row }">
             <el-button size="small" text type="primary" @click="openVersion(row.versionNo)">查看</el-button>
           </template>
         </el-table-column>
       </el-table>
     </ScrollArea>
-    <EmptyState v-else description="暂无历史版本（AI 初评尚未落库，或评价仍在排队）" />
+    <EmptyState v-else description="暂无历史记录（首次评价尚未生成）" />
     <div v-if="nextCursor" class="more">
-      <el-button size="small" plain :loading="loadingMore" @click="loadMore">加载更早版本</el-button>
+      <el-button size="small" plain :loading="loadingMore" @click="loadMore">加载更早记录</el-button>
     </div>
   </section>
 
   <!-- E-05 版本快照抽屉 -->
-  <el-drawer v-model="versionDrawer" :title="`版本快照 v${viewing?.versionNo ?? ''}（E-05）`" size="40%">
+  <el-drawer v-model="versionDrawer" :title="`版本详情 v${viewing?.versionNo ?? ''}`" size="40%">
     <AppSkeleton v-if="snapshotLoading" :rows="4" />
     <template v-else-if="viewing">
       <el-descriptions :column="2" border>
@@ -59,9 +58,6 @@
         </el-descriptions-item>
         <el-descriptions-item label="版本时间">{{ formatDateTime(viewing.createTime) }}</el-descriptions-item>
         <el-descriptions-item label="操作人">{{ viewing.reviewerName ?? '系统' }}</el-descriptions-item>
-        <el-descriptions-item v-if="viewing.traceId" label="TraceID" :span="2">
-          <span class="mono">{{ maskId(viewing.traceId) }}</span>
-        </el-descriptions-item>
       </el-descriptions>
       <el-alert
         v-if="viewing.teacherComment"
@@ -79,7 +75,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { evaluationApi, type EvaluationHistoryItem } from '@/api/evaluation'
-import { formatDateTime, maskId } from '@/utils/format'
+import { formatDateTime } from '@/utils/format'
 import { toast } from '@/utils/toast'
 import AppSkeleton from '@/components/ui/AppSkeleton.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'
@@ -90,7 +86,7 @@ import DimensionRadar from '@/components/ui/DimensionRadar.vue'
 import SuggestionList from '@/components/ui/SuggestionList.vue'
 
 const props = withDefaults(defineProps<{ evaluationId: number; title?: string }>(), {
-  title: '评价历史（版本链可追溯）'
+  title: '评价历史记录'
 })
 
 const loading = ref(false)
@@ -157,7 +153,7 @@ async function openVersion(versionNo: number) {
     viewing.value = await evaluationApi.historyVersion(props.evaluationId, versionNo)
   } catch (e) {
     versionDrawer.value = false
-    toast.error((e as { message?: string })?.message || '版本快照加载失败', '请重试')
+    toast.error((e as { message?: string })?.message || '历史详情加载失败', '请重试')
   } finally {
     snapshotLoading.value = false
   }

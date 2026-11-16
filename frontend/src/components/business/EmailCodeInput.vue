@@ -55,17 +55,15 @@ async function onSend() {
   }
   sending.value = true
   try {
-    const result = await authApi.emailCode({
+    await authApi.emailCode({
       username: props.username,
       email: props.email,
       scene: props.scene,
       captchaId: props.captchaId,
       captchaCode: props.captchaCode
     })
-    // dev模拟模式（未配SMTP）回显mockCode便于联调；真实SMTP通道恒为null
-    ElMessage.success(
-      result.mockCode ? `验证码已发送（模拟模式：${result.mockCode}）` : '验证码已发送，请查收邮箱'
-    )
+    // 未配置邮件服务时后端仍会生成验证码；页面统一按已发送提示，不暴露模拟细节
+    ElMessage.success('验证码已发送，请查收邮箱')
     startCountdown()
     emit('sent')
   } catch (e) {

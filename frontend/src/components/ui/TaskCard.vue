@@ -13,7 +13,6 @@
     </div>
     <div class="tc-foot">
       <DeadlineBadge :deadline="task.deadline" :status="task.status" />
-      <span class="tc-id mono">ID {{ task.id }}</span>
     </div>
     <div v-if="$slots.default" class="tc-action" @click.stop>
       <slot />
@@ -88,10 +87,6 @@ const emit = defineEmits<{ open: [] }>()
   align-items: center;
   justify-content: space-between;
   margin-top: 12px;
-}
-.tc-id {
-  font-size: 12px;
-  color: var(--aies-ink3);
 }
 .tc-action {
   margin-top: 12px;

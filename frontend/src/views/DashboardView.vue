@@ -23,7 +23,7 @@
       class="first-login"
     >
       <template #title>
-        首次登录：请尽快修改初始密码（UC-07）
+        首次登录：请尽快修改初始密码
         <el-button link type="primary" size="small" @click="router.push('/change-password')">
           去修改 →
         </el-button>
@@ -33,8 +33,7 @@
     <!-- 管理员：C1 裁决管理员暂不开放全局聚合报表，不请求教学统计端点 -->
     <el-alert v-if="isAdmin" type="info" show-icon :closable="false" class="admin-note">
       <template #title>
-        管理工作台：管理员不参与教学链路统计（报表聚合端点仅对教师开放，C1 范围收敛）。
-        可用的管理能力见「系统管理」与左侧教学/数据模块。
+        管理工作台：集中处理用户、权限、班级与系统运行配置。
       </template>
     </el-alert>
 
@@ -44,8 +43,8 @@
       <EmptyState
         v-else-if="!stats.length"
         description="暂无任务数据（等教师发布任务后这里会亮起来）"
-        :action-text="isTeacher ? '去任务管理' : '去任务中心'"
-        @action="router.push(isTeacher ? '/tasks/manage' : '/tasks')"
+        :action-text="isTeacher ? '去任务列表' : '去任务中心'"
+        @action="router.push(isTeacher ? '/modules?group=teaching&child=task-list' : '/tasks')"
       />
       <div v-else class="stat-grid">
         <StatCard
@@ -152,30 +151,35 @@ const stats = computed(() => {
 const cards = computed<QuickCard[]>(() => {
   if (!isTeacher.value) {
     return [
-      { title: '任务中心', desc: '查看已发布任务、截止时间与指标集', icon: 'tasks', to: '/tasks' },
-      { title: '提交档案', desc: '本人提交版本、解析状态与评价结果', icon: 'archive', to: '/submissions' },
+      { title: '任务中心', desc: '查看已发布任务、截止时间与评分指标', icon: 'tasks', to: '/tasks' },
+      { title: '提交档案', desc: '本人提交版本、文件处理状态与评分结果', icon: 'archive', to: '/submissions' },
       { title: '我的评价', desc: '已出分/已复核的评价报告入口', icon: 'evaluation', to: '/my-evaluations' },
-      { title: '文件中心', desc: '分片上传产物清单与流式下载', icon: 'files', to: '/files' }
+      { title: '文件中心', desc: '查看已上传文件并下载', icon: 'files', to: '/files' }
     ]
   }
   const list: QuickCard[] = [
-    { title: '任务管理', desc: '创建任务、配置指标权重、发布与跟踪', icon: 'manage', to: '/tasks/manage' },
-    { title: '评价复核', desc: '进入复核工作台：改分/重评/版本链', icon: 'review', to: '/review' }
+    {
+      title: '任务列表',
+      desc: '查看、筛选与发布实训任务',
+      icon: 'manage',
+      to: '/modules?group=teaching&child=task-list'
+    },
+    { title: '评价与复核', desc: '查看评分、调整分数与历史版本', icon: 'review', to: '/review' }
   ]
   if (isTeacherData.value) {
     list.push({
       title: '报表驾驶舱',
-      desc: '四图聚合、导出与缓存重建（新窗口）',
+      desc: '查看教学统计、导出报表（新窗口）',
       icon: 'chart',
       to: '/report.html',
       newWindow: true
     })
   }
-  list.push({ title: '文件中心', desc: '分片上传产物清单与流式下载', icon: 'files', to: '/files' })
+  list.push({ title: '文件中心', desc: '查看已上传文件并下载', icon: 'files', to: '/files' })
   if (isAdmin.value) {
     list.push({
       title: '功能模块',
-      desc: '用户/权限/班级/AI/审计（二级+三级目录）',
+      desc: '用户、权限、班级、AI 与审计等管理功能',
       icon: 'system',
       to: '/modules'
     })

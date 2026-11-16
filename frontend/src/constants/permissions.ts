@@ -28,9 +28,9 @@ export const PERM_MAP: Record<string, string> = {
   'system:config': '系统参数配置',
   'class:manage': '班级管理',
   'audit:view': '审计日志查询',
-  'llm:config': 'LLM 参数配置',
-  'prompt:manage': 'Prompt 模板管理',
-  'golden:manage': '黄金数据集管理'
+  'llm:config': 'AI 模型参数配置',
+  'prompt:manage': '评分提示词管理',
+  'golden:manage': '基准样本管理'
 }
 
 /** 命名空间中文名（权限卡分组用） */
@@ -45,9 +45,9 @@ export const NS_MAP: Record<string, string> = {
   role: '角色',
   system: '系统',
   audit: '审计',
-  llm: 'LLM',
-  prompt: 'Prompt',
-  golden: '黄金集'
+  llm: 'AI 模型',
+  prompt: '提示词',
+  golden: '基准样本'
 }
 
 export function permLabel(code: string): string {
@@ -68,11 +68,11 @@ export type PermEntry =
 export const PERM_ROUTE: Record<string, PermEntry> = {
   'auth:logout': { kind: 'action', act: 'logout', hint: '退出登录' },
   'user:me': { kind: 'action', act: 'profile', hint: '定位到个人信息卡' },
-  'task:create': { kind: 'route', to: '/tasks/manage', hint: '进入任务管理模块创建' },
-  'task:publish': { kind: 'route', to: '/tasks/manage', hint: '进入任务管理模块发布草稿' },
-  'task:edit': { kind: 'reserved', hint: '编辑端点为 V1 预留（T-02 未开放），M3 管理端规划' },
-  'task:view': { kind: 'route', to: '/tasks', hint: '进入任务模块（学生任务中心 / 教师任务管理）' },
-  'task:mine': { kind: 'route', to: '/tasks', hint: '进入任务中心' },
+  'task:create': { kind: 'route', to: '/modules?group=teaching&child=task-create', hint: '新建任务' },
+  'task:publish': { kind: 'route', to: '/modules?group=teaching&child=task-list', hint: '在任务列表发布草稿' },
+  'task:edit': { kind: 'route', to: '/modules?group=teaching&child=task-edit', hint: '编辑草稿任务' },
+  'task:view': { kind: 'route', to: '/modules?group=teaching&child=task-list', hint: '查看任务' },
+  'task:mine': { kind: 'route', to: '/modules?group=study&child=tasks', hint: '我的任务' },
   'submission:upload': { kind: 'route', to: '/tasks', hint: '在任务中心选择任务提交作业' },
   'submission:view': {
     kind: 'route',
@@ -96,7 +96,7 @@ export const PERM_ROUTE: Record<string, PermEntry> = {
   },
   'report:view:teacher': { kind: 'action', act: 'dashboard', hint: '打开教师聚合驾驶舱（新窗口）' },
   'report:refresh': { kind: 'action', act: 'dashboard', hint: '工作台页头「刷新报表缓存」按钮' },
-  'report:export': { kind: 'reserved', hint: '导出端点预留，M3 报表导出规划' },
+  'report:export': { kind: 'reserved', hint: '报表导出暂未开放' },
   'user:manage': { kind: 'route', to: '/modules?group=access&child=users', hint: '进入功能模块 → 用户管理' },
   'role:manage': { kind: 'route', to: '/modules?group=access&child=roles', hint: '进入功能模块 → 角色权限' },
   'class:manage': { kind: 'route', to: '/modules?group=data&child=classes', hint: '进入功能模块 → 班级管理' },
@@ -105,12 +105,12 @@ export const PERM_ROUTE: Record<string, PermEntry> = {
   'prompt:manage': {
     kind: 'route',
     to: '/modules?group=ai&child=prompts',
-    hint: '进入功能模块 → Prompt 模板'
+    hint: '进入功能模块 → 评分提示词'
   },
   'golden:manage': {
     kind: 'route',
     to: '/modules?group=data&child=golden',
-    hint: '进入功能模块 → 黄金数据集'
+    hint: '进入功能模块 → 基准样本'
   },
   'system:config': { kind: 'route', to: '/modules?group=ops&child=config', hint: '进入功能模块 → 系统配置' }
 }

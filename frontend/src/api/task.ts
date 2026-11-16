@@ -51,6 +51,14 @@ export const taskApi = {
   async create(payload: TaskCreatePayload): Promise<TaskInfo> {
     return (await request.post('/tasks', payload)) as unknown as TaskInfo
   },
+  /** 编辑任务（仅草稿；发布后指标集锁定） */
+  async update(id: number, payload: TaskCreatePayload): Promise<TaskInfo> {
+    return (await request.put(`/tasks/${id}`, payload)) as unknown as TaskInfo
+  },
+  /** 删除任务（仅草稿且无学生提交） */
+  async remove(id: number): Promise<void> {
+    await request.delete(`/tasks/${id}`)
+  },
   /** T-03 发布任务：DRAFT→PUBLISHED 状态机，发布后指标集锁定（不可逆） */
   async publish(id: number): Promise<TaskInfo> {
     return (await request.post(`/tasks/${id}/publish`)) as unknown as TaskInfo

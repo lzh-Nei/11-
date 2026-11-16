@@ -3,7 +3,7 @@
   <PageShell>
     <PageHeader
       title="个人中心"
-      subtitle="账号基础信息展示与自助资料维护（GET /api/auth/me · PUT /api/profile）"
+      subtitle="账号基础信息展示与自助资料维护"
     >
       <el-button size="small" :loading="reloading" @click="reloadMe">刷新用户信息</el-button>
     </PageHeader>
@@ -22,16 +22,12 @@
               class="tag-gap"
               effect="dark"
               :type="roleTagType"
-              :title="r"
             >
               {{ roleName(r) }}
             </el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="邮箱">{{ auth.me?.email || '未绑定' }}</el-descriptions-item>
           <el-descriptions-item label="手机号">{{ maskPhone(auth.me?.phone) }}</el-descriptions-item>
-          <el-descriptions-item label="已授予权限">
-            {{ auth.me?.permissions?.length ?? 0 }} 项
-          </el-descriptions-item>
         </el-descriptions>
         <p class="hint">学号/工号、角色与邮箱由账号体系维护；如需变更请联系管理员。</p>
       </section>
@@ -70,19 +66,19 @@
         <div class="security-item">
           <div>
             <b>修改密码</b>
-            <small>邮箱验证码校验；成功后需重新登录（作废全部刷新令牌）</small>
+            <small>通过邮箱验证码确认身份；修改成功后需要重新登录</small>
           </div>
           <el-button size="small" @click="router.push('/change-password')">去修改</el-button>
         </div>
         <div class="security-item">
           <div>
             <b>退出登录</b>
-            <small>当前访问令牌立即加入黑名单</small>
+            <small>退出后将返回登录页，需要重新登录</small>
           </div>
           <el-button size="small" plain @click="onLogout">退出</el-button>
         </div>
       </div>
-      <p v-if="auth.firstLogin" class="first-tip">首次登录：建议先修改初始密码（UC-07）。</p>
+      <p v-if="auth.firstLogin" class="first-tip">首次登录：建议先修改初始密码。</p>
     </section>
   </PageShell>
 </template>

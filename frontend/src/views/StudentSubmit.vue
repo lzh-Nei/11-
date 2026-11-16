@@ -1,6 +1,9 @@
 <template>
   <PageShell :width="860">
-    <PageHeader title="提交作业" :subtitle="`UC-16 · 任务 #${taskId}（S-01 multipart 直传）`">
+    <PageHeader
+      title="提交作业"
+      :subtitle="task.title ? `${task.title} · 上传并提交作业` : '上传并提交作业'"
+    >
       <el-button @click="router.push('/tasks')">返回任务中心</el-button>
     </PageHeader>
 
@@ -20,7 +23,7 @@
             <DeadlineBadge :deadline="task.deadline" :status="task.status" />
           </div>
           <div class="dc-row">
-            <span class="dc-label">指标集（AI 按 Σweight=100 评分）</span>
+            <span class="dc-label">评分指标（合计 100%）</span>
             <div class="dc-metrics">
               <span v-for="m in task.metrics" :key="m.id" class="metric-chip">
                 {{ m.metricName }} <b>{{ m.weight }}%</b>
@@ -31,7 +34,7 @@
 
         <el-alert
           v-if="latestVersion > 0"
-          :title="`当前最新版本 v${latestVersion}：再次上传将生成 v${latestVersion + 1}（旧版本保留可追溯，UC-16 A1）`"
+          :title="`当前最新版本 v${latestVersion}：再次上传将生成 v${latestVersion + 1}，旧版本会保留`"
           type="info"
           show-icon
           :closable="false"
@@ -58,7 +61,7 @@
         <div class="actions">
           <ConfirmAction
             title="提交作业"
-            message="提交后立即触发 AI 解析与评价（此动作产生新版本记录，不可撤回）。确认提交？"
+            message="提交后系统会自动检查并评分。本次提交会生成一个新版本，且不能撤回。确认提交？"
             confirm-text="确认提交"
             @execute="onConfirmSubmit"
           >
@@ -71,31 +74,6 @@
           <span v-if="!file" class="dim">请先选择文件（仅 .docx / .pdf，≤ 20MB）</span>
         </div>
 
-        <!-- 分片上传演示区（upload×5 真实承载：S-06 链路可视化——产物 fileId 不入提交表，桥接端点待补，见发现项台账） -->
-        <el-collapse class="shard-demo">
-          <el-collapse-item
-            title="分片上传演示（S-06 upload×5 链路：init → chunk → corrupt → 重传 → complete）"
-          >
-            <div class="shard-actions">
-              <el-button size="small" @click="demoBatch" :loading="batching"
-                >U-04 小文件批量上传（batch）</el-button
-              >
-              <el-button size="small" @click="demoShard" :loading="sharding" :disabled="!file">
-                走分片链上传当前选中文件（init/chunk/complete）
-              </el-button>
-              <el-button v-if="shardId && sharded" size="small" type="warning" plain @click="demoCorrupt">
-                U-05 注入坏块（corrupt-chunk）
-              </el-button>
-            </div>
-            <ScrollArea v-if="shardLog" max-height="220px">
-              <pre class="shard-log">{{ shardLog }}</pre>
-            </ScrollArea>
-            <p class="dim" style="margin-top: 8px">
-              说明：分片链真实上传至 MinIO（2MB/片、断点续传、MD5 坏块检测与定向重传闭环）。当前后端无
-              fileId→提交记录 桥接端点（发现项 F-08 已登记），产物仅为文件存储，不产生提交版本。
-            </p>
-          </el-collapse-item>
-        </el-collapse>
       </template>
     </ScrollArea>
   </PageShell>
@@ -106,7 +84,6 @@ import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { taskApi, type TaskInfo } from '@/api/task'
 import { submissionApi } from '@/api/submission'
-import { uploadApi } from '@/api/upload'
 import { toast } from '@/utils/toast'
 import PageShell from '@/components/ui/PageShell.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
@@ -115,7 +92,6 @@ import StatusTag from '@/components/ui/StatusTag.vue'
 import DeadlineBadge from '@/components/ui/DeadlineBadge.vue'
 import AppSkeleton from '@/components/ui/AppSkeleton.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'
-import ScrollArea from '@/components/ui/ScrollArea.vue'
 import ConfirmAction from '@/components/ui/ConfirmAction.vue'
 
 const route = useRoute()
@@ -146,13 +122,6 @@ const sentBytes = ref(0)
 const speed = ref(0)
 let speedTimer: number | undefined
 let lastLoaded = 0
-
-/* 分片演示态 */
-const sharding = ref(false)
-const batching = ref(false)
-const sharded = ref(false)
-const shardId = ref('')
-const shardLog = ref('')
 
 const MAX_BYTES = 20 * 1024 * 1024
 const ALLOWED = ['docx', 'pdf']
@@ -205,7 +174,7 @@ async function onSubmit() {
   }, 1000)
   try {
     const vo = await submissionApi.submit(taskId, file.value, trackSpeed)
-    toast.success(`提交成功：版本 v${vo.versionNo}，解析状态「${vo.parseStatus}」已进入 AI 评价管道`)
+    toast.success(`提交成功：已生成第 v${vo.versionNo} 版，系统正在检查评分`)
     latestVersion.value = vo.versionNo
     file.value = null
     percent.value = 100
@@ -229,81 +198,6 @@ function onCancel() {
 async function onConfirmSubmit(done: () => void) {
   await onSubmit()
   done()
-}
-
-/* ── 分片链演示（真实上传 MinIO）── */
-async function demoShard() {
-  if (!file.value) return
-  sharding.value = true
-  sharded.value = false
-  shardId.value = ''
-  const f = file.value
-  const log: string[] = []
-  try {
-    const init = await uploadApi.init(f.name, f.size, f.lastModified)
-    shardId.value = init.uploadId
-    log.push(`U-01 init → uploadId=${init.uploadId}，共 ${init.totalChunks} 片（2MB/片）`)
-    for (let i = 0; i < init.totalChunks; i++) {
-      const start = i * 2 * 1024 * 1024
-      const blob = f.slice(start, Math.min(start + 2 * 1024 * 1024, f.size))
-      const r = await uploadApi.chunk(init.uploadId, i, blob)
-      log.push(`U-02 chunk#${i} → ok=${r.ok} md5=${r.md5 ?? '—'}`)
-    }
-    const done = await uploadApi.complete(init.uploadId)
-    log.push(
-      `U-03 complete → success=${done.success} fileId=${done.fileId ?? '—'} badChunks=[${done.badChunks.join(',')}]`
-    )
-    if (done.badChunks.length > 0) {
-      for (const idx of done.badChunks) {
-        const blob = f.slice(idx * 2 * 1024 * 1024, Math.min((idx + 1) * 2 * 1024 * 1024, f.size))
-        await uploadApi.chunk(init.uploadId, idx, blob)
-        log.push(`定向重传 chunk#${idx} → 完成`)
-      }
-      const retry = await uploadApi.complete(init.uploadId)
-      log.push(`重新合并 → success=${retry.success} fileId=${retry.fileId ?? '—'}`)
-      sharded.value = retry.success
-    } else {
-      sharded.value = done.success
-    }
-    shardLog.value = log.join('\n')
-    toast.success('分片链演示完成（产物仅入 MinIO，不入提交表）')
-  } catch (e) {
-    log.push(`异常：${(e as { message?: string })?.message ?? '未知'}`)
-    shardLog.value = log.join('\n')
-    toast.error('分片演示失败', '详见日志')
-  } finally {
-    sharding.value = false
-  }
-}
-
-async function demoCorrupt() {
-  if (!shardId.value) return
-  try {
-    const r = await uploadApi.corruptChunk(shardId.value)
-    shardLog.value = `${shardLog.value}\nU-05 corrupt-chunk → 已破坏分片（下次 complete 将报 badChunks=[${r.chunkIndex}]，再次"走分片链"可观察定向重传闭环）`
-    toast.warning('坏块已注入——重新执行"走分片链上传"可观察检测与重传闭环')
-  } catch (e) {
-    toast.error((e as { message?: string })?.message || '注入失败')
-  }
-}
-
-async function demoBatch() {
-  batching.value = true
-  try {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.multiple = true
-    input.onchange = async () => {
-      const files = Array.from(input.files ?? [])
-      if (!files.length) return
-      const results = await uploadApi.batch(files)
-      shardLog.value = `U-04 batch →\n${results.map((r) => `${r.fileName}: ok=${r.ok} fileId=${r.fileId ?? '—'}`).join('\n')}`
-      toast.success(`批量上传完成：${results.filter((r) => r.ok).length}/${results.length} 成功`)
-    }
-    input.click()
-  } finally {
-    batching.value = false
-  }
 }
 
 onMounted(load)
@@ -371,24 +265,5 @@ onMounted(load)
 .dim {
   font-size: 12.5px;
   color: var(--aies-ink3);
-}
-.shard-demo {
-  margin-top: var(--aies-gap-lg);
-}
-.shard-actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.shard-log {
-  background: #171412;
-  color: #e7e5e4;
-  padding: 12px;
-  border-radius: var(--aies-radius);
-  font: 12px/1.6 var(--aies-mono, monospace);
-  max-height: 220px;
-  overflow: auto;
-  margin-top: 10px;
-  white-space: pre-wrap;
 }
 </style>

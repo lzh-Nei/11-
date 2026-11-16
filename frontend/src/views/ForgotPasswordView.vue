@@ -45,7 +45,7 @@
         type="warning"
         show-icon
         :closable="false"
-        title="邮件服务暂不可用，演示请使用账号密码登录"
+        title="邮件服务暂不可用，请暂时使用账号密码登录"
         class="hint"
       />
       <el-form-item label="图形验证码">

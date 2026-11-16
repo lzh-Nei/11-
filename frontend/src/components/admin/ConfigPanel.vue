@@ -2,8 +2,8 @@
   <!-- 系统配置（system:config）：只读运行快照（数据规模/认证邮件/AI 运行），不暴露密钥 -->
   <section class="panel">
     <div class="toolbar">
-      <el-button :loading="loading" @click="load">刷新快照</el-button>
-      <span class="dim">配置写入路径：认证参数走环境变量（.env），AI 参数见 LLM/Prompt/黄金集模块</span>
+      <el-button :loading="loading" @click="load">刷新概况</el-button>
+      <span class="dim">这里展示系统运行概况；登录与 AI 参数由对应配置模块维护</span>
     </div>
 
     <AppSkeleton v-if="loading" :rows="3" :row-height="80" />
@@ -20,11 +20,11 @@
       </section>
 
       <section class="card">
-        <h3>认证与邮件</h3>
+        <h3>登录与邮件</h3>
         <el-descriptions :column="1" border>
-          <el-descriptions-item label="SMTP 通道">
+          <el-descriptions-item label="邮件服务">
             <el-tag :type="config.smtpConfigured ? 'success' : 'warning'" size="small">
-              {{ config.smtpConfigured ? '已配置' : '模拟发送降级' }}
+              {{ config.smtpConfigured ? '已配置' : '未配置' }}
             </el-tag>
             <span v-if="config.smtpHost" class="mono host">{{ config.smtpHost }}</span>
           </el-descriptions-item>
@@ -43,10 +43,10 @@
           <el-descriptions-item label="当前模型">
             <span class="mono">{{ config.llmModel ?? '未配置' }}</span>
           </el-descriptions-item>
-          <el-descriptions-item label="启用 Prompt 版本">
+          <el-descriptions-item label="启用评分提示词版本">
             {{ config.activePromptVersion != null ? `v${config.activePromptVersion}` : '未启用' }}
           </el-descriptions-item>
-          <el-descriptions-item label="参与回归的黄金样本">
+          <el-descriptions-item label="参与校验的基准样本">
             {{ config.goldenActiveCount }} 个
           </el-descriptions-item>
         </el-descriptions>
@@ -54,7 +54,7 @@
     </div>
 
     <p class="foot">
-      快照只读：系统级密钥（JWT/SMTP/对象存储）不出库、不展示；数据变更请走对应管理模块或部署配置。
+      以上为只读概况；登录凭证、邮件服务与文件存储密钥不在页面展示，如需调整请联系系统管理员。
     </p>
   </section>
 </template>
@@ -87,7 +87,7 @@ async function load() {
   try {
     config.value = await adminApi.systemConfig()
   } catch (e) {
-    error.value = (e as { message?: string })?.message || '系统配置快照加载失败，请稍后重试'
+    error.value = (e as { message?: string })?.message || '系统概况加载失败，请稍后重试'
   } finally {
     loading.value = false
   }

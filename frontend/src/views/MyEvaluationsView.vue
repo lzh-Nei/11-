@@ -4,7 +4,7 @@
     <PageHeader
       v-if="!embedded"
       title="我的评价"
-      subtitle="本人每次提交对应的 AI / 教师评价状态与报告入口（E-01）"
+      subtitle="本人每次提交对应的评价状态与报告入口"
     >
       <el-button size="small" :loading="loading" @click="load">刷新</el-button>
     </PageHeader>
@@ -101,7 +101,7 @@ const taskMap = computed<Record<number, string>>(() => {
 })
 
 function taskTitle(taskId: number): string {
-  return taskMap.value[taskId] || `任务 #${taskId}`
+  return taskMap.value[taskId] || '未知任务'
 }
 
 function openReport(evaluationId: number | null) {

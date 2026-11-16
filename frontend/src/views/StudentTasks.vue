@@ -1,6 +1,6 @@
 <template>
   <PageShell :bare="embedded">
-    <PageHeader v-if="!embedded" title="任务中心" subtitle="学生视角：本班已发布任务（GET /api/tasks）">
+    <PageHeader v-if="!embedded" title="任务中心" subtitle="查看本班已发布的实训任务与截止时间">
       <el-button size="small" :loading="loading" @click="load">刷新</el-button>
     </PageHeader>
 
