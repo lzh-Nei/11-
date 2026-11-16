@@ -159,6 +159,7 @@ services:
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?请在.env设置MINIO_ROOT_PASSWORD}
       RABBITMQ_HOST: rabbitmq              # UC-16解析异步链（W7-C1）
       OLLAMA_BASE_URL: http://ollama:11434 # UC-20 AI评分链（W7-C2），LlmClient唯一出口
+      AI_CONFIG_SECRET: ${AI_CONFIG_SECRET:-aies-dev-config-secret-change-me} # API Key 加密密钥（生产必须覆盖）
     ports:
       - "8080:8080"          # dev直连调试；标准链路经nginx
     volumes:

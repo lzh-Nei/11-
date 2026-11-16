@@ -311,3 +311,12 @@
 - **指标模板**：`EvaluationVO` 增加 `taskId`；FAILED 评价缺少指标快照时，复核页按任务指标集补齐 0 分输入项。
 - **后端**：移除“单项指标不得超过权重”的旧校验，改为指标分非负且总和 ≤100；全量 303 测试、checkstyle、spotbugs 全绿并部署。
 - 验证：管理员端文件中心入口/列表正常；教师端导航只有功能模块/个人中心，`/files` 进入 403；复核页总分 62=22+15+25，改为 80 后汇总 120，出现“总分超限”提示且提交禁用；未写入演示评价数据。
+
+## 过程注记（C15 真实大模型供应商接入，2026-11-17）
+
+- **供应商配置**：`llm_config` 新增 `provider / api_base_url / api_key_cipher / api_key_hint`（V16）。管理端“模型参数”页支持选择 `Ollama 本地`、`OpenAI`、`DeepSeek`、`通义千问 DashScope`、`Moonshot Kimi`、`智谱 GLM`、`自定义 OpenAI 兼容`，并填写 Base URL、模型名、API Key、超时与重试次数。
+- **真实调用**：`LlmClient` 按 provider 路由——Ollama 走 `/api/generate`；云端供应商走 OpenAI 兼容 `/chat/completions`（Bearer Key，temperature=0，非流式），评分管道、Prompt、Schema 校验与重试逻辑保持不变。
+- **密钥安全**：API Key 只在服务端以 AES-GCM 加密保存（密钥来自 `AI_CONFIG_SECRET`，本地有开发默认值），接口只回传 `apiKeyConfigured` 与尾号提示，永不回传明文；保存留空表示保持原密钥。
+- **连通性测试**：管理端“测试连接”通过已保存配置发起一次轻量真实调用，返回成功/失败、模型标识与耗时；不落地评价、不影响业务数据。Ollama 实测 `qwen2.5:7b` 返回成功（303ms）。
+- **评分专用性**：继续复用现有“软件实训作业评分”Prompt 模板（指标 + 提取文本 → JSON），因此切换供应商后仍是由该任务指标驱动的实训专用 AI 评分，而不是通用聊天。
+- 验证：后端 306 测试、checkstyle、spotbugs 全绿；V16 迁移成功；前端构建通过；管理端供应商切换/保存/测试连接实测通过。

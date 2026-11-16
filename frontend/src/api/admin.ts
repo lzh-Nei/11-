@@ -97,11 +97,22 @@ export interface AdminSystemConfig {
 
 export interface AdminLlmConfig {
   id: number
+  provider: string
+  apiBaseUrl: string | null
   modelName: string
   temperature: number
   timeoutSeconds: number
   maxRetry: number
+  apiKeyConfigured: boolean
+  apiKeyHint: string | null
   updateTime: string
+}
+
+export interface LlmTestResult {
+  success: boolean
+  message: string
+  modelVersion: string | null
+  elapsedMs: number
 }
 
 export interface AdminPrompt {
@@ -242,9 +253,19 @@ export const adminApi = {
   },
   async updateLlmConfig(
     id: number,
-    payload: { modelName: string; timeoutSeconds: number; maxRetry: number }
+    payload: {
+      provider: string
+      apiBaseUrl?: string
+      apiKey?: string
+      modelName: string
+      timeoutSeconds: number
+      maxRetry: number
+    }
   ): Promise<void> {
     await request.put(`/admin/llm-configs/${id}`, payload)
+  },
+  async testLlmConfig(id: number): Promise<LlmTestResult> {
+    return (await request.post(`/admin/llm-configs/${id}/test`)) as unknown as LlmTestResult
   },
 
   /* Prompt 模板 */
