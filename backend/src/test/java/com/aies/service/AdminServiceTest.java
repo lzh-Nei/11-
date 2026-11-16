@@ -5,7 +5,9 @@ import com.aies.common.ErrorCode;
 import com.aies.config.AuthProperties;
 import com.aies.dto.admin.AdminDtos.ClassCreateRequest;
 import com.aies.dto.admin.AdminDtos.CreatePromptRequest;
+import com.aies.dto.admin.AdminDtos.CreateUserRequest;
 import com.aies.dto.admin.AdminDtos.UpdateLlmConfigRequest;
+import com.aies.dto.admin.AdminDtos.UpdateUserRequest;
 import com.aies.entity.AuditLog;
 import com.aies.entity.GoldenDataset;
 import com.aies.entity.LlmConfig;
@@ -17,6 +19,7 @@ import com.aies.entity.SysRolePermission;
 import com.aies.entity.SysUserRole;
 import com.aies.entity.User;
 import com.aies.mapper.AuditLogMapper;
+import com.aies.mapper.EvaluationHistoryMapper;
 import com.aies.mapper.EvaluationResultMapper;
 import com.aies.mapper.GoldenDatasetMapper;
 import com.aies.mapper.LlmConfigMapper;
@@ -37,6 +40,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -47,6 +51,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -86,6 +91,10 @@ class AdminServiceTest {
     private PromptTemplateMapper promptMapper;
     private GoldenDatasetMapper goldenMapper;
     private AuditLogMapper auditLogMapper;
+    private SubmissionMapper submissionMapper;
+    private EvaluationHistoryMapper evaluationHistoryMapper;
+    private EvaluationResultMapper evaluationResultMapper;
+    private PasswordEncoder passwordEncoder;
 
     @BeforeEach
     void setUp() {
@@ -104,16 +113,21 @@ class AdminServiceTest {
         promptMapper = mock(PromptTemplateMapper.class);
         goldenMapper = mock(GoldenDatasetMapper.class);
         auditLogMapper = mock(AuditLogMapper.class);
+        submissionMapper = mock(SubmissionMapper.class);
+        evaluationHistoryMapper = mock(EvaluationHistoryMapper.class);
+        evaluationResultMapper = mock(EvaluationResultMapper.class);
+        passwordEncoder = mock(PasswordEncoder.class);
 
         userService = new AdminUserService(userMapper, roleMapper, userRoleMapper, classMapper,
-                rbacMapper, jwtService, redis, auditService);
+                rbacMapper, jwtService, redis, auditService, auditLogMapper, taskMapper,
+                submissionMapper, evaluationHistoryMapper, evaluationResultMapper, passwordEncoder);
         rbacService = new AdminRbacService(roleMapper, permissionMapper, rolePermMapper,
                 userRoleMapper, redis, auditService);
         classService = new AdminClassService(classMapper, userMapper, taskMapper, rbacMapper, auditService);
         aiService = new AdminAiService(llmConfigMapper, promptMapper, goldenMapper,
                 new ObjectMapper(), auditService);
         systemService = new AdminSystemService(new AuthProperties(), userMapper, classMapper, taskMapper,
-                mock(SubmissionMapper.class), mock(EvaluationResultMapper.class), llmConfigMapper,
+                submissionMapper, evaluationResultMapper, llmConfigMapper,
                 promptMapper, goldenMapper, auditLogMapper);
     }
 
@@ -232,6 +246,114 @@ class AdminServiceTest {
 
         assertThat(teachers).hasSize(1);
         assertThat(teachers.get(0).username()).isEqualTo("teacher");
+    }
+
+    /* ==================== 用户增删改（M3 CRUD） ==================== */
+
+    @Test
+    void createUserShouldInsertWithRolesAndAudit() {
+        when(userMapper.selectByUsername("newuser")).thenReturn(null);
+        when(passwordEncoder.encode("Passw0rd1")).thenReturn("bcrypt");
+        when(roleMapper.selectList(any())).thenReturn(List.of(role(1L, "STUDENT")));
+        doAnswer(invocation -> {
+            User inserted = invocation.getArgument(0);
+            inserted.setId(20L);
+            return 1;
+        }).when(userMapper).insert(any(User.class));
+        User created = user(20L, "newuser", "STUDENT");
+        created.setRealName("新用户");
+        when(userMapper.selectById(20L)).thenReturn(created);
+        when(rbacMapper.selectRoleCodes(20L)).thenReturn(List.of("STUDENT"));
+
+        var vo = userService.create(createUserRequest(), admin);
+
+        assertThat(vo.username()).isEqualTo("newuser");
+        verify(userMapper).insert(any(User.class));
+        verify(rbacMapper).insertUserRole(20L, "STUDENT");
+        verify(auditService).record(eq(admin), eq("user"), eq("CREATE_USER"), eq("user:20"), any());
+    }
+
+    @Test
+    void createUserShouldRejectAdminRole() {
+        when(userMapper.selectByUsername(any())).thenReturn(null);
+        CreateUserRequest request = createUserRequest();
+        request.setRoleCodes(List.of("ADMIN"));
+
+        assertThatThrownBy(() -> userService.create(request, admin))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("不能创建管理员");
+        verify(userMapper, never()).insert(any(User.class));
+    }
+
+    @Test
+    void createUserShouldRejectDuplicateUsername() {
+        when(userMapper.selectByUsername("newuser")).thenReturn(user(9L, "newuser", "STUDENT"));
+
+        assertThatThrownBy(() -> userService.create(createUserRequest(), admin))
+                .isInstanceOf(BusinessException.class);
+        verify(userMapper, never()).insert(any(User.class));
+    }
+
+    @Test
+    void updateUserShouldUpdateProfileAndAudit() {
+        User original = user(5L, "stu01", "STUDENT");
+        original.setRealName("旧名");
+        original.setEmail("old@aies.local");
+        User updated = user(5L, "stu01", "STUDENT");
+        updated.setRealName("新名");
+        updated.setEmail("new@aies.local");
+        when(userMapper.selectById(5L)).thenReturn(original, updated);
+        when(rbacMapper.selectRoleCodes(5L)).thenReturn(List.of("STUDENT"));
+
+        var vo = userService.update(5L, updateUserRequest(), admin);
+
+        assertThat(vo.realName()).isEqualTo("新名");
+        verify(userMapper).update(any(), any());
+        verify(auditService).record(eq(admin), eq("user"), eq("UPDATE_USER"), eq("user:5"), any());
+    }
+
+    @Test
+    void updateUserShouldRejectAdminTarget() {
+        when(userMapper.selectById(1L)).thenReturn(user(1L, "admin", "ADMIN"));
+        when(rbacMapper.selectRoleCodes(1L)).thenReturn(List.of("ADMIN"));
+
+        assertThatThrownBy(() -> userService.update(1L, updateUserRequest(), admin))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("管理员账号资料");
+        verify(userMapper, never()).update(any(), any());
+    }
+
+    @Test
+    void deleteUserShouldRejectWhenBusinessDataExists() {
+        when(userMapper.selectById(6L)).thenReturn(user(6L, "stu06", "STUDENT"));
+        when(rbacMapper.selectRoleCodes(6L)).thenReturn(List.of("STUDENT"));
+        when(submissionMapper.selectCount(any())).thenReturn(2L);
+
+        assertThatThrownBy(() -> userService.delete(6L, admin))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("不能删除");
+        verify(userMapper, never()).deleteById(anyLong());
+    }
+
+    @Test
+    void deleteUserShouldRemoveRolesAndUser() {
+        when(userMapper.selectById(6L)).thenReturn(user(6L, "stu06", "STUDENT"));
+        when(rbacMapper.selectRoleCodes(6L)).thenReturn(List.of("STUDENT"));
+
+        userService.delete(6L, admin);
+
+        verify(userRoleMapper).delete(any());
+        verify(userMapper).deleteById(6L);
+        verify(redis).delete("auth:perm:6");
+        verify(auditService).record(eq(admin), eq("user"), eq("DELETE_USER"), eq("user:6"), any());
+    }
+
+    @Test
+    void deleteUserShouldRejectSelf() {
+        assertThatThrownBy(() -> userService.delete(1L, admin))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("当前登录账号");
+        verify(userMapper, never()).deleteById(anyLong());
     }
 
     /* ==================== 角色权限 ==================== */
@@ -471,6 +593,25 @@ class AdminServiceTest {
         request.setClassName("软件11班");
         request.setClassCode("AIES11-2026");
         request.setTeacherId(2L);
+        return request;
+    }
+
+    private CreateUserRequest createUserRequest() {
+        CreateUserRequest request = new CreateUserRequest();
+        request.setUsername("newuser");
+        request.setRealName("新用户");
+        request.setPassword("Passw0rd1");
+        request.setEmail("");
+        request.setPhone("");
+        request.setRoleCodes(List.of("STUDENT"));
+        return request;
+    }
+
+    private UpdateUserRequest updateUserRequest() {
+        UpdateUserRequest request = new UpdateUserRequest();
+        request.setRealName("新名");
+        request.setEmail("new@aies.local");
+        request.setPhone("13900000003");
         return request;
     }
 }

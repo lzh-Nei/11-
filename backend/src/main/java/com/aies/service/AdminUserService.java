@@ -4,14 +4,26 @@ import com.aies.common.BusinessException;
 import com.aies.common.ErrorCode;
 import com.aies.dto.admin.AdminDtos.AdminTeacherVO;
 import com.aies.dto.admin.AdminDtos.AdminUserVO;
+import com.aies.dto.admin.AdminDtos.CreateUserRequest;
+import com.aies.dto.admin.AdminDtos.UpdateUserRequest;
+import com.aies.entity.AuditLog;
+import com.aies.entity.EvaluationHistory;
+import com.aies.entity.EvaluationResult;
+import com.aies.entity.Submission;
 import com.aies.entity.SysClass;
 import com.aies.entity.SysRole;
 import com.aies.entity.SysUserRole;
+import com.aies.entity.Task;
 import com.aies.entity.User;
+import com.aies.mapper.AuditLogMapper;
+import com.aies.mapper.EvaluationHistoryMapper;
+import com.aies.mapper.EvaluationResultMapper;
 import com.aies.mapper.RbacMapper;
+import com.aies.mapper.SubmissionMapper;
 import com.aies.mapper.SysClassMapper;
 import com.aies.mapper.SysRoleMapper;
 import com.aies.mapper.SysUserRoleMapper;
+import com.aies.mapper.TaskMapper;
 import com.aies.mapper.UserMapper;
 import com.aies.security.JwtService;
 import com.aies.security.LoginPrincipal;
@@ -19,7 +31,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -54,6 +68,12 @@ public class AdminUserService {
     private final JwtService jwtService;
     private final StringRedisTemplate redis;
     private final AdminAuditService auditService;
+    private final AuditLogMapper auditLogMapper;
+    private final TaskMapper taskMapper;
+    private final SubmissionMapper submissionMapper;
+    private final EvaluationHistoryMapper evaluationHistoryMapper;
+    private final EvaluationResultMapper evaluationResultMapper;
+    private final PasswordEncoder passwordEncoder;
 
     /** 用户分页：keyword 匹配账号/姓名，status 与 roleCode 可组合筛选 */
     public Page<AdminUserVO> list(long page, long size, String keyword,
@@ -156,6 +176,133 @@ public class AdminUserService {
         auditService.record(principal, "user", "ASSIGN_ROLES", "user:" + userId, detail);
     }
 
+    /** 新建用户（管理员）：账号唯一、密码强度、角色仅 STUDENT/TEACHER、班级可选 */
+    @Transactional
+    public AdminUserVO create(CreateUserRequest request, LoginPrincipal principal) {
+        String username = request.getUsername().trim();
+        if (userMapper.selectByUsername(username) != null) {
+            throw new BusinessException(ErrorCode.USERNAME_REGISTERED);
+        }
+        ensurePasswordStrong(request.getPassword());
+        String realName = request.getRealName().trim();
+        if (realName.isEmpty()) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "姓名不能为空");
+        }
+        String email = normalizeEmail(request.getEmail());
+        String phone = normalizePhone(request.getPhone());
+        Long classId = request.getClassId();
+        ensureClassExists(classId);
+        List<String> roleCodes = normalizeRoleCodes(request.getRoleCodes());
+        if (roleCodes.contains(ROLE_ADMIN)) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "不能创建管理员角色账号");
+        }
+        validateRolesExist(roleCodes);
+
+        User user = new User();
+        user.setUsername(username);
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setRealName(realName);
+        user.setEmail(email);
+        user.setPhone(phone);
+        user.setClassId(classId);
+        user.setStatus(1);
+        user.setFirstLogin(1);
+        userMapper.insert(user);
+        for (String code : roleCodes) {
+            rbacMapper.insertUserRole(user.getId(), code);
+        }
+
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("username", username);
+        detail.put("realName", realName);
+        detail.put("roleCodes", roleCodes);
+        detail.put("classId", classId);
+        auditService.record(principal, "user", "CREATE_USER", "user:" + user.getId(), detail);
+
+        User created = userMapper.selectById(user.getId());
+        return toVO(created, classNames(List.of(created)));
+    }
+
+    /** 编辑用户基础资料（管理员）：姓名/邮箱/手机号/班级；ADMIN 账号受保护 */
+    @Transactional
+    public AdminUserVO update(long userId, UpdateUserRequest request, LoginPrincipal principal) {
+        User user = requireUser(userId);
+        if (hasRole(userId, ROLE_ADMIN)) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "管理员账号资料请在个人中心维护");
+        }
+        String realName = request.getRealName().trim();
+        if (realName.isEmpty()) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "姓名不能为空");
+        }
+        String email = normalizeEmail(request.getEmail());
+        String phone = normalizePhone(request.getPhone());
+        Long classId = request.getClassId();
+        ensureClassExists(classId);
+
+        userMapper.update(null, new UpdateWrapper<User>()
+                .eq("id", userId)
+                .set("real_name", realName)
+                .set("email", email)
+                .set("phone", phone)
+                .set("class_id", classId));
+
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("username", user.getUsername());
+        detail.put("realName", Map.of("before", user.getRealName(), "after", realName));
+        detail.put("email", Map.of("before", maskEmail(user.getEmail()), "after", maskEmail(email)));
+        detail.put("phone", Map.of("before", maskPhone(user.getPhone()), "after", maskPhone(phone)));
+        Map<String, Object> classDetail = new LinkedHashMap<>();
+        classDetail.put("before", user.getClassId());
+        classDetail.put("after", classId);
+        detail.put("classId", classDetail);
+        auditService.record(principal, "user", "UPDATE_USER", "user:" + userId, detail);
+
+        User updated = userMapper.selectById(userId);
+        return toVO(updated, classNames(List.of(updated)));
+    }
+
+    /** 删除用户（管理员）：自删/管理员/存在业务数据或审计记录时拒绝（建议改为禁用） */
+    @Transactional
+    public void delete(long userId, LoginPrincipal principal) {
+        if (principal.userId() == userId) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "不能删除当前登录账号");
+        }
+        User user = requireUser(userId);
+        if (hasRole(userId, ROLE_ADMIN)) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "管理员账号受保护，不能删除");
+        }
+        long dependencies = auditLogMapper.selectCount(new LambdaQueryWrapper<AuditLog>()
+                        .eq(AuditLog::getOperatorId, userId))
+                + classMapper.selectCount(new LambdaQueryWrapper<SysClass>()
+                        .eq(SysClass::getTeacherId, userId))
+                + taskMapper.selectCount(new LambdaQueryWrapper<Task>()
+                        .eq(Task::getTeacherId, userId))
+                + submissionMapper.selectCount(new LambdaQueryWrapper<Submission>()
+                        .eq(Submission::getStudentId, userId))
+                + evaluationHistoryMapper.selectCount(new LambdaQueryWrapper<EvaluationHistory>()
+                        .eq(EvaluationHistory::getReviewerId, userId))
+                + evaluationResultMapper.selectCount(new LambdaQueryWrapper<EvaluationResult>()
+                        .eq(EvaluationResult::getReviewerId, userId));
+        if (dependencies > 0) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR,
+                    "该用户存在业务数据或审计记录，不能删除，请改为禁用");
+        }
+        try {
+            userRoleMapper.delete(new LambdaQueryWrapper<SysUserRole>()
+                    .eq(SysUserRole::getUserId, userId));
+            userMapper.deleteById(userId);
+        } catch (DataIntegrityViolationException e) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR,
+                    "该用户存在关联数据，不能删除，请改为禁用");
+        }
+        redis.delete(AUTH_PERM_PREFIX + userId);
+
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("username", user.getUsername());
+        detail.put("realName", user.getRealName());
+        auditService.record(principal, "user", "DELETE_USER", "user:" + userId, detail);
+    }
+
     /** 教师下拉（班级管理绑定授课教师） */
     public List<AdminTeacherVO> teachers() {
         SysRole teacherRole = roleMapper.selectOne(new LambdaQueryWrapper<SysRole>()
@@ -173,6 +320,77 @@ public class AdminUserService {
                 .sorted(Comparator.comparing(User::getRealName, Comparator.nullsLast(String::compareTo)))
                 .map(user -> new AdminTeacherVO(user.getId(), user.getUsername(), user.getRealName()))
                 .toList();
+    }
+
+    private void ensurePasswordStrong(String password) {
+        if (password == null || !password.matches("^(?=.*[A-Za-z])(?=.*\\d).{8,32}$")) {
+            throw new BusinessException(ErrorCode.PASSWORD_WEAK);
+        }
+    }
+
+    private String normalizeEmail(String email) {
+        if (!StringUtils.hasText(email)) {
+            return null;
+        }
+        String value = email.trim();
+        if (!value.matches("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "邮箱格式不正确");
+        }
+        return value;
+    }
+
+    private String normalizePhone(String phone) {
+        if (!StringUtils.hasText(phone)) {
+            return null;
+        }
+        String value = phone.trim();
+        if (!value.matches("^1[3-9]\\d{9}$")) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "手机号格式不正确");
+        }
+        return value;
+    }
+
+    private void ensureClassExists(Long classId) {
+        if (classId != null && classMapper.selectById(classId) == null) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "班级不存在");
+        }
+    }
+
+    private List<String> normalizeRoleCodes(List<String> roleCodes) {
+        List<String> codes = roleCodes.stream().filter(StringUtils::hasText)
+                .map(String::trim).distinct().toList();
+        if (codes.isEmpty()) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "至少选择一个角色");
+        }
+        return codes;
+    }
+
+    private void validateRolesExist(List<String> codes) {
+        List<SysRole> roles = roleMapper.selectList(new LambdaQueryWrapper<SysRole>()
+                .in(SysRole::getRoleCode, codes));
+        Set<String> existing = roles.stream().map(SysRole::getRoleCode).collect(Collectors.toSet());
+        List<String> missing = codes.stream().filter(code -> !existing.contains(code)).toList();
+        if (!missing.isEmpty()) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "角色不存在：" + String.join(",", missing));
+        }
+    }
+
+    private String maskEmail(String email) {
+        if (!StringUtils.hasText(email)) {
+            return "";
+        }
+        int at = email.indexOf('@');
+        if (at <= 1) {
+            return "***";
+        }
+        return email.charAt(0) + "***" + email.substring(at);
+    }
+
+    private String maskPhone(String phone) {
+        if (!StringUtils.hasText(phone) || phone.length() < 7) {
+            return "";
+        }
+        return phone.substring(0, 3) + "****" + phone.substring(phone.length() - 4);
     }
 
     private User requireUser(long userId) {

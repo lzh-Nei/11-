@@ -50,6 +50,49 @@ public final class AdminDtos {
         private List<@NotBlank(message = "角色编码不能为空") String> roleCodes;
     }
 
+    @Data
+    public static class CreateUserRequest {
+        @NotBlank(message = "学号/工号不能为空")
+        @Pattern(regexp = "[A-Za-z0-9_]{4,20}", message = "学号/工号需为4-20位字母、数字或下划线")
+        private String username;
+
+        @NotBlank(message = "姓名不能为空")
+        @Size(max = 32, message = "姓名最长32字")
+        private String realName;
+
+        @NotBlank(message = "初始密码不能为空")
+        @Size(min = 8, max = 32, message = "密码长度需为8-32位")
+        private String password;
+
+        @Pattern(regexp = "^$|^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$",
+                message = "邮箱格式不正确")
+        private String email;
+
+        @Pattern(regexp = "^$|^1[3-9]\\d{9}$", message = "手机号格式不正确")
+        private String phone;
+
+        private Long classId;
+
+        @NotEmpty(message = "至少选择一个角色")
+        private List<@NotBlank(message = "角色编码不能为空") String> roleCodes;
+    }
+
+    @Data
+    public static class UpdateUserRequest {
+        @NotBlank(message = "姓名不能为空")
+        @Size(max = 32, message = "姓名最长32字")
+        private String realName;
+
+        @Pattern(regexp = "^$|^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$",
+                message = "邮箱格式不正确")
+        private String email;
+
+        @Pattern(regexp = "^$|^1[3-9]\\d{9}$", message = "手机号格式不正确")
+        private String phone;
+
+        private Long classId;
+    }
+
     /* ==================== 角色权限管理 ==================== */
 
     public record AdminRoleVO(Long id, String roleCode, String roleName, Integer builtIn,

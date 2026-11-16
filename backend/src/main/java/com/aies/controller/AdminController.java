@@ -11,6 +11,7 @@ import com.aies.dto.admin.AdminDtos.AuditLogVO;
 import com.aies.dto.admin.AdminDtos.ClassCreateRequest;
 import com.aies.dto.admin.AdminDtos.ClassUpdateRequest;
 import com.aies.dto.admin.AdminDtos.CreatePromptRequest;
+import com.aies.dto.admin.AdminDtos.CreateUserRequest;
 import com.aies.dto.admin.AdminDtos.GoldenSampleVO;
 import com.aies.dto.admin.AdminDtos.LlmConfigVO;
 import com.aies.dto.admin.AdminDtos.PromptDetailVO;
@@ -20,6 +21,7 @@ import com.aies.dto.admin.AdminDtos.ToggleActiveRequest;
 import com.aies.dto.admin.AdminDtos.UpdateLlmConfigRequest;
 import com.aies.dto.admin.AdminDtos.UpdateRolePermissionsRequest;
 import com.aies.dto.admin.AdminDtos.UpdateUserRolesRequest;
+import com.aies.dto.admin.AdminDtos.UpdateUserRequest;
 import com.aies.dto.admin.AdminDtos.UpdateUserStatusRequest;
 import com.aies.security.PrincipalUtils;
 import com.aies.service.AdminAiService;
@@ -77,6 +79,26 @@ public class AdminController {
             @RequestParam(required = false) Integer status,
             @RequestParam(required = false) String roleCode) {
         return Result.success(userService.list(page, size, keyword, status, roleCode));
+    }
+
+    @PreAuthorize("hasAuthority('" + PermissionConstants.USER_MANAGE + "')")
+    @PostMapping("/users")
+    public Result<AdminUserVO> createUser(@Valid @RequestBody CreateUserRequest request) {
+        return Result.success(userService.create(request, PrincipalUtils.current()));
+    }
+
+    @PreAuthorize("hasAuthority('" + PermissionConstants.USER_MANAGE + "')")
+    @PutMapping("/users/{id}")
+    public Result<AdminUserVO> updateUser(@PathVariable("id") @Positive long id,
+                                          @Valid @RequestBody UpdateUserRequest request) {
+        return Result.success(userService.update(id, request, PrincipalUtils.current()));
+    }
+
+    @PreAuthorize("hasAuthority('" + PermissionConstants.USER_MANAGE + "')")
+    @DeleteMapping("/users/{id}")
+    public Result<Void> deleteUser(@PathVariable("id") @Positive long id) {
+        userService.delete(id, PrincipalUtils.current());
+        return Result.success();
     }
 
     @PreAuthorize("hasAuthority('" + PermissionConstants.USER_MANAGE + "')")
