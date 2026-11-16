@@ -42,7 +42,12 @@ export const NS_MAP: Record<string, string> = {
   evaluation: '评价',
   report: '报表',
   class: '班级',
-  system: '系统'
+  role: '角色',
+  system: '系统',
+  audit: '审计',
+  llm: 'LLM',
+  prompt: 'Prompt',
+  golden: '黄金集'
 }
 
 export function permLabel(code: string): string {

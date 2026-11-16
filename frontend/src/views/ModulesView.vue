@@ -114,7 +114,7 @@ const permCatalog: ModuleChild = {
 const studentGroups: ModuleGroup[] = [
   {
     key: 'study',
-    label: '学习与任务',
+    label: '学习任务',
     icon: 'tasks',
     children: [
       { key: 'tasks', label: '任务中心', icon: 'tasks', component: StudentTasks, props: { embedded: true } },
@@ -135,11 +135,18 @@ const studentGroups: ModuleGroup[] = [
     ]
   },
   {
-    key: 'overview',
-    label: '学习概览',
-    icon: 'dashboard',
-    component: DashboardView,
-    props: { embedded: true }
+    key: 'analysis',
+    label: '学习分析',
+    icon: 'chart',
+    children: [
+      {
+        key: 'overview',
+        label: '学习概览',
+        icon: 'dashboard',
+        component: DashboardView,
+        props: { embedded: true }
+      }
+    ]
   },
   { key: 'access', label: '账号与权限', icon: 'lock', children: [permCatalog] }
 ]
@@ -147,7 +154,7 @@ const studentGroups: ModuleGroup[] = [
 const teacherGroups: ModuleGroup[] = [
   {
     key: 'teaching',
-    label: '教学与评价',
+    label: '教学任务',
     icon: 'manage',
     children: [
       { key: 'tasks', label: '任务管理', icon: 'manage', component: Check, props: { embedded: true } },
@@ -161,13 +168,20 @@ const teacherGroups: ModuleGroup[] = [
     ]
   },
   {
-    key: 'overview',
-    label: '教学概览',
-    icon: 'dashboard',
-    component: DashboardView,
-    props: { embedded: true }
+    key: 'analysis',
+    label: '教学分析',
+    icon: 'chart',
+    children: [
+      {
+        key: 'overview',
+        label: '教学概览',
+        icon: 'dashboard',
+        component: DashboardView,
+        props: { embedded: true }
+      },
+      { key: 'report', label: '报表驾驶舱', icon: 'chart', external: '/report.html' }
+    ]
   },
-  { key: 'report', label: '报表驾驶舱', icon: 'chart', external: '/report.html' },
   { key: 'access', label: '账号与权限', icon: 'lock', children: [permCatalog] }
 ]
 
@@ -184,7 +198,7 @@ const adminGroups: ModuleGroup[] = [
   },
   {
     key: 'teaching',
-    label: '教学与评价',
+    label: '教学管理',
     icon: 'manage',
     children: [
       { key: 'tasks', label: '任务管理', icon: 'manage', component: Check, props: { embedded: true } },

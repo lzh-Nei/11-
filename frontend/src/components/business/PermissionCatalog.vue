@@ -1,10 +1,15 @@
 <template>
-  <!-- 统一权限清单组件（WP8-C4）：管理员侧显示在"功能模块 → 用户与权限 → 权限清单"，
-       教师/学生侧保留在个人中心；点击权限点按角色分流到对应模块 -->
+  <!-- 统一权限清单组件（WP8-C4/C5）：三角色统一显示在「功能模块 → 账号与权限 → 权限清单」，
+       点击权限点按角色分流到对应二级/三级模块 -->
   <section class="catalog">
     <div class="catalog-head">
-      <h3>功能权限（{{ auth.me?.permissions?.length ?? 0 }} 项）</h3>
-      <span class="dim">点击权限点直达对应模块；虚线为 M3 预留</span>
+      <h3>功能权限（{{ totalCount }} 项 · 已落地 {{ implementedCount }} 项）</h3>
+      <span class="dim">
+        <template v-if="reservedCount"
+          >点击权限点直达对应模块；预留 {{ reservedCount }} 项以虚线标注</template
+        >
+        <template v-else>点击权限点直达对应模块；当前角色权限点均已落地</template>
+      </span>
     </div>
     <ScrollArea :max-height="maxHeight" padded>
       <div v-for="(perms, ns) in permGroups" :key="ns" class="perm-group">
@@ -45,13 +50,42 @@ withDefaults(defineProps<{ maxHeight?: string }>(), { maxHeight: '360px' })
 const router = useRouter()
 const auth = useAuthStore()
 
+const PERM_GROUP_ORDER = [
+  'auth',
+  'user',
+  'class',
+  'task',
+  'submission',
+  'evaluation',
+  'report',
+  'role',
+  'system',
+  'audit',
+  'llm',
+  'prompt',
+  'golden'
+]
+
+const permissions = computed(() => (auth.me?.permissions ?? []).map((p) => String(p)))
+const totalCount = computed(() => permissions.value.length)
+const reservedCount = computed(
+  () => permissions.value.filter((p) => permEntry(p)?.kind === 'reserved').length
+)
+const implementedCount = computed(() => totalCount.value - reservedCount.value)
+
 const permGroups = computed<Record<string, string[]>>(() => {
   const groups: Record<string, string[]> = {}
-  for (const p of auth.me?.permissions ?? []) {
-    const ns = String(p).split(':')[0]
-    ;(groups[ns] = groups[ns] || []).push(String(p))
+  for (const p of permissions.value) {
+    const ns = p.split(':')[0]
+    ;(groups[ns] = groups[ns] || []).push(p)
   }
-  return groups
+  return Object.fromEntries(
+    Object.entries(groups).sort(([a], [b]) => {
+      const ai = PERM_GROUP_ORDER.indexOf(a)
+      const bi = PERM_GROUP_ORDER.indexOf(b)
+      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
+    })
+  )
 })
 
 function permTooltip(code: string): string {
@@ -73,6 +107,7 @@ function onPermClick(code: string) {
     `/modules?group=${group}${child ? `&child=${child}` : ''}`
   const studyModule = (child: string) => toModule('study', child)
   const teachingModule = (child: string) => toModule('teaching', child)
+  const analysisModule = (child: string) => toModule('analysis', child)
 
   // 真正未开放的权限（task:edit / report:export）优先如实告知，不做导航
   const entry = permEntry(code)
@@ -81,11 +116,16 @@ function onPermClick(code: string) {
     return
   }
 
+  if (code === 'submission:upload') {
+    // 上传动作发生在任务中心（选任务 → 提交）
+    router.push(isStudent ? studyModule('tasks') : teachingModule('tasks'))
+    return
+  }
   if (code === 'task:create' || code === 'task:publish' || code === 'task:view' || code === 'task:mine') {
     router.push(isStudent ? studyModule('tasks') : teachingModule('tasks'))
     return
   }
-  if (code === 'submission:view' || code === 'submission:mine' || code === 'submission:upload') {
+  if (code === 'submission:view' || code === 'submission:mine') {
     router.push(isStudent ? studyModule('submissions') : teachingModule('review'))
     return
   }
@@ -103,19 +143,19 @@ function onPermClick(code: string) {
   }
   if (code === 'class:manage') {
     if (isAdmin) router.push(toModule('data', 'classes'))
-    else toast.warning('班级管理入口当前仅在管理端开放')
+    else toast.warning('班级管理为管理端能力，当前角色未开放独立入口')
     return
   }
   if (code.startsWith('report:')) {
     if (isStudent) {
-      router.push(toModule('overview'))
+      router.push(analysisModule('overview'))
       return
     }
     if (isAdmin) {
       toast.warning('管理员暂不开放全局聚合报表（C1 范围收敛）')
       return
     }
-    router.push(toModule('report'))
+    router.push(analysisModule('report'))
     return
   }
 
