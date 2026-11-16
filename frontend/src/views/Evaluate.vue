@@ -85,7 +85,14 @@
       <!-- 历史版本（E-04 分页 + E-05 单版本快照） -->
       <section class="history">
         <h3>评价历史（版本链可追溯）</h3>
-        <el-table v-if="history.length" :data="history" stripe size="small">
+        <el-alert
+          v-if="historyDenied"
+          title="历史版本无权查看（E-04 归属校验：仅限本人任务的复核记录；该评价归属其他教师或数据造数教师不匹配）"
+          type="info"
+          show-icon
+          :closable="false"
+        />
+        <el-table v-else-if="history.length" :data="history" stripe size="small">
           <el-table-column prop="versionNo" label="版本" width="70">
             <template #default="{ row }"><span class="mono">v{{ row.versionNo }}</span></template>
           </el-table-column>
@@ -151,6 +158,7 @@ const error = ref<string | null>(null)
 const evaluation = ref<EvaluationVO | null>(null)
 const history = ref<EvaluationHistoryItem[]>([])
 const nextCursor = ref<string | null>(null)
+const historyDenied = ref(false)
 const versionDrawer = ref(false)
 const viewing = ref<EvaluationVO | null>(null)
 let timer: number | undefined
@@ -202,7 +210,15 @@ async function load() {
       window.clearInterval(timer)
       timer = undefined
     }
-    await loadHistory()
+    // 历史区独立容错：E-04 教师归属校验（限本人任务）不通过时降级提示，主面板照常
+    historyDenied.value = false
+    try {
+      await loadHistory()
+    } catch {
+      historyDenied.value = true
+      history.value = []
+      nextCursor.value = null
+    }
   } catch (e) {
     error.value = (e as { message?: string })?.message || '网络或服务暂时不可用，请稍后重试'
   } finally {
