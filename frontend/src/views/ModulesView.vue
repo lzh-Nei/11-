@@ -1,7 +1,7 @@
 <template>
   <!-- 功能模块（三角色统一）：顶部横向二级模块 + 紧邻顶部栏的纵向三级目录 + 内容展示区。
        权限清单统一收口在「账号与权限 → 权限清单」；内容区弹性填满，避免底部大块留白。 -->
-  <PageShell fill>
+  <PageShell fill fluid>
     <PageHeader
       title="功能模块"
       :subtitle="`${roleTitle} · 二级模块（顶部横向） / 三级目录（左侧纵向） / 功能页面`"
@@ -311,6 +311,7 @@ function selectChild(child: ModuleChild) {
 
 <style scoped>
 .browser {
+  margin: 0;
   flex: 1;
   min-height: 0;
   display: flex;
@@ -322,6 +323,7 @@ function selectChild(child: ModuleChild) {
   overflow: hidden;
 }
 .l2-bar {
+  margin: 0;
   display: flex;
   align-items: stretch;
   gap: 4px;
@@ -333,6 +335,7 @@ function selectChild(child: ModuleChild) {
   flex: none;
 }
 .l2-item {
+  margin: 0;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -365,6 +368,7 @@ function selectChild(child: ModuleChild) {
   color: var(--aies-ink3);
 }
 .browser-body {
+  margin: 0;
   flex: 1;
   min-height: 0;
   display: grid;
@@ -379,6 +383,7 @@ function selectChild(child: ModuleChild) {
   }
 }
 .l3-nav {
+  margin: 0;
   min-height: 0;
   overflow-y: auto;
   border-right: 1px solid var(--aies-border);
@@ -424,6 +429,7 @@ function selectChild(child: ModuleChild) {
   font-weight: 600;
 }
 .content {
+  margin: 0;
   min-width: 0;
   min-height: 0;
   display: flex;
