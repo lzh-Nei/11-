@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>AIES · 报表驾驶舱</title>
+<script src="https://registry.npmmirror.com/echarts/5.5.0/files/dist/echarts.min.js"></script>
+<style>
+/* ===== Design Tokens（Taste 三旋钮物化：V3/M3/D6） ===== */
+:root{
+  --paper:#f7f6f3;--surface:#fff;--line:#e7e4de;--line2:#d9d4cb;
+  --ink:#1c1917;--ink2:#57534e;--ink3:#78716c;--ink4:#a8a29e;
+  --brand:#b45309;--brand2:#d97706;--brand-bg:#fef3c7;--brand-ink:#78350f;
+  --teal:#0f766e;--teal-bg:#ccfbf1;--teal-ink:#134e4a;--clay:#9a3412;
+  --ok:#15803d;--err:#b91c1c;
+  --r-lg:10px;--r-md:6px;
+  --shadow:0 1px 2px rgba(28,25,23,.04),0 6px 20px rgba(28,25,23,.05);
+  --sans:-apple-system,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,"Liberation Mono",monospace;
+  --t:160ms ease-out;
+}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--paper);color:var(--ink);font:14px/1.6 var(--sans)}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+button{font:inherit;cursor:pointer;transition:background var(--t),border-color var(--t),color var(--t)}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line2);border-radius:var(--r-md);padding:9px 12px;transition:border-color var(--t)}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px solid var(--brand2);outline-offset:2px}
+.hidden{display:none!important}
+/* ===== 壳层 ===== */
+.shell{display:flex;min-height:100vh}
+.rail{width:216px;flex:none;background:var(--surface);border-right:1px solid var(--line);padding:22px 14px;display:flex;flex-direction:column;gap:6px;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:10px;padding:0 8px 18px}
+.mark{width:30px;height:30px;border-radius:8px;background:var(--brand);color:#fff;display:grid;place-items:center;font:700 15px var(--mono)}
+.brand b{font-size:14px;letter-spacing:.02em}
+.brand small{display:block;font-size:11px;color:var(--ink3);font-weight:400}
+.nav-btn{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:9px 12px;border-radius:var(--r-md);border:1px solid transparent;background:none;color:var(--ink2)}
+.nav-btn:hover{background:var(--paper);color:var(--ink)}
+.nav-btn.on{background:var(--brand-bg);color:var(--brand-ink);border-color:#f0e3bb;font-weight:600}
+body:not(.authed) .nav-btn{opacity:.35;pointer-events:none}
+.rail-foot{margin-top:auto;padding:12px 8px;font-size:11px;color:var(--ink3);border-top:1px solid var(--line)}
+.main{flex:1;min-width:0;padding:28px 34px 70px;max-width:1260px}
+@media(max-width:900px){.shell{flex-direction:column}.rail{position:static;width:auto;height:auto;flex-direction:row;align-items:center;flex-wrap:wrap}.brand{padding:0 8px}.nav-btn{width:auto}.rail-foot{display:none}.main{padding:20px 16px 60px}}
+/* ===== 组件 ===== */
+.ovl{font-size:11px;font-weight:700;letter-spacing:.14em;color:var(--ink3)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:20px;box-shadow:var(--shadow)}
+.card h2{font-size:17px;margin:2px 0 0}
+.card h3{font-size:14px;margin:2px 0 0}
+.sub{font-size:12.5px;color:var(--ink2);margin-top:4px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.btn{background:var(--brand);color:#fff;border:0;border-radius:var(--r-md);padding:9px 16px;font-weight:600}
+.btn:hover{background:#9a4207}
+.ghost{background:var(--surface);color:var(--ink2);border:1px solid var(--line2);border-radius:var(--r-md);padding:8px 14px}
+.ghost:hover{color:var(--ink);border-color:var(--ink4)}
+.ghost.on{background:var(--brand-bg);color:var(--brand-ink);border-color:#f0e3bb;font-weight:600}
+.pill{display:inline-flex;align-items:center;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600}
+.pill.ok{background:#dcfce7;color:#14532d}.pill.warn{background:var(--brand-bg);color:var(--brand-ink)}
+.pill.err{background:#fee2e2;color:#7f1d1d}.pill.t{background:var(--teal-bg);color:var(--teal-ink)}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.lat{font-size:12px;color:var(--ink3)}
+.empty{color:var(--ink2);font-size:13px;border:1px dashed var(--line2);border-radius:var(--r-md);padding:18px;text-align:center;background:var(--paper)}
+.err-t{color:var(--err);font-weight:600;font-size:13px}
+/* KPI 瓷砖 */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:16px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:14px 16px;box-shadow:var(--shadow)}
+.kpi .v{font:600 26px/1.15 var(--mono);letter-spacing:-.01em;margin-top:4px}
+.kpi .u{font-size:12px;color:var(--ink3);font-family:var(--sans);font-weight:400;margin-left:2px}
+/* 图阵 */
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(460px,1fr));gap:16px}
+@media(max-width:1020px){.grid{grid-template-columns:1fr}}
+.chart{height:290px;margin-top:10px}
+.skel{position:relative;overflow:hidden;background:#edebe6;border-radius:var(--r-md)}
+.skel::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent);animation:sh 1.2s infinite}
+@keyframes sh{to{transform:translateX(100%)}}
+/* 控制台 */
+pre{background:#171412;color:#e7e5e4;padding:14px;border-radius:var(--r-md);overflow:auto;max-height:400px;font:12.5px/1.55 var(--mono);margin:0}
+textarea{width:100%;min-height:64px;font-family:var(--mono);font-size:13px}
+.hItem{font-size:12.5px;color:var(--ink2);padding:6px 10px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface);cursor:pointer}
+.hItem:hover{border-color:var(--ink4)}
+/* 身份页 */
+.idgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin:14px 0}
+.idrow{background:var(--paper);border:1px solid var(--line);border-radius:var(--r-md);padding:10px 14px}
+.idrow .ovl{display:block;margin-bottom:4px}
+.sep{height:1px;background:var(--line);margin:18px 0}
+.pg{margin-bottom:16px}
+.pg .ns{font:600 12px var(--mono);color:var(--ink2);margin-bottom:8px}
+.pillgrid{display:flex;flex-wrap:wrap;gap:8px}
+.perm{font:12px var(--mono);background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:4px 10px;color:var(--ink2)}
+/* 登录 */
+#view-login{max-width:420px;margin:8vh auto 0}
+#toast{position:fixed;bottom:24px;left:50%;transform:translate(-50%,16px);opacity:0;background:var(--ink);color:#fafaf9;padding:10px 18px;border-radius:var(--r-md);font-size:13px;transition:opacity .2s,transform .2s;pointer-events:none;z-index:50}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+.cssbar-row{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:13px}
+.cssbar-name{width:130px;text-align:right;color:var(--ink2);flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cssbar-track{flex:1;background:#edebe6;border-radius:4px;height:14px;overflow:hidden}
+.cssbar-fill{height:100%;background:var(--brand2)}
+.cssbar-val{width:56px;font:12px var(--mono);color:var(--ink3)}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="rail">
+    <div class="brand"><div class="mark">A</div><div><b>AIES 驾驶舱</b><small>教学AI检查评价系统</small></div></div>
+    <button class="nav-btn" id="nav-dash" onclick="go('dash')">报表驾驶舱</button>
+    <button class="nav-btn" id="nav-console" onclick="go('console')">API 控制台</button>
+    <button class="nav-btn" id="nav-id" onclick="go('id')">身份与权限</button>
+    <div class="rail-foot">UC-25 查询链 · V14 权限<br>数据源：本机后端契约</div>
+  </aside>
+  <main class="main">
+    <div id="view-login" class="card">
+      <div class="ovl">AIES · 登录</div>
+      <h2>进入驾驶舱</h2>
+      <div class="row" style="margin:16px 0 10px">
+        <input id="account" placeholder="学号/工号" style="flex:1">
+        <input id="pwd" type="password" placeholder="密码" style="flex:1">
+      </div>
+      <button class="btn" style="width:100%" onclick="login()">密码登录</button>
+      <div class="sub" style="margin-top:8px">注：后端登录需图形验证码，本页密码登录路径未接 captcha——请先在主应用登录，本页将自动探测登录态；或使用 TOKEN 装载。</div>
+      <div class="sep"></div>
+      <div class="ovl">或使用 TOKEN</div>
+      <div class="row" style="margin-top:8px">
+        <input id="tokenIn" placeholder="粘贴 JWT（F12 → Local Storage）" style="flex:1">
+        <button class="ghost" onclick="useToken()">装载</button>
+      </div>
+      <div class="sub" id="loginMsg" style="margin-top:10px">同源部署时将自动探测已有登录态。</div>
+    </div>
+    <div id="view-dash" class="hidden">
+      <div class="row" style="margin-bottom:14px">
+        <button class="ghost" id="sc-teacher" onclick="setScope('teacher')">教师聚合</button>
+        <button class="ghost" id="sc-me" onclick="setScope('me')">学生个人</button>
+        <button class="btn" onclick="doRefresh()">⟳ 刷新缓存</button>
+        <span id="dashMsg" class="lat"></span>
+      </div>
+      <div class="sub" style="margin:-6px 0 14px">演示路径：在控制台执行一次复核或重评，回此页点刷新，四图即时变化（缓存主动失效可视化）。</div>
+      <div class="kpis" id="kpis"></div>
+      <div class="grid" id="charts"></div>
+      <div class="card" style="margin-top:16px">
+        <div class="row" style="justify-content:space-between">
+          <h3>原始响应<span class="sub" style="display:inline">（契约校准对照用）</span></h3>
+          <button class="ghost" onclick="toggleRaw()">展开/收起</button>
+        </div>
+        <pre id="rawJson" class="hidden" style="margin-top:12px"></pre>
+      </div>
+    </div>
+    <div id="view-console" class="hidden">
+      <div class="card">
+        <div class="ovl">ENDPOINT PRESETS</div>
+        <div id="presets" style="margin-top:10px"></div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <div class="ovl">REQUEST BUILDER</div>
+        <div class="row" style="margin-top:10px">
+          <select id="cMethod" style="width:96px"><option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option></select>
+          <input id="cUrl" placeholder="/api/..." style="flex:1;min-width:220px" class="mono">
+          <button class="btn" onclick="sendConsole()">发送</button>
+          <button class="ghost" onclick="copyCurl()">Copy curl</button>
+        </div>
+        <textarea id="cBody" placeholder="请求体 JSON（GET 留空）" style="margin-top:10px"></textarea>
+        <div class="row" style="margin:12px 0 8px"><span id="cMeta"></span></div>
+        <pre id="cResp">{ 就绪 }</pre>
+        <div class="ovl" style="margin-top:16px">RECENT</div>
+        <div class="row" id="history" style="margin-top:8px"></div>
+      </div>
+    </div>
+    <div id="view-id" class="hidden">
+      <div class="card"><div class="ovl">IDENTITY</div><h2>身份与权限</h2><div id="idBody" style="margin-top:6px"></div></div>
+    </div>
+  </main>
+</div>
+<div id="toast"></div>
+<script>
+/* ══════════ 契约校准区（唯一允许手改的区域，diff 定位锚）
+   锁定版（W12-D39，执行侧按 ReportOverviewDTO 真实结构 + LoginPrincipal 体系锁定）：
+   - overview 响应：{tasks:[{taskId,title,submitted,scored,avgScore,rate}],
+     scoreDist:[{range,count}]×5, metricRadar:[{metricName,avgScore}], scoreGapDist:[{range,count}]×5}
+   - 顶层无 KPI 标量 → kpiMode:'fromTasks' 由 tasks 数组派生四 KPI
+   - task 图名键 = title（TaskStat.title）→ nameKey
+   - 登录契约：/api/auth/login 需 captchaId+captchaCode（V2 安全种子）→ 本页密码登录路径不可用，
+     走 token 装载 / 同源自动探测（主应用登录后同源 localStorage 存 JWT） */
+const CONFIG={
+  loginPath:'/api/auth/login', loginMethod:'POST', tokenField:'data.accessToken',
+  mePath:'/api/auth/me',
+  overviewTeacher:'/api/reports/overview',
+  overviewMe:'/api/reports/overview/me',
+  refreshPath:'/api/reports/refresh', refreshMethod:'POST',
+  authScheme:'Bearer',
+  fields:{task:'tasks',dist:'scoreDist',radar:'metricRadar',gap:'scoreGapDist'},
+  nameKey:'title',
+  kpiMode:'fromTasks',
+  kpi:{tasks:['totalTasks','taskCount','taskTotal'],avg:['averageScore','avgScore','avg'],
+       subs:['submissionCount','submissions','totalSubmissions'],pending:['pendingCount','pendingReview','toBeReviewed']}
+};
+const PRESETS=[
+  ['GET',CONFIG.mePath,'当前身份'],
+  ['GET',CONFIG.overviewTeacher,'教师聚合报表'],
+  ['GET',CONFIG.overviewMe,'学生个人报表'],
+  ['POST',CONFIG.refreshPath,'刷新缓存（D-36）'],
+];
+/* ══════════ 状态与工具 ══════════ */
+const S={token:localStorage.getItem('aies_ui_token')||'',identity:null,scope:'teacher',charts:[]};
+const H=[];
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'"'}[c]));
+const dig=(o,p)=>p.split('.').reduce((o,k)=>(o==null?undefined:o[k]),o);
+const num=v=>typeof v==='number'?v:(typeof v==='string'&&v!==''&&!isNaN(+v)?+v:null);
+const jwtLike=v=>typeof v==='string'&&/^eyJ[\w-]+\.[\w-]+\.[\w-]+$/.test(v);
+const toast=t=>{const el=$('toast');el.textContent=t;el.classList.add('show');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),2200)};
+async function api(path,opt={}){
+  const t0=performance.now();
+  const auth=S.token?(CONFIG.authScheme?CONFIG.authScheme+' '+S.token:S.token):null;
+  const res=await fetch(path,{method:opt.method||'GET',headers:{'Content-Type':'application/json',...(auth?{Authorization:auth}:{})},body:opt.body?JSON.stringify(opt.body):undefined});
+  let json=null;try{json=await res.json();}catch(e){}
+  return{status:res.status,ms:Math.round(performance.now()-t0),json};
+}
+const payload=r=>r.json&&r.json.data!==undefined?r.json.data:r.json;
+/* ══════════ 视图路由 ══════════ */
+const VIEWS=['dash','console','id'];
+function go(v){
+  VIEWS.forEach(x=>{$('view-'+x).classList.toggle('hidden',x!==v);$('nav-'+x).classList.toggle('on',x===v)});
+  if(v==='id')renderIdentity();
+  if(v==='dash')requestAnimationFrame(()=>S.charts.forEach(c=>c&&c.resize()));
+}
+/* ══════════ 认证 ══════════ */
+function detectToken(){
+  if(S.token&&jwtLike(S.token))return true;
+  for(let i=0;i<localStorage.length;i++){const v=(localStorage.getItem(localStorage.key(i))||'').trim();
+    if(jwtLike(v)){S.token=v;localStorage.setItem('aies_ui_token',v);return true;}}
+  return false;
+}
+function setWho(){
+  const d=S.identity||{};const box=$('who');if(!box)return;
+  const name=d.name||d.realName||d.username||d.studentId||'已登录';
+  const role=String(d.role||(Array.isArray(d.roles)?d.roles[0]:'')||'');
+  const isS=/student/i.test(role);
+  box.innerHTML=`<span class="pill ${isS?'t':'warn'}">${esc(role||'USER')}</span><span style="font-size:13px">${esc(name)}</span>`;
+  if(isS)S.scope='me';else if(/teacher/i.test(role))S.scope='teacher';
+  syncScope();
+}
+function setAuthed(on){document.body.classList.toggle('authed',on);}
+async function afterAuth(){
+  setAuthed(true);$('view-login').classList.add('hidden');
+  const r=await api(CONFIG.mePath);
+  S.identity=r.status===200?payload(r):{};
+  if(r.status===401){deauth('登录态失效，请重新登录');return;}
+  setWho();go('dash');await loadReport();
+}
+function deauth(msg){S.token='';localStorage.removeItem('aies_ui_token');setAuthed(false);
+  VIEWS.forEach(x=>$('view-'+x).classList.add('hidden'));$('view-login').classList.remove('hidden');
+  if(msg)toast(msg);}
+async function login(){
+  const a=$('account').value.trim(),p=$('pwd').value;
+  if(!a||!p){$('loginMsg').textContent='请输入账号与密码';return;}
+  /* 契约偏差登记（W12-D39）：后端 /api/auth/login 强制 captchaId+captchaCode（V2 安全种子），
+     本页无 captcha 输入 → 密码登录路径设计上不可用，保留代码仅为形态完整。
+     可用路径：① 主应用登录后同源自动探测 ② TOKEN 粘贴装载 */
+  const r=await api(CONFIG.loginPath,{method:CONFIG.loginMethod,body:{username:a,password:p}});
+  const tok=r.status===200?(dig(r.json,CONFIG.tokenField)||dig(r.json,'token')):null;
+  if(jwtLike(tok)){S.token=tok;localStorage.setItem('aies_ui_token',tok);afterAuth();}
+  else if(r.status===200)$('loginMsg').textContent='返回 200 但未定位 token 字段：改 CONFIG.tokenField，或改用 token 粘贴';
+  else $('loginMsg').innerHTML=`<span class="err-t">登录失败 ${r.status}</span>（登录需图形验证码——请用主应用登录后回本页自动探测，或 TOKEN 装载）`;
+}
+function useToken(){
+  const t=$('tokenIn').value.trim().replace(/^Bearer\s+/i,'');
+  if(!jwtLike(t)){$('loginMsg').textContent='不是合法 JWT 形态（应形如 eyJxxx.yyy.zzz）';return;}
+  S.token=t;localStorage.setItem('aies_ui_token',t);afterAuth();
+}
+/* ══════════ 报表 ══════════ */
+function syncScope(){['teacher','me'].forEach(s=>$('sc-'+s).classList.toggle('on',S.scope===s));}
+function setScope(s){S.scope=s;syncScope();if(S.token&&document.body.classList.contains('authed'))loadReport();}
+async function doRefresh(){
+  toast('刷新缓存…');
+  let r=await api(CONFIG.refreshPath,{method:CONFIG.refreshMethod});
+  if(r.status===405)r=await api(CONFIG.refreshPath,{method:'GET'});
+  if(r.status>=200&&r.status<300){toast('缓存已主动失效，拉取最新');await loadReport();}
+  else toast(`refresh ${r.status}：方法不符改 CONFIG.refreshMethod`);
+}
+const renderRaw=j=>{$('rawJson').textContent=JSON.stringify(j,null,2)};
+const toggleRaw=()=>$('rawJson').classList.toggle('hidden');
+const CHART_DEFS=[{k:'task',t:'任务统计'},{k:'dist',t:'均分分布'},{k:'radar',t:'指标雷达'},{k:'gap',t:'分差分布'}];
+const CHART_COLORS={task:'#d97706',dist:'#0f766e',radar:'#b45309',gap:'#9a3412'};
+function buildChartDom(){$('charts').innerHTML=CHART_DEFS.map(c=>`<div class="card"><div class="ovl">${c.t}</div><div id="ch-${c.k}" class="chart"></div></div>`).join('');}
+function showSkeleton(on){CHART_DEFS.forEach(c=>{const el=$('ch-'+c.k);if(!el)return;
+  if(on){el.innerHTML='';el.classList.add('skel');}else el.classList.remove('skel');});}
+/* KPI 派生：kpiMode='fromTasks' 时由 tasks[] 派生（真实契约无顶层标量）；
+   引用的契约知识全部声明在 CONFIG 校准区，本函数仅引用 */
+function deriveKpi(d){
+  if(CONFIG.kpiMode==='fromTasks'&&Array.isArray(d.tasks)){
+    const tasks=d.tasks;
+    const sum=k=>tasks.reduce((a,t)=>a+(+t[k]||0),0);
+    const subs=sum('submitted'),scored=sum('scored');
+    const avgs=tasks.filter(t=>t.avgScore!=null).map(t=>+t.avgScore);
+    return [['任务总数',tasks.length],['提交总数',subs],
+            ['已出分',scored],['待复核',Math.max(subs-scored,0)]].filter(x=>x[1]!=null);
+  }
+  const pick=keys=>{for(const k of keys){const v=num(dig(d,k));if(v!=null)return v;}return null};
+  const defs=[['任务总数',pick(CONFIG.kpi.tasks)],['平均分',pick(CONFIG.kpi.avg)],['提交数',pick(CONFIG.kpi.subs)],['待复核',pick(CONFIG.kpi.pending)]];
+  return defs.filter(x=>x[1]!=null);
+}
+const emptyBox=()=>'<div class="empty">该图字段待契约校准：改 CONFIG.fields 对应键为实际字段名（对照原始响应），或把响应贴给 PM 锁定映射</div>';
+/* name 候选首二位引用 CONFIG.nameKey（契约知识在 CONFIG 声明） */
+function toNameValue(v,nested=[]){
+  let d=v;
+  if(d&&typeof d==='object'&&!Array.isArray(d))for(const k of nested)if(d[k]!==undefined){d=d[k];break;}
+  if(!d)return null;
+  if(Array.isArray(d))return d.map((it,i)=>it&&typeof it==='object'
+    ?{name:String(it.name??(CONFIG.nameKey&&it[CONFIG.nameKey])??it.label??it.range??it.key??it.category??it.metric??('#'+i)),
+      value:num(it.value??it.count??it.avg??it.score??it.ratio??it.percent??it.num??it.total)}
+    :{name:'#'+i,value:num(it)}).filter(x=>x.value!==null);
+  if(typeof d==='object')return Object.entries(d).map(([k,val])=>({name:k,value:num(val)})).filter(x=>x.value!==null);
+  return null;
+}
+const niceMax=m=>m<=1?1:m<=10?10:m<=100?100:Math.ceil(m/50)*50;
+function renderAll(data){
+  $('kpis').innerHTML=deriveKpi(data).map(([l,v])=>`<div class="kpi"><div class="ovl">${l}</div><div class="v">${v}</div></div>`).join('');
+  if(!window.echarts){CHART_DEFS.forEach(c=>{const nv=toNameValue(dig(data,CONFIG.fields[c.k]),[c.k]);$('ch-'+c.k).innerHTML=nv?cssBars(nv):emptyBox();});return;}
+  S.charts.forEach(c=>c.dispose());S.charts=[];
+  drawBar('task',toNameValue(dig(data,CONFIG.fields.task)));
+  drawBar('dist',toNameValue(dig(data,CONFIG.fields.dist)));
+  drawRadar(dig(data,CONFIG.fields.radar));
+  drawBar('gap',toNameValue(dig(data,CONFIG.fields.gap)));
+}
+function drawBar(k,nv){
+  const el=$('ch-'+k);if(!el)return;
+  if(!nv||!nv.length){el.innerHTML=emptyBox();return;}
+  const c=echarts.init(el);S.charts.push(c);
+  c.setOption({tooltip:{trigger:'axis'},grid:{left:44,right:20,top:24,bottom:46},
+    xAxis:{type:'category',data:nv.map(x=>x.name),axisLabel:{color:'#57534e',rotate:nv.length>6?28:0},axisLine:{lineStyle:{color:'#d9d4cb'}}},
+    yAxis:{type:'value',axisLabel:{color:'#78716c',fontFamily:'ui-monospace,Consolas,monospace'},splitLine:{lineStyle:{color:'#e7e4de'}}},
+    series:[{type:'bar',data:nv.map(x=>x.value),itemStyle:{color:CHART_COLORS[k],borderRadius:[3,3,0,0]},barMaxWidth:40,animationDuration:500}]});
+}
+function drawRadar(v){
+  const el=$('ch-radar');if(!el)return;
+  const nv=toNameValue(v,['indicators','axes','metrics','dimensions']);
+  if(!nv||nv.length<3){el.innerHTML=emptyBox();return;}
+  const max=niceMax(Math.max(...nv.map(x=>x.value)));
+  const c=echarts.init(el);S.charts.push(c);
+  c.setOption({tooltip:{},radar:{indicator:nv.map(x=>({name:x.name,max})),axisName:{color:'#57534e'},splitLine:{lineStyle:{color:'#e7e4de'}},splitArea:{show:false}},
+    series:[{type:'radar',data:[{value:nv.map(x=>x.value),name:'指标得分',itemStyle:{color:'#b45309'},lineStyle:{color:'#b45309'},areaStyle:{color:'#d97706',opacity:.18}}],animationDuration:500}]});
+}
+function cssBars(nv){
+  const max=Math.max(...nv.map(x=>Math.abs(x.value)))||1;
+  return nv.map(x=>`<div class="cssbar-row"><span class="cssbar-name">${esc(x.name)}</span><div class="cssbar-track"><div class="cssbar-fill" style="width:${(Math.abs(x.value)/max*100).toFixed(1)}%"></div></div><span class="cssbar-val">${x.value}</span></div>`).join('');
+}
+async function loadReport(){
+  const m=$('dashMsg');m.textContent='加载中…';showSkeleton(true);
+  const r=await api(S.scope==='me'?CONFIG.overviewMe:CONFIG.overviewTeacher);
+  showSkeleton(false);renderRaw(r.json);
+  if(r.status===401){deauth('登录态失效，请重新登录');return;}
+  if(r.status!==200){m.innerHTML=`<span class="err-t">HTTP ${r.status}</span> ${esc((r.json&&r.json.message)||'')}`;return;}
+  m.innerHTML=`<span class="pill ok">200</span><span class="lat">${r.ms}ms · ${S.scope==='me'?'学生个人':'教师聚合'}</span>`;
+  renderAll(payload(r));
+}
+/* ══════════ 身份与权限 ══════════ */
+async function renderIdentity(){
+  const box=$('idBody');
+  if(!S.identity){const r=await api(CONFIG.mePath);S.identity=r.status===200?payload(r):null;
+    if(!S.identity){box.innerHTML=`<div class="empty">身份获取失败（HTTP ${r.status}）</div>`;return;}}
+  const d=S.identity;
+  const name=d.name||d.realName||d.username||d.studentId||'—';
+  const role=String(d.role||(Array.isArray(d.roles)?d.roles[0]:'')||'—');
+  const isS=/student/i.test(role);
+  const perms=d.permissions||d.perms||d.authorities||[];
+  const groups={};
+  perms.forEach(p=>{const ns=String(p).split(':')[0];(groups[ns]=groups[ns]||[]).push(String(p));});
+  box.innerHTML=`
+    <div class="idgrid">
+      <div class="idrow"><span class="ovl">姓名</span><b>${esc(name)}</b></div>
+      <div class="idrow"><span class="ovl">账号</span><span class="mono">${esc(d.studentId||d.username||'—')}</span></div>
+      <div class="idrow"><span class="ovl">角色</span><span class="pill ${isS?'t':'warn'}">${esc(role)}</span></div>
+      <div class="idrow"><span class="ovl">邮箱</span><span>${esc(d.email||'—')}</span></div>
+    </div>
+    <div class="sep"></div>
+    <div class="ovl">权限清单 · ${perms.length} 项 · 按命名空间分组</div>
+    <div style="margin-top:12px">
+      ${Object.keys(groups).length?Object.entries(groups).map(([ns,list])=>`
+        <div class="pg"><div class="ns">${esc(ns)} · ${list.length}</div>
+        <div class="pillgrid">${list.map(p=>`<span class="perm">${esc(p)}</span>`).join('')}</div></div>`).join('')
+      :'<div class="empty">响应中未定位权限数组：核对 CONFIG.mePath 返回结构</div>'}
+    </div>`;
+}
+/* ══════════ 控制台 ══════════ */
+function buildPresets(){$('presets').innerHTML=PRESETS.map((p,i)=>`<button class="ghost" style="margin:0 8px 8px 0" onclick="preset(${i})"><span class="mono">${p[0]}</span> ${esc(p[1])}</button>`).join('');}
+function preset(i){$('cMethod').value=PRESETS[i][0];$('cUrl').value=PRESETS[i][1];$('cBody').value='';sendConsole();}
+async function sendConsole(){
+  const method=$('cMethod').value,url=$('cUrl').value.trim(),raw=$('cBody').value.trim();
+  if(!url){toast('请输入路径');return;}
+  let body=null;
+  if(raw&&method!=='GET'){try{body=JSON.parse(raw);}catch(e){toast('请求体不是合法 JSON');return;}}
+  $('cMeta').innerHTML='<span class="lat">请求中…</span>';
+  const r=await api(url,{method,body});
+  $('cMeta').innerHTML=`<span class="pill ${r.status<300?'ok':r.status<500?'warn':'err'}">${r.status}</span><span class="lat">${r.ms}ms</span>`;
+  $('cResp').textContent=JSON.stringify(r.json??'(无 JSON 响应体)',null,2);
+  H.unshift({m:method,u:url,b:raw});if(H.length>5)H.pop();renderHistory();
+}
+function renderHistory(){$('history').innerHTML=H.map((h,i)=>`<span class="hItem mono" onclick="refill(${i})">${h.m} ${esc(h.u)}</span>`).join('');}
+function refill(i){$('cMethod').value=H[i].m;$('cUrl').value=H[i].u;$('cBody').value=H[i].b;}
+function copyCurl(){
+  const m=$('cMethod').value,u=$('cUrl').value.trim(),b=$('cBody').value.trim();
+  const auth=S.token?` -H "Authorization: ${CONFIG.authScheme?CONFIG.authScheme+' '+S.token:S.token}"`:'';
+  const body=b&&m!=='GET'?` -H "Content-Type: application/json" -d '${b}'`:'';
+  navigator.clipboard?.writeText(`curl -X ${m} http://localhost:8082${u}${auth}${body}`);
+  toast('curl 已复制（直连 8082）');
+}
+/* ══════════ 启动 ══════════ */
+(function init(){
+  buildChartDom();buildPresets();syncScope();
+  if(location.protocol==='file:')$('loginMsg').innerHTML='<span class="err-t">file:// 直开会跨域失败</span>，请访问 http://localhost:8082/report.html';
+  if(detectToken())afterAuth();else{setAuthed(false);$('view-login').classList.remove('hidden');}
+  window.addEventListener('resize',()=>S.charts.forEach(c=>c&&c.resize()));
+})();
+</script>
+</body>
+</html>
