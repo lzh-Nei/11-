@@ -54,3 +54,19 @@
   与教师评分标准的系统性分歧（完成度线索 vs 主流程跑通），prompt 迭代链五轮证伪
   （V7→V8→V9→V10→V11回滚），详见 golden-eval-report-W7C2.md W9-M2 附录 §四——
   三选项（例外登记/P2技术路径/样本调整）待 PM 裁决。
+
+## 待裁决（WP8-B6 前端验收发现，2026-11-16）
+
+- **学生端评价历史版本（02-05 #08，P0）与权限矩阵冲突**：V1__rbac.sql 的 STUDENT 角色
+  未授予 `evaluation:history:view`（D-36 矩阵 STUDENT=7 项口径），E-04/E-05 对学生会返回
+  40301。前端已按权限显隐历史区（不伪造访问）。需裁决：
+  A) 补授 STUDENT 该权限点（新增 V 迁移 + 回写 03-API 权限矩阵与 02-05 页面范围）；
+  B) 修订页面清单，将 #08 定性为教师侧能力（学生仅看当前生效版本）。
+- **教师端提交总览（#14）/报表导出（#16）缺后端端点**：SubmissionController 仅 `/mine`
+  （本人视角），ReportController 无 exports 链（`report:export` 仍为预留权限点）。两页
+  暂无法真实承载，维持 M3 规划，不计入本轮前端验收缺口。
+- **E-04/E-05 契约口径回写**：EvaluationHistoryPageVO 实为
+  `list/nextCursor/hasMore`，列表项仅 `versionNo/source/totalScore/reviewerName/createTime`；
+  `teacherComment/metricScores/aiComment/traceId` 仅 E-05 快照返回。前端曾按
+  `items/operatorName/createdAt` 实现（渲染崩溃根因），B6 已校正——建议 03-API 回写该细节。
+

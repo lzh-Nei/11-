@@ -94,6 +94,34 @@
         </el-button>
       </div>
 
+      <!-- UC-18/21：评价结果内嵌（E-01 真实数据，完整报告另开页） -->
+      <section v-if="detail?.evaluationId" class="eval-block">
+        <div class="eval-head">
+          <h4>评价结果（E-01 · 当前生效）</h4>
+          <el-button link type="primary" @click="router.push(`/evaluations/${detail.evaluationId}`)">
+            完整报告 →
+          </el-button>
+        </div>
+        <AppSkeleton v-if="evalLoading" :rows="2" :row-height="56" />
+        <ErrorState v-else-if="evalError" title="评价加载失败" :message="evalError" :retryable="false" />
+        <template v-else-if="evaluation">
+          <div class="eval-band">
+            <ScoreDisplay :score="evaluation.totalScore" />
+            <StatusTag :status="evaluation.status" />
+            <span class="dim"
+              >版本 v{{ evaluation.currentVersionNo }} · {{ formatDateTime(evaluation.updateTime) }}</span
+            >
+          </div>
+          <DimensionRadar
+            v-if="evaluation.metricScores"
+            :scores="metricRecord"
+            :size="220"
+            class="eval-radar"
+          />
+          <SuggestionList v-if="evaluation.aiComment" :comment="evaluation.aiComment" class="eval-comment" />
+        </template>
+      </section>
+
       <template v-if="detail?.textPreview">
         <div class="preview-title">提取文本预览（{{ detail.textChars }} 字符，展示前2000）</div>
         <el-input type="textarea" :model-value="detail.textPreview" :rows="14" readonly />
@@ -104,9 +132,10 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { submissionApi, type SubmissionMine, type SubmissionDetail } from '@/api/submission'
+import { evaluationApi, type EvaluationVO } from '@/api/evaluation'
 import { formatDateTime } from '@/utils/format'
 import { toast } from '@/utils/toast'
 import PageShell from '@/components/ui/PageShell.vue'
@@ -114,6 +143,11 @@ import PageHeader from '@/components/ui/PageHeader.vue'
 import DataTableShell from '@/components/ui/DataTableShell.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
 import FileLink from '@/components/ui/FileLink.vue'
+import AppSkeleton from '@/components/ui/AppSkeleton.vue'
+import ErrorState from '@/components/ui/ErrorState.vue'
+import ScoreDisplay from '@/components/ui/ScoreDisplay.vue'
+import DimensionRadar from '@/components/ui/DimensionRadar.vue'
+import SuggestionList from '@/components/ui/SuggestionList.vue'
 
 const router = useRouter()
 const loading = ref(false)
@@ -124,6 +158,32 @@ const size = 20
 const total = ref(0)
 const drawer = ref(false)
 const detail = ref<SubmissionDetail | null>(null)
+const evaluation = ref<EvaluationVO | null>(null)
+const evalLoading = ref(false)
+const evalError = ref<string | null>(null)
+
+/* 指标分字典 → 雷达（空值过滤为 0 保持形状） */
+const metricRecord = computed<Record<string, number>>(() => {
+  const src = evaluation.value?.metricScores ?? {}
+  const out: Record<string, number> = {}
+  for (const [k, v] of Object.entries(src)) out[k] = Number(v) || 0
+  return out
+})
+
+/** 评价内嵌区独立容错：E-01 失败只降级本区，不阻塞提交详情 */
+async function loadEvaluation(evaluationId: number | null) {
+  evaluation.value = null
+  evalError.value = null
+  if (!evaluationId) return
+  evalLoading.value = true
+  try {
+    evaluation.value = await evaluationApi.detail(evaluationId)
+  } catch (e) {
+    evalError.value = (e as { message?: string })?.message || '评价结果加载失败，请稍后重试'
+  } finally {
+    evalLoading.value = false
+  }
+}
 
 function download(url: string) {
   // S-04：浏览器直接跳 302 签名URL（MinIO 私有桶直连）
@@ -147,6 +207,7 @@ async function openDetail(id: number) {
   try {
     detail.value = await submissionApi.detail(id)
     drawer.value = true
+    await loadEvaluation(detail.value.evaluationId)
   } catch (e) {
     toast.error((e as { message?: string })?.message || '详情加载失败', '请重试')
   }
@@ -157,6 +218,40 @@ onMounted(load)
 <style scoped>
 .drawer-actions {
   margin: var(--aies-gap) 0;
+}
+.eval-block {
+  margin: var(--aies-gap) 0;
+  padding: var(--aies-gap);
+  background: var(--aies-paper);
+  border: 1px solid var(--aies-border);
+  border-radius: var(--aies-radius-lg);
+}
+.eval-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.eval-head h4 {
+  margin: 0;
+  font-size: 14px;
+  color: var(--aies-ink);
+}
+.eval-band {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.eval-radar {
+  margin: 10px auto 0;
+}
+.eval-comment {
+  margin-top: 10px;
+}
+.dim {
+  font-size: 12px;
+  color: var(--aies-ink3);
 }
 .preview-title {
   margin-bottom: 8px;

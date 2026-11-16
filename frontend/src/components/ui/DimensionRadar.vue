@@ -88,12 +88,21 @@ const dataPoints = computed(() =>
 )
 
 const labelPositions = computed(() =>
-  names.value.map((_, i) => {
+  names.value.map((name, i) => {
     const n = names.value.length || 1
     const angle = (Math.PI * 2 * i) / n - Math.PI / 2
     const r = radius.value + 16
-    const x = cx.value + Math.cos(angle) * r
     const anchor = Math.abs(Math.cos(angle)) < 0.3 ? 'middle' : Math.cos(angle) > 0 ? 'start' : 'end'
+    // 标签约束在 viewBox 内：CJK 按 12px/字估算，避免小尺寸下被 SVG 边界裁切
+    const w = Math.max(String(name).length, 2) * 12
+    let x = cx.value + Math.cos(angle) * r
+    if (anchor === 'middle') {
+      x = Math.min(Math.max(x, w / 2 + 2), props.size - w / 2 - 2)
+    } else if (anchor === 'start') {
+      x = Math.min(x, props.size - w - 2)
+    } else {
+      x = Math.max(x, w + 2)
+    }
     return { x, y: cy.value + Math.sin(angle) * r + 4, anchor }
   })
 )
