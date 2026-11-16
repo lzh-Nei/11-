@@ -131,12 +131,12 @@ public class EvaluationCommandService {
         if (comment.length() < MIN_COMMENT_LEN) {
             throw new BusinessException(ErrorCode.REVIEW_REASON_REQUIRED);
         }
-        validateScores(cmd, ctx.submission().getTaskId());
+        BigDecimal total = validateScores(cmd, ctx.submission().getTaskId());
 
         int nextVersion = nextVersionNo(evaluationId);
         // 乐观锁先更新当前值（并发复核在此串行化：后到者version过期→0行→30000，UC-22 E2）
         result.setStatus(EvaluationService.STATUS_REVIEWED);
-        result.setTotalScore(cmd.getTotalScore());
+        result.setTotalScore(total);
         result.setMetricScores(serializeMetrics(cmd.getMetricScores()));
         result.setReviewerId(principal.userId());
         result.setReviewTime(LocalDateTime.now());
@@ -150,32 +150,31 @@ public class EvaluationCommandService {
         history.setSubmissionId(result.getSubmissionId());
         history.setVersionNo(nextVersion);
         history.setSource(SOURCE_TEACHER_REVIEW);
-        history.setTotalScore(cmd.getTotalScore());
+        history.setTotalScore(total);
         history.setMetricScores(result.getMetricScores());
         history.setAiComment(result.getAiComment());
         history.setTeacherComment(comment);
         history.setReviewerId(principal.userId());
         evaluationHistoryMapper.insert(history);
         log.info("复核完成: evaluationId={} version={} total={} reviewer={}",
-                evaluationId, nextVersion, cmd.getTotalScore(), principal.userId());
+                evaluationId, nextVersion, total, principal.userId());
         // 报表缓存主动失效（D-36：事件经 common 解耦，报表侧 AFTER_COMMIT 监听；review/manualScore 共用本尾部）
         eventPublisher.publishEvent(new com.aies.common.ReportCacheEvictEvent(
                 ctx.submission().getTaskId(), ctx.submission().getStudentId()));
         return toVo(result, cmd.getMetricScores());
     }
 
-    /** 教师输入校验（对齐SchemaValidator纪律：键集/权重上限/Σ=总分±0.5/总分0~100） */
-    private void validateScores(ReviewEvaluationRequest cmd, long taskId) {
-        BigDecimal total = cmd.getTotalScore();
-        if (total == null || total.compareTo(BigDecimal.ZERO) < 0 || total.compareTo(SCORE_MAX) > 0) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR, "总分超出0~100");
-        }
-        Map<String, BigDecimal> caps = new LinkedHashMap<>();
-        for (TaskMetric metric : taskService.listMetrics(taskId)) {
-            caps.put(metric.getMetricName(), metric.getWeight());
-        }
+    /** 教师输入校验：键集=任务指标集，逐项非负；总分由指标分自动求和，Σ>100 直接拒绝。 */
+    private BigDecimal validateScores(ReviewEvaluationRequest cmd, long taskId) {
         Map<String, BigDecimal> scores = cmd.getMetricScores();
-        if (scores == null || !caps.keySet().equals(scores.keySet())) {
+        if (scores == null || scores.isEmpty()) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "指标分不能为空");
+        }
+        java.util.Set<String> expected = new java.util.LinkedHashSet<>();
+        for (TaskMetric metric : taskService.listMetrics(taskId)) {
+            expected.add(metric.getMetricName());
+        }
+        if (!expected.equals(scores.keySet())) {
             throw new BusinessException(ErrorCode.PARAM_ERROR, "指标集与任务指标不符");
         }
         BigDecimal sum = BigDecimal.ZERO;
@@ -184,17 +183,13 @@ public class EvaluationCommandService {
             if (score == null || score.compareTo(BigDecimal.ZERO) < 0) {
                 throw new BusinessException(ErrorCode.PARAM_ERROR, "指标分为负: " + entry.getKey());
             }
-            BigDecimal cap = caps.get(entry.getKey());
-            if (score.compareTo(cap) > 0) {
-                throw new BusinessException(ErrorCode.PARAM_ERROR,
-                        "指标分超权重上限(" + entry.getKey() + "): " + score + ">" + cap);
-            }
             sum = sum.add(score);
         }
-        if (sum.subtract(total).abs().compareTo(SchemaValidator.SUM_TOLERANCE) > 0) {
+        if (sum.compareTo(SCORE_MAX) > 0) {
             throw new BusinessException(ErrorCode.PARAM_ERROR,
-                    "指标分之和与总分不符: Σ" + sum + " vs " + total);
+                    "总分超限：各指标分之和为 " + sum + "，不能超过 100");
         }
+        return sum;
     }
 
     private String serializeMetrics(Map<String, BigDecimal> metricScores) {

@@ -19,6 +19,9 @@ public class EvaluationVO {
 
     private Long submissionId;
 
+    /** 提交所属任务（复核表单加载指标集用；学生也可见自己的任务） */
+    private Long taskId;
+
     /** 评价状态机字典：PENDING/AI_DONE/REVIEWED/FAILED */
     private String status;
 

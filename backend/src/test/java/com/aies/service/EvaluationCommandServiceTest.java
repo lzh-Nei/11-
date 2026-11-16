@@ -197,15 +197,22 @@ class EvaluationCommandServiceTest {
                 .isEqualTo(30000);
     }
 
-    /** 总分越界(>100)→30000 */
+    /** 指标分之和超过100→30000，且不写history（总分超限拦截） */
     @Test
-    void reviewTotalOutOfRangeThrows30000() {
+    void reviewMetricSumOver100Throws30000() {
         stubReviewChain("AI_DONE", 1, 2L);
+        Map<String, BigDecimal> scores = new LinkedHashMap<>();
+        scores.put("功能正确性", new BigDecimal("50"));
+        scores.put("代码质量", new BigDecimal("30"));
+        scores.put("文档规范", new BigDecimal("30"));
 
-        assertThatThrownBy(() -> service.review(7L, cmd("101", validScores(), COMMENT), principal(2L, "TEACHER")))
-                .isInstanceOf(BusinessException.class)
-                .extracting(e -> ((BusinessException) e).getCode())
-                .isEqualTo(30000);
+        assertThatThrownBy(() -> service.review(7L, cmd(null, scores, COMMENT), principal(2L, "TEACHER")))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        e -> {
+                            assertThat(e.getCode()).isEqualTo(30000);
+                            assertThat(e.getMessage()).contains("总分超限");
+                        });
+        verify(evaluationHistoryMapper, never()).insert(any());
     }
 
     /** 指标缺项→30000（键集必须与任务指标集一致） */
@@ -221,34 +228,24 @@ class EvaluationCommandServiceTest {
                 .isEqualTo(30000);
     }
 
-    /** 指标超权重上限→30000（对齐SchemaValidator纪律） */
+    /** 客户端总分被忽略：后端按指标分之和计算并回写 */
     @Test
-    void reviewMetricOverCapThrows30000() {
+    void reviewComputesTotalFromMetricScores() {
         stubReviewChain("AI_DONE", 1, 2L);
-        Map<String, BigDecimal> scores = new LinkedHashMap<>();
-        scores.put("功能正确性", new BigDecimal("41"));
-        scores.put("代码质量", new BigDecimal("30"));
-        scores.put("文档规范", new BigDecimal("20"));
-
-        assertThatThrownBy(() -> service.review(7L, cmd("91", scores, COMMENT), principal(2L, "TEACHER")))
-                .isInstanceOf(BusinessException.class)
-                .extracting(e -> ((BusinessException) e).getCode())
-                .isEqualTo(30000);
-    }
-
-    /** Σ指标分与总分不符→30000（±0.5容差外） */
-    @Test
-    void reviewSumMismatchThrows30000() {
-        stubReviewChain("AI_DONE", 1, 2L);
+        EvaluationHistory latest = new EvaluationHistory();
+        latest.setVersionNo(1);
+        when(evaluationHistoryMapper.selectOne(any())).thenReturn(latest);
         Map<String, BigDecimal> scores = new LinkedHashMap<>();
         scores.put("功能正确性", new BigDecimal("40"));
         scores.put("代码质量", new BigDecimal("30"));
         scores.put("文档规范", new BigDecimal("20"));
 
-        assertThatThrownBy(() -> service.review(7L, cmd("60", scores, COMMENT), principal(2L, "TEACHER")))
-                .isInstanceOf(BusinessException.class)
-                .extracting(e -> ((BusinessException) e).getCode())
-                .isEqualTo(30000);
+        EvaluationVO vo = service.review(7L, cmd("60", scores, COMMENT), principal(2L, "TEACHER"));
+
+        assertThat(vo.getTotalScore()).isEqualByComparingTo("90");
+        ArgumentCaptor<EvaluationHistory> captor = ArgumentCaptor.forClass(EvaluationHistory.class);
+        verify(evaluationHistoryMapper).insert(captor.capture());
+        assertThat(captor.getValue().getTotalScore()).isEqualByComparingTo("90");
     }
 
     /** IDOR：学生调复核→40400同形（防探测） */

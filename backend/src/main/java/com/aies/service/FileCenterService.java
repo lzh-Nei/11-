@@ -33,7 +33,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class FileCenterService {
 
-    private static final String ROLE_STUDENT = "STUDENT";
     private static final String ROLE_ADMIN = "ADMIN";
 
     private final FileStoreService store;
@@ -42,9 +41,9 @@ public class FileCenterService {
     private final SysClassMapper classMapper;
     private final AdminAuditService auditService;
 
-    /** 已入库文件列表（仅教师/管理员；上传者优先取上传元数据，历史文件回查提交记录）。 */
+    /** 已入库文件列表（仅管理员；上传者优先取上传元数据，历史文件回查提交记录）。 */
     public List<FileMetaVO> listFiles(LoginPrincipal principal) throws IOException {
-        requireStaff(principal);
+        requireAdmin(principal);
         List<FileMeta> files = store.listFiles();
         if (files.isEmpty()) {
             return List.of();
@@ -116,8 +115,8 @@ public class FileCenterService {
                 Map.of("fileName", meta.name(), "size", meta.size(), "referenced", referenced > 0));
     }
 
-    private void requireStaff(LoginPrincipal principal) {
-        if (ROLE_STUDENT.equals(principal.role())) {
+    private void requireAdmin(LoginPrincipal principal) {
+        if (!ROLE_ADMIN.equals(principal.role())) {
             throw new BusinessException(ErrorCode.FORBIDDEN);
         }
     }

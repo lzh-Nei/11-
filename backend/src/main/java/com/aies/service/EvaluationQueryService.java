@@ -74,6 +74,7 @@ public class EvaluationQueryService {
         EvaluationVO vo = new EvaluationVO();
         vo.setId(result.getId());
         vo.setSubmissionId(result.getSubmissionId());
+        vo.setTaskId(submission == null ? null : submission.getTaskId());
         vo.setStatus(result.getStatus());
         vo.setCurrentVersionNo(result.getCurrentVersionNo());
         vo.setTotalScore(result.getTotalScore());

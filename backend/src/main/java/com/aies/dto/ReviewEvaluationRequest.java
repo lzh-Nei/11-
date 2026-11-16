@@ -1,24 +1,21 @@
 package com.aies.dto;
 
 import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.math.BigDecimal;
 import java.util.Map;
 
 /**
- * 教师复核/人工评分请求体（03-03 §七 E-02/E-06：totalScore + metricScores +
- * reviewComment(≥10字)；理由空/不足10字→30007应用层校验）。
+ * 教师复核/人工评分请求体（E-02/E-06）：metricScores + reviewComment（≥10字）。
  *
- * <p>指标分结构校验（键集=任务指标集/权重上限/Σ=总分±0.5）在应用层对齐
- * SchemaValidator纪律执行，违规→30000。</p>
+ * <p>总分不再由客户端决定：后端以各指标分之和计算并回写；Σ>100 直接拒绝。
+ * 保留 totalScore 字段仅为旧客户端兼容，服务端忽略。</p>
  */
 @Data
 public class ReviewEvaluationRequest {
 
-    /** 复核后总分（0~100，应用层校验） */
-    @NotNull(message = "总分不能为空")
+    /** 兼容字段：服务端忽略，以 metricScores 之和为准 */
     private BigDecimal totalScore;
 
     /** 指标名→分值（键集必须与任务指标集一致） */
