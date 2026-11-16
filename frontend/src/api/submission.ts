@@ -32,14 +32,19 @@ export interface SubmissionVO {
 }
 
 export const submissionApi = {
-  /** S-01 提交作业（multipart） */
-  async submit(taskId: number, file: File): Promise<SubmissionVO> {
+  /** S-01 提交作业（multipart，onUploadProgress 提供真实上传进度回调） */
+  async submit(
+    taskId: number,
+    file: File,
+    onUploadProgress?: (e: { loaded: number; total?: number }) => void
+  ): Promise<SubmissionVO> {
     const form = new FormData()
     form.append('taskId', String(taskId))
     form.append('file', file)
     return (await request.post('/submissions', form, {
       headers: { 'Content-Type': 'multipart/form-data' },
-      timeout: 60000
+      onUploadProgress,
+      timeout: 120000
     })) as unknown as SubmissionVO
   },
   /** S-02 我的提交列表（UC-17） */

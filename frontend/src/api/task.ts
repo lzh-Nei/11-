@@ -29,6 +29,15 @@ export interface PageResult<T> {
   current: number
 }
 
+/** T-01 创建任务载荷（TaskCreateRequest 真身：Σweight 必须=100） */
+export interface TaskCreatePayload {
+  title: string
+  description: string
+  classId: number
+  deadline: string
+  metrics: { metricName: string; weight: number; sortOrder: number }[]
+}
+
 export const taskApi = {
   async list(page = 1, size = 10, status?: string): Promise<PageResult<TaskInfo>> {
     const params: Record<string, unknown> = { page, size }
@@ -37,5 +46,13 @@ export const taskApi = {
   },
   async detail(id: number): Promise<TaskInfo> {
     return (await request.get(`/tasks/${id}`)) as unknown as TaskInfo
+  },
+  /** T-01 创建任务（UC-10）：Σweight≠100→40001、deadline 非法→30006 */
+  async create(payload: TaskCreatePayload): Promise<TaskInfo> {
+    return (await request.post('/tasks', payload)) as unknown as TaskInfo
+  },
+  /** T-03 发布任务：DRAFT→PUBLISHED 状态机，发布后指标集锁定（不可逆） */
+  async publish(id: number): Promise<TaskInfo> {
+    return (await request.post(`/tasks/${id}/publish`)) as unknown as TaskInfo
   }
 }

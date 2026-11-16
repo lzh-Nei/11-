@@ -85,6 +85,10 @@ export const authApi = {
   async login(payload: LoginPayload): Promise<LoginResult> {
     return (await request.post('/auth/login', payload)) as unknown as LoginResult
   },
+  /** A-07 邮箱验证码登录（UC-42）：签发 AT/RT 同 A-01 */
+  async loginByEmail(payload: { username: string; emailCode: string }): Promise<LoginResult> {
+    return (await request.post('/auth/login/email', payload)) as unknown as LoginResult
+  },
   async me(): Promise<MeInfo> {
     return (await request.get('/auth/me')) as unknown as MeInfo
   },

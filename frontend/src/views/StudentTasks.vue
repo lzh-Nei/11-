@@ -1,59 +1,39 @@
 <template>
   <div class="page">
-    <el-card>
-      <template #header>
-        <div class="card-head">
-          <span>我的任务（GET /api/tasks，学生视角：本班已发布）</span>
-          <el-button size="small" @click="router.push('/')">返回首页</el-button>
-        </div>
-      </template>
+    <PageHeader title="我的任务" subtitle="学生视角：本班已发布任务（GET /api/tasks）">
+      <el-button @click="router.push('/')">返回首页</el-button>
+    </PageHeader>
 
-      <el-table v-loading="loading" :data="tasks" stripe>
-        <el-table-column prop="id" label="ID" width="60" />
-        <el-table-column prop="title" label="任务名称" min-width="180" />
-        <el-table-column label="指标集" min-width="220">
-          <template #default="{ row }">
-            <el-tag
-              v-for="m in row.metrics"
-              :key="m.id"
-              size="small"
-              type="info"
-              effect="plain"
-              class="tag-gap"
-            >
-              {{ m.metricName }} {{ m.weight }}%
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="截止时间" width="170">
-          <template #default="{ row }">
-            <span :class="{ overdue: isOverdue(row), urgent: isUrgent(row) }">{{ fmt(row.deadline) }}</span>
-            <el-tag v-if="isOverdue(row)" size="small" type="danger" class="tag-gap">已截止</el-tag>
-            <el-tag v-else-if="isUrgent(row)" size="small" type="warning" class="tag-gap">临近</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="140" fixed="right">
-          <template #default="{ row }">
-            <el-button
-              type="primary"
-              size="small"
-              :disabled="isOverdue(row) || row.status === 'CLOSED'"
-              @click="router.push(`/tasks/${row.id}/submit`)"
-            >
-              提交作业
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+    <TaskFilterBar v-model="filter" class="filter-row" @update:model-value="reload" />
+
+    <AppSkeleton v-if="loading" :rows="3" :row-height="110" class="mt" />
+    <ErrorState v-else-if="error" :message="error" @retry="load" />
+    <EmptyState
+      v-else-if="!tasks.length"
+      description="暂无已发布任务——教师发布后这里会亮起来"
+    />
+    <div v-else class="card-list">
+      <TaskCard v-for="t in tasks" :key="t.id" :task="t" @open="router.push(`/tasks/${t.id}/submit`)">
+        <el-button
+          type="primary"
+          size="small"
+          :disabled="isOverdue(t) || t.status === 'CLOSED'"
+          @click="router.push(`/tasks/${t.id}/submit`)"
+        >
+          提交作业
+        </el-button>
+      </TaskCard>
+    </div>
+
+    <div v-if="total > size" class="pager">
       <el-pagination
         v-model:current-page="page"
         :page-size="size"
         :total="total"
         layout="total, prev, pager, next"
-        class="pager"
         @current-change="load"
       />
-    </el-card>
+    </div>
   </div>
 </template>
 
@@ -61,30 +41,41 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { taskApi, type TaskInfo } from '@/api/task'
+import PageHeader from '@/components/ui/PageHeader.vue'
+import TaskCard from '@/components/ui/TaskCard.vue'
+import TaskFilterBar from '@/components/ui/TaskFilterBar.vue'
+import AppSkeleton from '@/components/ui/AppSkeleton.vue'
+import ErrorState from '@/components/ui/ErrorState.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 
 const router = useRouter()
 const loading = ref(false)
+const error = ref<string | null>(null)
 const tasks = ref<TaskInfo[]>([])
 const page = ref(1)
 const size = 10
 const total = ref(0)
+const filter = ref('PUBLISHED')
 
-function fmt(s: string) {
-  return s ? s.replace('T', ' ').slice(0, 16) : '—'
+function isOverdue(t: TaskInfo) {
+  return t.status === 'CLOSED' || new Date(t.deadline).getTime() < Date.now()
 }
-function isOverdue(row: TaskInfo) {
-  return row.status === 'CLOSED' || new Date(row.deadline).getTime() < Date.now()
-}
-function isUrgent(row: TaskInfo) {
-  return !isOverdue(row) && new Date(row.deadline).getTime() - Date.now() < 24 * 3600 * 1000
+
+function reload() {
+  page.value = 1
+  load()
 }
 
 async function load() {
   loading.value = true
+  error.value = null
   try {
-    const result = await taskApi.list(page.value, size, 'PUBLISHED')
+    const status = filter.value || undefined
+    const result = await taskApi.list(page.value, size, status)
     tasks.value = result.records
     total.value = result.total
+  } catch (e) {
+    error.value = (e as { message?: string })?.message || '网络或服务暂时不可用，请稍后重试'
   } finally {
     loading.value = false
   }
@@ -95,25 +86,23 @@ onMounted(load)
 <style scoped>
 .page {
   max-width: 1080px;
-  margin: 16px auto;
-  padding: 0 12px;
+  margin: 0 auto;
+  padding: var(--aies-gap-lg) 16px 80px;
 }
-.card-head {
+.filter-row {
+  margin-bottom: var(--aies-gap);
+}
+.mt {
+  margin-top: var(--aies-gap);
+}
+.card-list {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: var(--aies-gap);
 }
 .pager {
-  margin-top: 12px;
+  display: flex;
   justify-content: flex-end;
-}
-.tag-gap {
-  margin-right: 4px;
-}
-.overdue {
-  color: #f56c6c;
-}
-.urgent {
-  color: #e6a23c;
+  margin-top: var(--aies-gap);
 }
 </style>
