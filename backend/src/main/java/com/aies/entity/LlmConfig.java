@@ -21,6 +21,18 @@ public class LlmConfig {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    /** 供应商：OLLAMA/OPENAI/DEEPSEEK/DASHSCOPE/MOONSHOT/ZHIPU/CUSTOM */
+    private String provider;
+
+    /** OpenAI 兼容 Base URL（Ollama 可空，取 ai.ollama.base-url） */
+    private String apiBaseUrl;
+
+    /** AES-GCM 加密后的 API Key（密文，接口不返回） */
+    private String apiKeyCipher;
+
+    /** API Key 尾号提示 */
+    private String apiKeyHint;
+
     /** 模型名（本地Ollama 7B，ADR-001数据不出域） */
     private String modelName;
 

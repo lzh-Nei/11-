@@ -17,6 +17,9 @@ public class AiProperties {
     private final Semaphore semaphore = new Semaphore();
     private final Prompt prompt = new Prompt();
 
+    /** API Key 加密密钥（生产必须由 AI_CONFIG_SECRET 注入；默认值仅用于本地开发） */
+    private String configSecret = "aies-dev-config-secret-change-me";
+
     @Getter
     @Setter
     public static class Ollama {

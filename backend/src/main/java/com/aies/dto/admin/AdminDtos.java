@@ -148,12 +148,28 @@ public final class AdminDtos {
 
     /* ==================== LLM 参数 ==================== */
 
-    public record LlmConfigVO(Long id, String modelName, BigDecimal temperature,
-                              Integer timeoutSeconds, Integer maxRetry, LocalDateTime updateTime) {
+    public record LlmConfigVO(Long id, String provider, String apiBaseUrl, String modelName,
+                              BigDecimal temperature, Integer timeoutSeconds, Integer maxRetry,
+                              boolean apiKeyConfigured, String apiKeyHint,
+                              LocalDateTime updateTime) {
+    }
+
+    public record LlmTestResult(boolean success, String message, String modelVersion,
+                                long elapsedMs) {
     }
 
     @Data
     public static class UpdateLlmConfigRequest {
+        @NotBlank(message = "模型供应商不能为空")
+        private String provider;
+
+        @Size(max = 255, message = "Base URL 最长255字")
+        private String apiBaseUrl;
+
+        /** 新 API Key；留空表示保持已配置密钥 */
+        @Size(max = 512, message = "API Key 过长")
+        private String apiKey;
+
         @NotBlank(message = "模型名不能为空")
         @Size(max = 64, message = "模型名最长64字")
         private String modelName;

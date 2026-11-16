@@ -5,6 +5,7 @@ import com.aies.entity.LlmConfig;
 import com.aies.model.LlmRawResult;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.MediaType;
@@ -13,6 +14,7 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
@@ -42,8 +44,15 @@ public class OllamaLlmClient implements LlmClient {
     private final Semaphore permits;
     private final int queueWarnSeconds;
     private final String baseUrl;
+    private final ApiKeyCipher apiKeyCipher;
 
     public OllamaLlmClient(AiProperties aiProperties, ObjectMapper objectMapper) {
+        this(aiProperties, objectMapper, new ApiKeyCipher(aiProperties));
+    }
+
+    @Autowired
+    public OllamaLlmClient(AiProperties aiProperties, ObjectMapper objectMapper,
+                           ApiKeyCipher apiKeyCipher) {
         this.baseClient = new OkHttpClient.Builder()
                 .connectTimeout(10, TimeUnit.SECONDS)
                 .build();
@@ -51,7 +60,8 @@ public class OllamaLlmClient implements LlmClient {
         this.permits = new Semaphore(aiProperties.getSemaphore().getPermits());
         this.queueWarnSeconds = aiProperties.getSemaphore().getQueueWarnSeconds();
         this.baseUrl = aiProperties.getOllama().getBaseUrl();
-        log.info("OllamaLlmClient 装配: baseUrl={}, permits={}", baseUrl, permits.availablePermits());
+        this.apiKeyCipher = apiKeyCipher;
+        log.info("LlmClient 装配: ollamaBaseUrl={}, permits={}", baseUrl, permits.availablePermits());
     }
 
     @Override
@@ -80,46 +90,122 @@ public class OllamaLlmClient implements LlmClient {
         return permits.availablePermits();
     }
 
-    /** 实际HTTP调用（timeout取llm_config，非200/网络异常/超时统一LlmInvocationException） */
+    /** 按 llm_config.provider 路由：Ollama 本地 / 云端 OpenAI 兼容。 */
     private LlmRawResult doCall(String promptText, LlmConfig cfg) {
-        // /api/generate 非流式；temperature 锁定0由 llm_config 承载（R4：禁止硬编码）
+        LlmProvider provider = LlmProvider.of(cfg.getProvider());
+        if (provider == LlmProvider.OLLAMA) {
+            return doOllamaCall(promptText, cfg);
+        }
+        return doOpenAiCompatibleCall(promptText, cfg, provider);
+    }
+
+    /** Ollama /api/generate 非流式。 */
+    private LlmRawResult doOllamaCall(String promptText, LlmConfig cfg) {
         ObjectNode body = objectMapper.createObjectNode();
         body.put("model", cfg.getModelName());
         body.put("prompt", promptText);
         body.put("stream", false);
         body.putObject("options").put("temperature", cfg.getTemperature());
+        String endpoint = (cfg.getApiBaseUrl() == null || cfg.getApiBaseUrl().isBlank()
+                ? baseUrl : cfg.getApiBaseUrl().trim().replaceAll("/+$", "")) + "/api/generate";
         OkHttpClient client = baseClient.newBuilder()
                 .callTimeout(cfg.getTimeoutSeconds(), TimeUnit.SECONDS)
                 .build();
         Request request = new Request.Builder()
-                .url(baseUrl + "/api/generate")
+                .url(endpoint)
                 .post(RequestBody.create(body.toString(), JSON))
                 .build();
         long start = System.currentTimeMillis();
         try (Response response = client.newCall(request).execute()) {
             if (response.code() != 200) {
-                throw new LlmInvocationException("Ollama非200响应: HTTP " + response.code());
+                throw new LlmInvocationException("Ollama 非200响应: HTTP " + response.code());
             }
             ResponseBody responseBody = response.body();
             if (responseBody == null) {
-                throw new LlmInvocationException("Ollama响应体为空");
+                throw new LlmInvocationException("Ollama 响应体为空");
             }
             JsonNode root = objectMapper.readTree(responseBody.string());
             JsonNode respNode = root.get("response");
             if (respNode == null || !respNode.isTextual()) {
-                // 空体/缺response字段（readTree空串返回MissingNode不抛）：归一为调用失败（重试路径）
-                throw new LlmInvocationException("Ollama响应缺response字段");
+                throw new LlmInvocationException("Ollama 响应缺 response 字段");
             }
             String modelVersion = root.path("model").asText(cfg.getModelName());
             return new LlmRawResult(respNode.asText(""), System.currentTimeMillis() - start, modelVersion);
         } catch (LlmInvocationException e) {
             throw e;
         } catch (java.io.InterruptedIOException e) {
-            // 超时语义（规范§三）：计为一次失败重试（okio AsyncTimeout超时=InterruptedIOException
-            // "timeout"，含SocketTimeoutException子类）
-            throw new LlmInvocationException("Ollama调用超时(" + cfg.getTimeoutSeconds() + "s)", e);
+            throw new LlmInvocationException("Ollama 调用超时(" + cfg.getTimeoutSeconds() + "s)", e);
         } catch (Exception e) {
-            throw new LlmInvocationException("Ollama调用失败: " + e.getMessage(), e);
+            throw new LlmInvocationException("Ollama 调用失败: " + e.getMessage(), e);
         }
+    }
+
+    /** OpenAI 兼容接口 /chat/completions（OpenAI/DeepSeek/通义/Kimi/智谱/自定义）。 */
+    private LlmRawResult doOpenAiCompatibleCall(String promptText, LlmConfig cfg,
+                                                LlmProvider provider) {
+        String configuredBase = cfg.getApiBaseUrl() == null || cfg.getApiBaseUrl().isBlank()
+                ? provider.defaultBaseUrl() : cfg.getApiBaseUrl().trim();
+        if (configuredBase == null || configuredBase.isBlank()) {
+            throw new LlmInvocationException(provider.label() + " 未配置 Base URL");
+        }
+        String base = configuredBase.replaceAll("/+$", "");
+        String endpoint = base.endsWith("/chat/completions") ? base : base + "/chat/completions";
+        String apiKey;
+        try {
+            apiKey = apiKeyCipher.decrypt(cfg.getApiKeyCipher());
+        } catch (IllegalArgumentException e) {
+            throw new LlmInvocationException(e.getMessage(), e);
+        }
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new LlmInvocationException(provider.label() + " 未配置 API Key");
+        }
+
+        ObjectNode body = objectMapper.createObjectNode();
+        body.put("model", cfg.getModelName());
+        ArrayNode messages = body.putArray("messages");
+        ObjectNode message = messages.addObject();
+        message.put("role", "user");
+        message.put("content", promptText);
+        body.put("temperature", 0);
+        body.put("stream", false);
+        OkHttpClient client = baseClient.newBuilder()
+                .callTimeout(cfg.getTimeoutSeconds(), TimeUnit.SECONDS)
+                .build();
+        Request request = new Request.Builder()
+                .url(endpoint)
+                .header("Authorization", "Bearer " + apiKey)
+                .post(RequestBody.create(body.toString(), JSON))
+                .build();
+        long start = System.currentTimeMillis();
+        try (Response response = client.newCall(request).execute()) {
+            ResponseBody responseBody = response.body();
+            String raw = responseBody == null ? "" : responseBody.string();
+            if (response.code() != 200) {
+                throw new LlmInvocationException(provider.label() + " 非200响应: HTTP "
+                        + response.code() + " " + truncate(raw));
+            }
+            JsonNode root = objectMapper.readTree(raw);
+            JsonNode content = root.path("choices").path(0).path("message").path("content");
+            if (!content.isTextual()) {
+                throw new LlmInvocationException(provider.label() + " 响应缺 choices[0].message.content");
+            }
+            String modelVersion = root.path("model").asText(cfg.getModelName());
+            return new LlmRawResult(content.asText(""), System.currentTimeMillis() - start, modelVersion);
+        } catch (LlmInvocationException e) {
+            throw e;
+        } catch (java.io.InterruptedIOException e) {
+            throw new LlmInvocationException(provider.label() + " 调用超时("
+                    + cfg.getTimeoutSeconds() + "s)", e);
+        } catch (Exception e) {
+            throw new LlmInvocationException(provider.label() + " 调用失败: " + e.getMessage(), e);
+        }
+    }
+
+    private String truncate(String text) {
+        if (text == null) {
+            return "";
+        }
+        String compact = text.replaceAll("\\s+", " ").trim();
+        return compact.length() <= 180 ? compact : compact.substring(0, 180) + "…";
     }
 }

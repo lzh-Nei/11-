@@ -125,7 +125,7 @@ class AdminServiceTest {
                 userRoleMapper, redis, auditService);
         classService = new AdminClassService(classMapper, userMapper, taskMapper, rbacMapper, auditService);
         aiService = new AdminAiService(llmConfigMapper, promptMapper, goldenMapper,
-                new ObjectMapper(), auditService);
+                new ObjectMapper(), auditService, mock(ApiKeyCipher.class), mock(LlmClient.class));
         systemService = new AdminSystemService(new AuthProperties(), userMapper, classMapper, taskMapper,
                 submissionMapper, evaluationResultMapper, llmConfigMapper,
                 promptMapper, goldenMapper, auditLogMapper);
@@ -520,6 +520,7 @@ class AdminServiceTest {
         when(llmConfigMapper.selectById(1L)).thenReturn(config);
 
         UpdateLlmConfigRequest request = new UpdateLlmConfigRequest();
+        request.setProvider("OLLAMA");
         request.setModelName("qwen2.5:7b");
         request.setTimeoutSeconds(90);
         request.setMaxRetry(3);

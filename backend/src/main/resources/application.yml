@@ -119,6 +119,7 @@ filestorage:
 ai:
   # LLM基础设施配置（W7-C2；运行参数model/temperature/timeout/max_retry一律llm_config表读取，红线R4）
   client: ollama                     # LlmClient装配开关（OllamaLlmClient默认；单测MockLlmClient不经此装配）
+  config-secret: ${AI_CONFIG_SECRET:aies-dev-config-secret-change-me}  # API Key AES-GCM 加密密钥（生产必须覆盖）
   ollama:
     base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
   semaphore:

@@ -15,6 +15,7 @@ import com.aies.dto.admin.AdminDtos.CreatePromptRequest;
 import com.aies.dto.admin.AdminDtos.CreateUserRequest;
 import com.aies.dto.admin.AdminDtos.GoldenSampleVO;
 import com.aies.dto.admin.AdminDtos.LlmConfigVO;
+import com.aies.dto.admin.AdminDtos.LlmTestResult;
 import com.aies.dto.admin.AdminDtos.PromptDetailVO;
 import com.aies.dto.admin.AdminDtos.PromptTemplateVO;
 import com.aies.dto.admin.AdminDtos.SystemConfigVO;
@@ -228,6 +229,12 @@ public class AdminController {
                                         @Valid @RequestBody UpdateLlmConfigRequest request) {
         aiService.updateLlmConfig(id, request, PrincipalUtils.current());
         return Result.success();
+    }
+
+    @PreAuthorize("hasAuthority('" + PermissionConstants.LLM_CONFIG + "')")
+    @PostMapping("/llm-configs/{id}/test")
+    public Result<LlmTestResult> testLlmConfig(@PathVariable("id") @Positive long id) {
+        return Result.success(aiService.testLlmConfig(id));
     }
 
     /* ==================== Prompt 模板（prompt:manage） ==================== */

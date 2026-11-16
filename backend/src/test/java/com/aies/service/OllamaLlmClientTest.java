@@ -5,6 +5,7 @@ import com.aies.entity.LlmConfig;
 import com.aies.model.LlmRawResult;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
+import okhttp3.mockwebserver.RecordedRequest;
 import okhttp3.mockwebserver.SocketPolicy;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -75,6 +76,28 @@ class OllamaLlmClientTest {
                 .contains("\"stream\":false")
                 .contains("\"temperature\":0")
                 .contains("\"prompt\":\"prompt-text\"");
+    }
+
+    /** OpenAI 兼容供应商：/chat/completions + Bearer 密钥，解析 choices[0].message.content */
+    @Test
+    void openAiCompatibleProviderUsesChatCompletions() throws Exception {
+        server.enqueue(new MockResponse()
+                .setHeader("Content-Type", "application/json")
+                .setBody("{\"model\":\"deepseek-chat\",\"choices\":[{\"message\":{\"content\":\"{\\\"total_score\\\":88}\"}}]}"));
+        LlmConfig cfg = cfg(60);
+        cfg.setProvider("CUSTOM");
+        cfg.setApiBaseUrl(server.url("/v1").toString());
+        cfg.setModelName("deepseek-chat");
+        cfg.setApiKeyCipher(new ApiKeyCipher(new AiProperties()).encrypt("sk-test-key"));
+
+        LlmRawResult raw = client.evaluate("prompt-text", cfg);
+
+        assertThat(raw.rawResponse()).isEqualTo("{\"total_score\":88}");
+        assertThat(raw.modelVersion()).isEqualTo("deepseek-chat");
+        RecordedRequest recorded = server.takeRequest();
+        assertThat(recorded.getPath()).isEqualTo("/v1/chat/completions");
+        assertThat(recorded.getHeader("Authorization")).isEqualTo("Bearer sk-test-key");
+        assertThat(recorded.getBody().readUtf8()).contains("\"model\":\"deepseek-chat\"");
     }
 
     /** 非200：统一 LlmInvocationException（不外泄HTTP细节，由管道重试） */

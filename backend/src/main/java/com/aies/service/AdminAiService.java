@@ -5,6 +5,7 @@ import com.aies.common.ErrorCode;
 import com.aies.dto.admin.AdminDtos.CreatePromptRequest;
 import com.aies.dto.admin.AdminDtos.GoldenSampleVO;
 import com.aies.dto.admin.AdminDtos.LlmConfigVO;
+import com.aies.dto.admin.AdminDtos.LlmTestResult;
 import com.aies.dto.admin.AdminDtos.PromptDetailVO;
 import com.aies.dto.admin.AdminDtos.PromptTemplateVO;
 import com.aies.dto.admin.AdminDtos.UpdateLlmConfigRequest;
@@ -49,6 +50,8 @@ public class AdminAiService {
     private final GoldenDatasetMapper goldenDatasetMapper;
     private final ObjectMapper objectMapper;
     private final AdminAuditService auditService;
+    private final ApiKeyCipher apiKeyCipher;
+    private final LlmClient llmClient;
 
     /* ==================== LLM 参数 ==================== */
 
@@ -56,28 +59,84 @@ public class AdminAiService {
         return llmConfigMapper.selectList(new LambdaQueryWrapper<LlmConfig>()
                         .orderByAsc(LlmConfig::getId))
                 .stream()
-                .map(cfg -> new LlmConfigVO(cfg.getId(), cfg.getModelName(), cfg.getTemperature(),
-                        cfg.getTimeoutSeconds(), cfg.getMaxRetry(), cfg.getUpdateTime()))
+                .map(cfg -> new LlmConfigVO(cfg.getId(), cfg.getProvider(),
+                        cfg.getApiBaseUrl(), cfg.getModelName(), cfg.getTemperature(),
+                        cfg.getTimeoutSeconds(), cfg.getMaxRetry(),
+                        cfg.getApiKeyCipher() != null && !cfg.getApiKeyCipher().isBlank(),
+                        cfg.getApiKeyHint(), cfg.getUpdateTime()))
                 .toList();
     }
 
-    /** 更新运行参数（temperature 锁定不改；下次评价调用生效） */
+    /** 更新供应商/地址/密钥/运行参数（temperature 锁定不改；下次评价调用生效） */
     public void updateLlmConfig(long id, UpdateLlmConfigRequest request, LoginPrincipal principal) {
         LlmConfig config = llmConfigMapper.selectById(id);
         if (config == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "LLM 配置不存在");
         }
+        LlmProvider provider;
+        try {
+            provider = LlmProvider.of(request.getProvider());
+        } catch (IllegalArgumentException e) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, e.getMessage());
+        }
+        String baseUrl = trimToNull(request.getApiBaseUrl());
+        if (baseUrl == null && provider.defaultBaseUrl() != null) {
+            baseUrl = provider.defaultBaseUrl();
+        }
+        if (provider.requiresKey() && baseUrl == null) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "请填写该供应商的 Base URL");
+        }
+        String newKey = trimToNull(request.getApiKey());
+        String cipher = config.getApiKeyCipher();
+        String hint = config.getApiKeyHint();
+        if (newKey != null) {
+            cipher = apiKeyCipher.encrypt(newKey);
+            hint = apiKeyCipher.hint(newKey);
+        }
+        if (provider.requiresKey() && (cipher == null || cipher.isBlank())) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR,
+                    "该供应商需要 API Key，请填写后再保存");
+        }
         llmConfigMapper.update(null, new UpdateWrapper<LlmConfig>()
                 .eq("id", id)
+                .set("provider", provider.name())
+                .set("api_base_url", baseUrl)
+                .set("api_key_cipher", cipher)
+                .set("api_key_hint", hint)
                 .set("model_name", request.getModelName().trim())
                 .set("timeout_seconds", request.getTimeoutSeconds())
                 .set("max_retry", request.getMaxRetry()));
 
         Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("provider", provider.name());
+        detail.put("apiBaseUrl", baseUrl);
         detail.put("modelName", request.getModelName().trim());
         detail.put("timeoutSeconds", request.getTimeoutSeconds());
         detail.put("maxRetry", request.getMaxRetry());
+        detail.put("apiKeyChanged", newKey != null);
+        detail.put("apiKeyHint", hint);
         auditService.record(principal, "system", "UPDATE_LLM_CONFIG", "llm_config:" + id, detail);
+    }
+
+    /** 使用已保存配置发起一次轻量真实调用（仅管理员入口；不回传密钥）。 */
+    public LlmTestResult testLlmConfig(long id) {
+        LlmConfig config = llmConfigMapper.selectById(id);
+        if (config == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "LLM 配置不存在");
+        }
+        try {
+            var raw = llmClient.evaluate("请只回复：OK", config);
+            return new LlmTestResult(true, "连接成功", raw.modelVersion(), raw.elapsedMs());
+        } catch (LlmInvocationException e) {
+            return new LlmTestResult(false, e.getMessage(), null, 0L);
+        }
+    }
+
+    private String trimToNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 
     /* ==================== Prompt 模板 ==================== */
