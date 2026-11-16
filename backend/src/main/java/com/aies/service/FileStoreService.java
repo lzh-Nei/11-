@@ -264,6 +264,15 @@ public class FileStoreService {
         return requireFile(id);
     }
 
+    /**
+     * UC-16 提交域复用：单文件落盘+登记（UUID32 重命名，S-07 用户输入禁入 key）。
+     * 与分片合并共用 files/ 目录与 meta 结构，桶化迁移时仅需替换本层实现。
+     */
+    public FileMeta storeSingle(String name, InputStream in, long size) throws IOException {
+        ensureDirs();
+        return storeFile(name, in, size);
+    }
+
     /* ==================== 内部工具 ==================== */
 
     /** 存储目录自愈：目录被删除后各接口仍可用 */

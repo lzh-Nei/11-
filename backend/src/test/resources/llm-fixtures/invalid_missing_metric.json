@@ -1,0 +1,5 @@
+{
+  "total_score": 60,
+  "metric_scores": {"功能正确性": 30, "代码质量": 20},
+  "ai_comment": "缺少文档规范维度评分。"
+}
