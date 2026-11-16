@@ -28,6 +28,10 @@ export const useAuthStore = defineStore('auth', {
     async loadMe() {
       this.me = await authApi.me()
     },
+    /** 自助资料更新后同步用户态（侧栏/首页姓名即时刷新） */
+    setMe(me: MeInfo | null) {
+      this.me = me
+    },
     startCooldown(seconds: number) {
       this.cooldownUntil = Date.now() + seconds * 1000
     },

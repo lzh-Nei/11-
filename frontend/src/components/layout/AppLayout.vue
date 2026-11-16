@@ -14,19 +14,18 @@
       <nav class="nav">
         <div v-for="g in groups" :key="g.label" class="group">
           <p class="group-label">{{ g.label }}</p>
-          <button
+          <router-link
             v-for="item in g.items"
             :key="item.key"
-            type="button"
+            :to="item.to"
             class="nav-item"
             :class="{ active: isActive(item) }"
             :title="item.label"
-            @click="go(item)"
           >
             <NavIcon :name="item.icon" />
             <span class="nav-text">{{ item.label }}</span>
             <span v-if="item.newWindow" class="nav-ext" aria-hidden="true">↗</span>
-          </button>
+          </router-link>
         </div>
       </nav>
 
@@ -120,10 +119,6 @@ function isActive(item: ModuleItem): boolean {
   return item.match(route.path)
 }
 
-function go(item: ModuleItem) {
-  if (route.path !== item.to) router.push(item.to)
-}
-
 async function onLogout() {
   await auth.logout()
   router.push('/login')
@@ -210,6 +205,7 @@ async function onLogout() {
   font-size: 13.5px;
   font-family: inherit;
   text-align: left;
+  text-decoration: none;
   cursor: pointer;
   transition:
     background var(--aies-t),
