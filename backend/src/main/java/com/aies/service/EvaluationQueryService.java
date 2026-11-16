@@ -180,7 +180,6 @@ public class EvaluationQueryService {
                         new LambdaQueryWrapper<EvaluationAppeal>()
                                 .eq(EvaluationAppeal::getEvaluationId, evaluationId)
                                 .eq(EvaluationAppeal::getAssignedTeacherId, principal.userId())
-                                .eq(EvaluationAppeal::getStatus, "PENDING")
                                 .last("LIMIT 1"));
                 if (appeal == null) {
                     throw new BusinessException(ErrorCode.NOT_FOUND);
