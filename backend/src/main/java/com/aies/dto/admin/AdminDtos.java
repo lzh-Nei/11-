@@ -35,6 +35,13 @@ public final class AdminDtos {
     public record AdminTeacherVO(Long id, String username, String realName) {
     }
 
+    /** 管理端评价列表（管理员查看教师评价与复核历史入口） */
+    public record AdminEvaluationVO(Long id, Long submissionId, Long taskId, String taskTitle,
+                                    String studentName, String teacherName, String status,
+                                    BigDecimal totalScore, Integer currentVersionNo,
+                                    LocalDateTime updateTime) {
+    }
+
     @Data
     public static class UpdateUserStatusRequest {
         /** 1=正常，0=禁用（禁用后登录 40103、刷新令牌作废） */

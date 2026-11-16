@@ -5,9 +5,11 @@ import com.aies.common.ErrorCode;
 import com.aies.dto.TaskCreateRequest;
 import com.aies.dto.TaskMetricVO;
 import com.aies.dto.TaskVO;
+import com.aies.entity.Submission;
 import com.aies.entity.Task;
 import com.aies.entity.TaskMetric;
 import com.aies.entity.User;
+import com.aies.mapper.SubmissionMapper;
 import com.aies.mapper.TaskMapper;
 import com.aies.mapper.TaskMetricMapper;
 import com.aies.mapper.UserMapper;
@@ -46,6 +48,7 @@ public class TaskService {
     private final TaskMapper taskMapper;
     private final TaskMetricMapper taskMetricMapper;
     private final UserMapper userMapper;
+    private final SubmissionMapper submissionMapper;
 
     /**
      * T-01 创建任务（UC-10）：deadline→30006 / 班级归属→40301 / Σ≠100→40001，
@@ -103,6 +106,101 @@ public class TaskService {
                         .orderByAsc(TaskMetric::getSortOrder)
                         .orderByAsc(TaskMetric::getId));
         return toVO(task, metrics, true);
+    }
+
+    /** 编辑任务（仅草稿）：标题/说明/截止/班级/指标集可改；发布后指标锁定 */
+    @Transactional
+    public TaskVO update(long taskId, TaskCreateRequest request, LoginPrincipal principal) {
+        Task task = requireDraftManageable(taskId, principal, "编辑");
+        validateTaskFields(request, principal);
+
+        task.setTitle(request.getTitle().trim());
+        task.setDescription(request.getDescription());
+        task.setClassId(request.getClassId());
+        task.setDeadline(request.getDeadline());
+        taskMapper.updateById(task);
+
+        taskMetricMapper.delete(new LambdaQueryWrapper<TaskMetric>()
+                .eq(TaskMetric::getTaskId, taskId));
+        request.getMetrics().forEach(item -> {
+            TaskMetric metric = new TaskMetric();
+            metric.setTaskId(taskId);
+            metric.setMetricName(item.getMetricName().trim());
+            metric.setWeight(item.getWeight());
+            metric.setSortOrder(item.getSortOrder() == null ? 0 : item.getSortOrder());
+            taskMetricMapper.insert(metric);
+        });
+
+        List<TaskMetric> metrics = taskMetricMapper.selectList(
+                new LambdaQueryWrapper<TaskMetric>()
+                        .eq(TaskMetric::getTaskId, taskId)
+                        .orderByAsc(TaskMetric::getSortOrder)
+                        .orderByAsc(TaskMetric::getId));
+        return toVO(task, metrics, true);
+    }
+
+    /** 删除任务（仅草稿且无学生提交）：指标集同事务清理 */
+    @Transactional
+    public void delete(long taskId, LoginPrincipal principal) {
+        requireDraftManageable(taskId, principal, "删除");
+        long submissions = submissionMapper.selectCount(new LambdaQueryWrapper<Submission>()
+                .eq(Submission::getTaskId, taskId));
+        if (submissions > 0) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR.getCode(),
+                    "任务已有学生提交，不能删除");
+        }
+        taskMetricMapper.delete(new LambdaQueryWrapper<TaskMetric>()
+                .eq(TaskMetric::getTaskId, taskId));
+        taskMapper.deleteById(taskId);
+    }
+
+    /** 可管理任务（草稿 + 归属）：教师=本人；管理员=全局；学生不可见 */
+    private Task requireDraftManageable(long taskId, LoginPrincipal principal, String action) {
+        Task task = taskMapper.selectById(taskId);
+        if (task == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND);
+        }
+        switch (principal.role()) {
+            case ROLE_TEACHER -> {
+                if (task.getTeacherId() != principal.userId()) {
+                    throw new BusinessException(ErrorCode.NOT_FOUND);
+                }
+            }
+            case ROLE_STUDENT -> throw new BusinessException(ErrorCode.NOT_FOUND);
+            default -> {
+                // ADMIN：全局可管理（报表同口径）
+            }
+        }
+        if (!STATUS_DRAFT.equals(task.getStatus())) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR.getCode(),
+                    "仅草稿状态任务可" + action + "，当前状态: " + task.getStatus());
+        }
+        return task;
+    }
+
+    /** 创建/编辑共用字段校验：截止时间、班级归属、权重和、指标名唯一 */
+    private void validateTaskFields(TaskCreateRequest request, LoginPrincipal principal) {
+        if (request.getDeadline().isBefore(LocalDateTime.now())) {
+            throw new BusinessException(ErrorCode.DEADLINE_INVALID);
+        }
+        Long classTeacher = taskMapper.selectClassTeacher(request.getClassId());
+        if (classTeacher == null) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR.getCode(), "目标班级不存在");
+        }
+        if (classTeacher != principal.userId()) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+        BigDecimal sum = request.getMetrics().stream()
+                .map(TaskCreateRequest.MetricItem::getWeight)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (sum.compareTo(WEIGHT_SUM_REQUIRED) != 0) {
+            throw new BusinessException(ErrorCode.METRIC_WEIGHT_SUM_INVALID);
+        }
+        TreeSet<String> distinctNames = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        request.getMetrics().forEach(item -> distinctNames.add(item.getMetricName().trim()));
+        if (distinctNames.size() != request.getMetrics().size()) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR.getCode(), "指标名重复");
+        }
     }
 
     /**

@@ -3,6 +3,7 @@ package com.aies.controller;
 import com.aies.common.PermissionConstants;
 import com.aies.common.Result;
 import com.aies.dto.admin.AdminDtos.AdminClassVO;
+import com.aies.dto.admin.AdminDtos.AdminEvaluationVO;
 import com.aies.dto.admin.AdminDtos.AdminPermissionVO;
 import com.aies.dto.admin.AdminDtos.AdminRoleVO;
 import com.aies.dto.admin.AdminDtos.AdminTeacherVO;
@@ -26,6 +27,7 @@ import com.aies.dto.admin.AdminDtos.UpdateUserStatusRequest;
 import com.aies.security.PrincipalUtils;
 import com.aies.service.AdminAiService;
 import com.aies.service.AdminClassService;
+import com.aies.service.AdminEvaluationService;
 import com.aies.service.AdminRbacService;
 import com.aies.service.AdminSystemService;
 import com.aies.service.AdminUserService;
@@ -66,6 +68,7 @@ public class AdminController {
     private final AdminClassService classService;
     private final AdminAiService aiService;
     private final AdminSystemService systemService;
+    private final AdminEvaluationService evaluationService;
 
     /* ==================== 用户管理（user:manage） ==================== */
 
@@ -123,6 +126,18 @@ public class AdminController {
     @GetMapping("/teachers")
     public Result<List<AdminTeacherVO>> teachers() {
         return Result.success(userService.teachers());
+    }
+
+    /* ==================== 管理端评价列表（管理员查看教师评价/复核历史） ==================== */
+
+    @PreAuthorize("hasAuthority('" + PermissionConstants.EVALUATION_VIEW + "')")
+    @GetMapping("/evaluations")
+    public Result<Page<AdminEvaluationVO>> evaluations(
+            @RequestParam(defaultValue = "1") @Min(value = 1, message = "页码最小为1") long page,
+            @RequestParam(defaultValue = "10") @Min(value = 1, message = "每页条数最小为1")
+            @Max(value = 100, message = "每页条数最大为100") long size,
+            @RequestParam(required = false) String status) {
+        return Result.success(evaluationService.list(page, size, status));
     }
 
     /* ==================== 角色权限管理（role:manage） ==================== */

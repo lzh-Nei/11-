@@ -14,9 +14,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -41,6 +43,22 @@ public class TaskController {
     @PostMapping
     public Result<TaskVO> create(@Valid @RequestBody TaskCreateRequest request) {
         return Result.success(taskService.create(request, currentPrincipal()));
+    }
+
+    /** T-02 编辑任务（仅草稿）：指标集可改，发布后锁定；权限点 task:edit */
+    @PreAuthorize("hasAuthority('" + PermissionConstants.TASK_EDIT + "')")
+    @PutMapping("/{id}")
+    public Result<TaskVO> update(@PathVariable("id") long id,
+                                 @Valid @RequestBody TaskCreateRequest request) {
+        return Result.success(taskService.update(id, request, currentPrincipal()));
+    }
+
+    /** T-02 删除任务（仅草稿且无提交）：指标集同事务清理；权限点 task:edit */
+    @PreAuthorize("hasAuthority('" + PermissionConstants.TASK_EDIT + "')")
+    @DeleteMapping("/{id}")
+    public Result<Void> delete(@PathVariable("id") long id) {
+        taskService.delete(id, currentPrincipal());
+        return Result.success();
     }
 
     /** T-03 任务发布：DRAFT→PUBLISHED 状态机，发布后指标集锁定；权限点 task:publish */

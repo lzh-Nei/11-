@@ -7,6 +7,7 @@ import com.aies.dto.TaskVO;
 import com.aies.entity.Task;
 import com.aies.entity.TaskMetric;
 import com.aies.entity.User;
+import com.aies.mapper.SubmissionMapper;
 import com.aies.mapper.TaskMapper;
 import com.aies.mapper.TaskMetricMapper;
 import com.aies.mapper.UserMapper;
@@ -40,6 +41,7 @@ class TaskServiceTest {
     private TaskMapper taskMapper;
     private TaskMetricMapper taskMetricMapper;
     private UserMapper userMapper;
+    private SubmissionMapper submissionMapper;
     private TaskService taskService;
 
     private final LoginPrincipal teacher = new LoginPrincipal(2L, "jti", "raw", "TEACHER", Long.MAX_VALUE);
@@ -52,7 +54,8 @@ class TaskServiceTest {
         taskMapper = mock(TaskMapper.class);
         taskMetricMapper = mock(TaskMetricMapper.class);
         userMapper = mock(UserMapper.class);
-        taskService = new TaskService(taskMapper, taskMetricMapper, userMapper);
+        submissionMapper = mock(SubmissionMapper.class);
+        taskService = new TaskService(taskMapper, taskMetricMapper, userMapper, submissionMapper);
     }
 
     private TaskCreateRequest request(BigDecimal w1, BigDecimal w2, BigDecimal w3) {
@@ -313,6 +316,58 @@ class TaskServiceTest {
     }
 
     /** 构造任务实体（id/归属教师/班级/状态齐备，createTime供列表排序字段读取） */
+    /** T-02 编辑草稿任务：字段+指标集替换（发布后锁定语义由状态校验承载） */
+    @Test
+    void updateDraftShouldReplaceMetrics() {
+        when(taskMapper.selectById(5L)).thenReturn(task(5L, 2L, 1L, "DRAFT"));
+        when(taskMapper.selectClassTeacher(1L)).thenReturn(2L);
+        when(taskMetricMapper.selectList(any())).thenReturn(List.of(metric(5L, "metric-a", "40")));
+
+        var vo = taskService.update(5L,
+                request(new BigDecimal("40"), new BigDecimal("35"), new BigDecimal("25")), teacher);
+
+        assertThat(vo).isNotNull();
+        verify(taskMapper).updateById(any(Task.class));
+        verify(taskMetricMapper).delete(any());
+        verify(taskMetricMapper, times(3)).insert(any(TaskMetric.class));
+    }
+
+    /** T-02 编辑已发布任务：拒绝（发布后指标集锁定） */
+    @Test
+    void updatePublishedShouldReject() {
+        when(taskMapper.selectById(5L)).thenReturn(task(5L, 2L, 1L, "PUBLISHED"));
+
+        assertThatThrownBy(() -> taskService.update(5L,
+                request(new BigDecimal("40"), new BigDecimal("35"), new BigDecimal("25")), teacher))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("仅草稿");
+        verify(taskMapper, never()).updateById(any(Task.class));
+    }
+
+    /** T-02 删除草稿任务（无提交）：指标集与任务同事务清理 */
+    @Test
+    void deleteDraftWithoutSubmissionsShouldDelete() {
+        when(taskMapper.selectById(5L)).thenReturn(task(5L, 2L, 1L, "DRAFT"));
+        when(submissionMapper.selectCount(any())).thenReturn(0L);
+
+        taskService.delete(5L, teacher);
+
+        verify(taskMetricMapper).delete(any());
+        verify(taskMapper).deleteById(5L);
+    }
+
+    /** T-02 删除有学生提交的任务：拒绝（保留业务证据链） */
+    @Test
+    void deleteWithSubmissionsShouldReject() {
+        when(taskMapper.selectById(5L)).thenReturn(task(5L, 2L, 1L, "DRAFT"));
+        when(submissionMapper.selectCount(any())).thenReturn(1L);
+
+        assertThatThrownBy(() -> taskService.delete(5L, teacher))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("已有学生提交");
+        verify(taskMapper, never()).deleteById(5L);
+    }
+
     private Task task(long id, long teacherId, long classId, String status) {
         Task task = new Task();
         task.setId(id);
