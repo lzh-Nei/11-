@@ -42,7 +42,7 @@
         </aside>
 
         <section class="content">
-          <ScrollArea fill padded>
+          <ScrollArea fill>
             <component :is="pageComponent" v-if="pageComponent" v-bind="pageProps ?? {}" />
             <div v-else class="placeholder">请选择左侧三级目录</div>
           </ScrollArea>
@@ -443,7 +443,7 @@ function selectChild(child: ModuleChild) {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 12px 14px 10px;
+  padding: 0;
 }
 .placeholder {
   padding: 40px 0;
