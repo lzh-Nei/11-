@@ -126,7 +126,7 @@ textarea{width:100%;min-height:64px;font-family:var(--mono);font-size:13px}
       <div class="row" style="margin-bottom:14px">
         <button class="ghost" id="sc-teacher" onclick="setScope('teacher')">教师聚合</button>
         <button class="ghost" id="sc-me" onclick="setScope('me')">学生个人</button>
-        <button class="btn" onclick="doRefresh()">⟳ 刷新缓存</button>
+        <button class="btn" onclick="doRefresh()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" style="vertical-align:-1px;margin-right:5px"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>刷新缓存</button>
         <span id="dashMsg" class="lat"></span>
       </div>
       <div class="sub" style="margin:-6px 0 14px">演示路径：在控制台执行一次复核或重评，回此页点刷新，四图即时变化（缓存主动失效可视化）。</div>
@@ -276,6 +276,8 @@ const renderRaw=j=>{$('rawJson').textContent=JSON.stringify(j,null,2)};
 const toggleRaw=()=>$('rawJson').classList.toggle('hidden');
 const CHART_DEFS=[{k:'task',t:'任务统计'},{k:'dist',t:'均分分布'},{k:'radar',t:'指标雷达'},{k:'gap',t:'分差分布'}];
 const CHART_COLORS={task:'#d97706',dist:'#0f766e',radar:'#b45309',gap:'#9a3412'};
+/* 图表墨色常量：与 CSS tokens 逐值对齐（craft-floor 单一来源——JS 层无法引用 var()，改常量对齐并注释锚点） */
+const INK={axis:'#57534e',axisSoft:'#78716c',line:'#d9d4cb',split:'#e7e4de',anim:280};
 function buildChartDom(){$('charts').innerHTML=CHART_DEFS.map(c=>`<div class="card"><div class="ovl">${c.t}</div><div id="ch-${c.k}" class="chart"></div></div>`).join('');}
 function showSkeleton(on){CHART_DEFS.forEach(c=>{const el=$('ch-'+c.k);if(!el)return;
   if(on){el.innerHTML='';el.classList.add('skel');}else el.classList.remove('skel');});}
@@ -322,9 +324,9 @@ function drawBar(k,nv){
   if(!nv||!nv.length){el.innerHTML=emptyBox();return;}
   const c=echarts.init(el);S.charts.push(c);
   c.setOption({tooltip:{trigger:'axis'},grid:{left:44,right:20,top:24,bottom:46},
-    xAxis:{type:'category',data:nv.map(x=>x.name),axisLabel:{color:'#57534e',rotate:nv.length>6?28:0},axisLine:{lineStyle:{color:'#d9d4cb'}}},
-    yAxis:{type:'value',axisLabel:{color:'#78716c',fontFamily:'ui-monospace,Consolas,monospace'},splitLine:{lineStyle:{color:'#e7e4de'}}},
-    series:[{type:'bar',data:nv.map(x=>x.value),itemStyle:{color:CHART_COLORS[k],borderRadius:[3,3,0,0]},barMaxWidth:40,animationDuration:500}]});
+    xAxis:{type:'category',data:nv.map(x=>x.name),axisLabel:{color:INK.axis,rotate:nv.length>6?28:0},axisLine:{lineStyle:{color:INK.line}}},
+    yAxis:{type:'value',axisLabel:{color:INK.axisSoft,fontFamily:'ui-monospace,Consolas,monospace'},splitLine:{lineStyle:{color:INK.split}}},
+    series:[{type:'bar',data:nv.map(x=>x.value),itemStyle:{color:CHART_COLORS[k],borderRadius:[3,3,0,0]},barMaxWidth:40,animationDuration:INK.anim}]});
 }
 function drawRadar(v){
   const el=$('ch-radar');if(!el)return;
@@ -332,8 +334,8 @@ function drawRadar(v){
   if(!nv||nv.length<3){el.innerHTML=emptyBox();return;}
   const max=niceMax(Math.max(...nv.map(x=>x.value)));
   const c=echarts.init(el);S.charts.push(c);
-  c.setOption({tooltip:{},radar:{indicator:nv.map(x=>({name:x.name,max})),axisName:{color:'#57534e'},splitLine:{lineStyle:{color:'#e7e4de'}},splitArea:{show:false}},
-    series:[{type:'radar',data:[{value:nv.map(x=>x.value),name:'指标得分',itemStyle:{color:'#b45309'},lineStyle:{color:'#b45309'},areaStyle:{color:'#d97706',opacity:.18}}],animationDuration:500}]});
+  c.setOption({tooltip:{},radar:{indicator:nv.map(x=>({name:x.name,max})),axisName:{color:INK.axis},splitLine:{lineStyle:{color:INK.split}},splitArea:{show:false}},
+    series:[{type:'radar',data:[{value:nv.map(x=>x.value),name:'指标得分',itemStyle:{color:'#b45309'},lineStyle:{color:'#b45309'},areaStyle:{color:'#d97706',opacity:.18}}],animationDuration:INK.anim}]});
 }
 function cssBars(nv){
   const max=Math.max(...nv.map(x=>Math.abs(x.value)))||1;
