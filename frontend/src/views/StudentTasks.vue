@@ -9,18 +9,20 @@
     <AppSkeleton v-if="loading" :rows="3" :row-height="110" class="mt" />
     <ErrorState v-else-if="error" :message="error" @retry="load" />
     <EmptyState v-else-if="!tasks.length" description="暂无已发布任务——教师发布后这里会亮起来" />
-    <div v-else class="card-list">
-      <TaskCard v-for="t in tasks" :key="t.id" :task="t" @open="openSubmit(t.id)">
-        <el-button
-          type="primary"
-          size="small"
-          :disabled="isOverdue(t) || t.status === 'CLOSED'"
-          @click="openSubmit(t.id)"
-        >
-          提交作业 ↗
-        </el-button>
-      </TaskCard>
-    </div>
+    <ScrollArea v-else max-height="calc(100vh - 320px)" padded>
+      <div class="card-list">
+        <TaskCard v-for="t in tasks" :key="t.id" :task="t" @open="openSubmit(t.id)">
+          <el-button
+            type="primary"
+            size="small"
+            :disabled="isOverdue(t) || t.status === 'CLOSED'"
+            @click="openSubmit(t.id)"
+          >
+            提交作业 ↗
+          </el-button>
+        </TaskCard>
+      </div>
+    </ScrollArea>
 
     <div v-if="total > size" class="pager">
       <el-pagination
@@ -45,6 +47,7 @@ import TaskFilterBar from '@/components/ui/TaskFilterBar.vue'
 import AppSkeleton from '@/components/ui/AppSkeleton.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import ScrollArea from '@/components/ui/ScrollArea.vue'
 
 const loading = ref(false)
 const error = ref<string | null>(null)

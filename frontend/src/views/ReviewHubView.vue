@@ -39,16 +39,18 @@
           </el-button>
         </div>
         <EmptyState v-if="!recent.length" description="还没有打开记录——从左侧输入评价编号进入复核台" />
-        <ul v-else class="recent-list">
-          <li v-for="r in recent" :key="r.id" class="recent-item">
-            <button type="button" class="recent-main" @click="openReview(r.id)">
-              <span class="mono">评价 #{{ r.id }}</span>
-              <small>{{ formatDateTime(r.at) }}</small>
-            </button>
-            <el-button link type="primary" size="small" @click="openReview(r.id)">打开 ↗</el-button>
-            <el-button link type="danger" size="small" @click="removeRecent(r.id)">移除</el-button>
-          </li>
-        </ul>
+        <ScrollArea v-else max-height="240px" padded>
+          <ul class="recent-list">
+            <li v-for="r in recent" :key="r.id" class="recent-item">
+              <button type="button" class="recent-main" @click="openReview(r.id)">
+                <span class="mono">评价 #{{ r.id }}</span>
+                <small>{{ formatDateTime(r.at) }}</small>
+              </button>
+              <el-button link type="primary" size="small" @click="openReview(r.id)">打开 ↗</el-button>
+              <el-button link type="danger" size="small" @click="removeRecent(r.id)">移除</el-button>
+            </li>
+          </ul>
+        </ScrollArea>
       </section>
     </div>
 
@@ -60,22 +62,24 @@
         </el-button>
       </div>
       <AppSkeleton v-if="tasksLoading" :rows="2" :row-height="48" />
-      <table v-else-if="tasks.length" class="task-table">
-        <thead>
-          <tr>
-            <th>任务</th>
-            <th style="width: 120px">状态</th>
-            <th style="width: 160px">截止时间</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="t in tasks" :key="t.id">
-            <td>{{ t.title }}</td>
-            <td><StatusTag :status="t.status" /></td>
-            <td class="dim">{{ formatDateTime(t.deadline) }}</td>
-          </tr>
-        </tbody>
-      </table>
+      <ScrollArea v-else-if="tasks.length" max-height="320px">
+        <table class="task-table">
+          <thead>
+            <tr>
+              <th>任务</th>
+              <th style="width: 120px">状态</th>
+              <th style="width: 160px">截止时间</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="t in tasks" :key="t.id">
+              <td>{{ t.title }}</td>
+              <td><StatusTag :status="t.status" /></td>
+              <td class="dim">{{ formatDateTime(t.deadline) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </ScrollArea>
       <EmptyState v-else description="暂无任务——先在任务管理创建并发布任务" />
     </section>
   </PageShell>
@@ -92,6 +96,7 @@ import PageHeader from '@/components/ui/PageHeader.vue'
 import AppSkeleton from '@/components/ui/AppSkeleton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
+import ScrollArea from '@/components/ui/ScrollArea.vue'
 
 interface RecentReview {
   id: number
@@ -262,6 +267,9 @@ p.dim {
   margin-top: 10px;
 }
 .task-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   text-align: left;
   font-size: 12px;
   font-weight: 600;

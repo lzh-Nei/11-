@@ -107,3 +107,14 @@
 - 管理端发布前提醒：M3 管理端点首版未加操作频控/二次确认口令；生产环境建议补审计告警与
   RBAC 变更双人复核（04-08 §三例外登记候选）。
 
+## 过程注记（WP8-C3 滚动容器规约，2026-11-16）
+
+- 新增通用 `ScrollArea`（限高 + `overscroll-behavior: contain` + 统一细滚动条），作为
+  "长内容只在本组件内滚动"的统一承载，覆盖三层：表格层 `DataTableShell`、页面级卡片/列表
+  （任务中心/任务管理/复核台最近记录与任务表/评价历史/个人中心权限清单）、管理端矩阵与
+  Prompt 版本表。
+- Element Plus 表格改为身体区 `.el-scrollbar__wrap` 内部纵向滚动（保留横向滚动与右侧固定列），
+  表头常驻；原生表格（文件中心/Prompt/复核台）表头 `position: sticky`。
+- 验证口径：内层 `scrollTop` 变化时 `window.scrollY` 与 `document.scrollingElement.scrollTop`
+  恒为 0，`body.scrollHeight` 等于视口高度；审计长列表（16+ 行）实测通过。
+

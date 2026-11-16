@@ -227,6 +227,9 @@ onMounted(load)
   border-collapse: collapse;
 }
 .file-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   text-align: left;
   font-size: 12.5px;
   font-weight: 600;

@@ -10,8 +10,10 @@
       @action="emit('emptyAction')"
     />
     <template v-else>
-      <div class="table-card">
-        <slot />
+      <div class="table-card" :style="{ '--table-scroll-max': scrollMaxHeight }">
+        <ScrollArea :max-height="scrollMaxHeight">
+          <slot />
+        </ScrollArea>
       </div>
       <div v-if="total > pageSize" class="pager">
         <el-pagination
@@ -30,6 +32,7 @@
 import AppSkeleton from './AppSkeleton.vue'
 import ErrorState from './ErrorState.vue'
 import EmptyState from './EmptyState.vue'
+import ScrollArea from './ScrollArea.vue'
 
 withDefaults(
   defineProps<{
@@ -41,8 +44,17 @@ withDefaults(
     pageSize?: number
     emptyText?: string
     emptyActionText?: string
+    scrollMaxHeight?: string
   }>(),
-  { loading: false, error: null, total: 0, page: 1, pageSize: 10, emptyText: '暂无数据' }
+  {
+    loading: false,
+    error: null,
+    total: 0,
+    page: 1,
+    pageSize: 10,
+    emptyText: '暂无数据',
+    scrollMaxHeight: '62vh'
+  }
 )
 
 const emit = defineEmits<{ retry: []; pageChange: [p: number]; emptyAction: [] }>()
@@ -55,6 +67,13 @@ const emit = defineEmits<{ retry: []; pageChange: [p: number]; emptyAction: [] }
   border-radius: var(--aies-radius-lg);
   box-shadow: var(--aies-shadow);
   overflow: hidden;
+}
+/* Element Plus 表格：让身体区在表头下方内部纵向滚动（保留横向滚动与固定列），
+   外层 ScrollArea 仅兜底自定义原生表格；-56px 预留表头与横向滚动条高度 */
+:deep(.el-scrollbar__wrap) {
+  max-height: calc(var(--table-scroll-max, 62vh) - 56px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .pager {
   display: flex;

@@ -57,26 +57,28 @@
         <h3>功能权限（{{ auth.me?.permissions?.length ?? 0 }} 项）</h3>
         <span class="dim">点击权限点直达对应模块；虚线为 M3 预留</span>
       </div>
-      <div v-for="(perms, ns) in permGroups" :key="ns" class="perm-group">
-        <div class="ns-title">{{ nsLabel(ns) }} · {{ perms.length }}</div>
-        <div class="perm-list">
-          <el-tooltip v-for="p in perms" :key="p" :content="permTooltip(p)" placement="top">
-            <button
-              type="button"
-              class="perm-chip"
-              :class="{
-                reserved: permEntry(p)?.kind === 'reserved',
-                action: permEntry(p)?.kind === 'action'
-              }"
-              @click="onPermClick(p)"
-            >
-              {{ permLabel(p) }}
-              <i v-if="permEntry(p)?.kind === 'route'" class="chip-arrow">→</i>
-              <i v-else-if="permEntry(p)?.kind === 'reserved'" class="chip-lock">预留</i>
-            </button>
-          </el-tooltip>
+      <ScrollArea max-height="360px" padded>
+        <div v-for="(perms, ns) in permGroups" :key="ns" class="perm-group">
+          <div class="ns-title">{{ nsLabel(ns) }} · {{ perms.length }}</div>
+          <div class="perm-list">
+            <el-tooltip v-for="p in perms" :key="p" :content="permTooltip(p)" placement="top">
+              <button
+                type="button"
+                class="perm-chip"
+                :class="{
+                  reserved: permEntry(p)?.kind === 'reserved',
+                  action: permEntry(p)?.kind === 'action'
+                }"
+                @click="onPermClick(p)"
+              >
+                {{ permLabel(p) }}
+                <i v-if="permEntry(p)?.kind === 'route'" class="chip-arrow">→</i>
+                <i v-else-if="permEntry(p)?.kind === 'reserved'" class="chip-lock">预留</i>
+              </button>
+            </el-tooltip>
+          </div>
         </div>
-      </div>
+      </ScrollArea>
     </section>
   </PageShell>
 </template>
@@ -87,6 +89,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import PageShell from '@/components/ui/PageShell.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
+import ScrollArea from '@/components/ui/ScrollArea.vue'
 import { permLabel, nsLabel, permEntry } from '@/constants/permissions'
 import { toast } from '@/utils/toast'
 import { openWindow } from '@/utils/window'

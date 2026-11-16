@@ -44,27 +44,34 @@
 
         <AppSkeleton v-if="loading" :rows="4" />
         <ErrorState v-else-if="error" :message="error" @retry="load" />
-        <div v-else class="groups">
-          <div v-for="group in grouped" :key="group.module" class="group">
-            <div class="group-head">
-              <el-checkbox
-                :model-value="allChecked(group.codes)"
-                :indeterminate="someChecked(group.codes)"
-                :disabled="readonly"
-                @change="(v: boolean) => toggleGroup(group.codes, v)"
-              >
-                <b>{{ permModuleLabel(group.module) }}</b>
-              </el-checkbox>
-              <span class="dim">{{ group.codes.length }} 项</span>
+        <ScrollArea v-else max-height="calc(100vh - 380px)" padded>
+          <div class="groups">
+            <div v-for="group in grouped" :key="group.module" class="group">
+              <div class="group-head">
+                <el-checkbox
+                  :model-value="allChecked(group.codes)"
+                  :indeterminate="someChecked(group.codes)"
+                  :disabled="readonly"
+                  @change="(v: boolean) => toggleGroup(group.codes, v)"
+                >
+                  <b>{{ permModuleLabel(group.module) }}</b>
+                </el-checkbox>
+                <span class="dim">{{ group.codes.length }} 项</span>
+              </div>
+              <el-checkbox-group v-model="draftPerms" :disabled="readonly">
+                <el-checkbox
+                  v-for="p in group.items"
+                  :key="p.permCode"
+                  :value="p.permCode"
+                  class="perm-check"
+                >
+                  {{ p.permName }}
+                  <code>{{ p.permCode }}</code>
+                </el-checkbox>
+              </el-checkbox-group>
             </div>
-            <el-checkbox-group v-model="draftPerms" :disabled="readonly">
-              <el-checkbox v-for="p in group.items" :key="p.permCode" :value="p.permCode" class="perm-check">
-                {{ p.permName }}
-                <code>{{ p.permCode }}</code>
-              </el-checkbox>
-            </el-checkbox-group>
           </div>
-        </div>
+        </ScrollArea>
         <p v-if="dirty" class="dirty-hint">有未保存的变更（保存后该角色全部用户的权限缓存立即失效）</p>
       </div>
     </div>
@@ -79,6 +86,7 @@ import { permModuleLabel, roleLabel } from '@/constants/admin'
 import { toast } from '@/utils/toast'
 import AppSkeleton from '@/components/ui/AppSkeleton.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'
+import ScrollArea from '@/components/ui/ScrollArea.vue'
 
 const loading = ref(false)
 const saving = ref(false)

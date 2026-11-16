@@ -18,41 +18,43 @@
     <AppSkeleton v-if="loading" :rows="4" />
     <ErrorState v-else-if="error" :message="error" @retry="load" />
     <div v-else class="table-card">
-      <table class="prompt-table">
-        <thead>
-          <tr>
-            <th style="width: 90px">版本</th>
-            <th style="width: 110px">状态</th>
-            <th style="width: 110px">内容长度</th>
-            <th>内容预览</th>
-            <th style="width: 160px">创建时间</th>
-            <th style="width: 160px">操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="p in list" :key="p.id">
-            <td>
-              <b class="mono">v{{ p.versionNo }}</b>
-            </td>
-            <td>
-              <el-tag :type="p.enabled === 1 ? 'success' : 'info'" size="small">
-                {{ p.enabled === 1 ? '启用中' : '未启用' }}
-              </el-tag>
-            </td>
-            <td class="dim">{{ p.contentLength }} 字</td>
-            <td>
-              <span class="preview">{{ p.contentPreview }}</span>
-            </td>
-            <td class="dim">{{ formatDateTime(p.createTime) }}</td>
-            <td>
-              <el-button size="small" text type="primary" @click="view(p.id)">查看</el-button>
-              <el-button size="small" text type="success" :disabled="p.enabled === 1" @click="enable(p)">
-                启用
-              </el-button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <ScrollArea max-height="calc(100vh - 460px)">
+        <table class="prompt-table">
+          <thead>
+            <tr>
+              <th style="width: 90px">版本</th>
+              <th style="width: 110px">状态</th>
+              <th style="width: 110px">内容长度</th>
+              <th>内容预览</th>
+              <th style="width: 160px">创建时间</th>
+              <th style="width: 160px">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="p in list" :key="p.id">
+              <td>
+                <b class="mono">v{{ p.versionNo }}</b>
+              </td>
+              <td>
+                <el-tag :type="p.enabled === 1 ? 'success' : 'info'" size="small">
+                  {{ p.enabled === 1 ? '启用中' : '未启用' }}
+                </el-tag>
+              </td>
+              <td class="dim">{{ p.contentLength }} 字</td>
+              <td>
+                <span class="preview">{{ p.contentPreview }}</span>
+              </td>
+              <td class="dim">{{ formatDateTime(p.createTime) }}</td>
+              <td>
+                <el-button size="small" text type="primary" @click="view(p.id)">查看</el-button>
+                <el-button size="small" text type="success" :disabled="p.enabled === 1" @click="enable(p)">
+                  启用
+                </el-button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </ScrollArea>
       <EmptyState
         v-if="!list.length"
         description="还没有 Prompt 模板版本"
@@ -103,6 +105,7 @@ import { formatDateTime } from '@/utils/format'
 import { toast } from '@/utils/toast'
 import AppSkeleton from '@/components/ui/AppSkeleton.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'
+import ScrollArea from '@/components/ui/ScrollArea.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 
 const loading = ref(false)
@@ -210,6 +213,9 @@ onMounted(load)
   border-collapse: collapse;
 }
 .prompt-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   text-align: left;
   font-size: 12px;
   font-weight: 600;

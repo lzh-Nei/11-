@@ -89,14 +89,16 @@
       <AppSkeleton v-if="loading" :rows="2" :row-height="110" class="mt" />
       <ErrorState v-else-if="error" :message="error" @retry="load" />
       <EmptyState v-else-if="!tasks.length" description="暂无任务" />
-      <div v-else class="card-list">
-        <TaskCard v-for="t in tasks" :key="t.id" :task="t">
-          <el-button v-if="t.status === 'DRAFT'" type="primary" size="small" @click="confirmPublish(t)">
-            发布任务
-          </el-button>
-          <span v-else class="dim">{{ t.status === 'PUBLISHED' ? '已发布（指标锁定）' : '已关闭' }}</span>
-        </TaskCard>
-      </div>
+      <ScrollArea v-else max-height="44vh" padded>
+        <div class="card-list">
+          <TaskCard v-for="t in tasks" :key="t.id" :task="t">
+            <el-button v-if="t.status === 'DRAFT'" type="primary" size="small" @click="confirmPublish(t)">
+              发布任务
+            </el-button>
+            <span v-else class="dim">{{ t.status === 'PUBLISHED' ? '已发布（指标锁定）' : '已关闭' }}</span>
+          </TaskCard>
+        </div>
+      </ScrollArea>
       <div v-if="total > size" class="pager">
         <el-pagination
           v-model:current-page="page"
@@ -121,6 +123,7 @@ import TaskFilterBar from '@/components/ui/TaskFilterBar.vue'
 import AppSkeleton from '@/components/ui/AppSkeleton.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import ScrollArea from '@/components/ui/ScrollArea.vue'
 import ConfirmAction from '@/components/ui/ConfirmAction.vue'
 import { ElMessageBox } from 'element-plus'
 

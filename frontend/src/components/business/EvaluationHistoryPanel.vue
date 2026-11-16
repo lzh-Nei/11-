@@ -12,32 +12,34 @@
       :closable="false"
     />
     <ErrorState v-else-if="error" :message="error" @retry="load" />
-    <el-table v-else-if="items.length" :data="items" stripe size="small">
-      <el-table-column prop="versionNo" label="版本" width="70">
-        <template #default="{ row }"
-          ><span class="mono">v{{ row.versionNo }}</span></template
-        >
-      </el-table-column>
-      <el-table-column label="来源" width="120">
-        <template #default="{ row }"><StatusTag :status="row.source" /></template>
-      </el-table-column>
-      <el-table-column label="总分" width="90">
-        <template #default="{ row }">
-          <span class="mono">{{ row.totalScore ?? '—' }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作人" width="110">
-        <template #default="{ row }">{{ row.reviewerName ?? '系统' }}</template>
-      </el-table-column>
-      <el-table-column label="时间" width="160">
-        <template #default="{ row }">{{ formatDateTime(row.createTime) }}</template>
-      </el-table-column>
-      <el-table-column label="快照" width="90">
-        <template #default="{ row }">
-          <el-button size="small" text type="primary" @click="openVersion(row.versionNo)">查看</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <ScrollArea v-else-if="items.length" max-height="360px">
+      <el-table :data="items" stripe size="small">
+        <el-table-column prop="versionNo" label="版本" width="70">
+          <template #default="{ row }"
+            ><span class="mono">v{{ row.versionNo }}</span></template
+          >
+        </el-table-column>
+        <el-table-column label="来源" width="120">
+          <template #default="{ row }"><StatusTag :status="row.source" /></template>
+        </el-table-column>
+        <el-table-column label="总分" width="90">
+          <template #default="{ row }">
+            <span class="mono">{{ row.totalScore ?? '—' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作人" width="110">
+          <template #default="{ row }">{{ row.reviewerName ?? '系统' }}</template>
+        </el-table-column>
+        <el-table-column label="时间" width="160">
+          <template #default="{ row }">{{ formatDateTime(row.createTime) }}</template>
+        </el-table-column>
+        <el-table-column label="快照" width="90">
+          <template #default="{ row }">
+            <el-button size="small" text type="primary" @click="openVersion(row.versionNo)">查看</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </ScrollArea>
     <EmptyState v-else description="暂无历史版本（AI 初评尚未落库，或评价仍在排队）" />
     <div v-if="nextCursor" class="more">
       <el-button size="small" plain :loading="loadingMore" @click="loadMore">加载更早版本</el-button>
@@ -83,6 +85,7 @@ import AppSkeleton from '@/components/ui/AppSkeleton.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
+import ScrollArea from '@/components/ui/ScrollArea.vue'
 import DimensionRadar from '@/components/ui/DimensionRadar.vue'
 import SuggestionList from '@/components/ui/SuggestionList.vue'
 
