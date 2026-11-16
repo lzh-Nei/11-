@@ -87,17 +87,55 @@
             <version>4.12.0</version>
         </dependency>
 
-        <!-- Sa-Token：登录鉴权、注解式角色/权限校验 -->
+        <!-- Spring Security：过滤器链+方法级@PreAuthorize（03-01 §三/04-04 S-06基线，D-15维持） -->
         <dependency>
-            <groupId>cn.dev33</groupId>
-            <artifactId>sa-token-spring-boot3-starter</artifactId>
-            <version>1.44.0</version>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
 
-        <!-- Redis：图形验证码、短信验证码（StringRedisTemplate） -->
+        <!-- JWT签发与解析（AT）：jjwt 0.12.x；RT为随机串存Redis（03-04 §2.1） -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+            <version>0.12.5</version>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <version>0.12.5</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+            <version>0.12.5</version>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- Redis：图形验证码、邮箱验证码（StringRedisTemplate） -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+
+        <!-- RabbitMQ：UC-16 解析异步链（上传PENDING→发MQ→worker置QUEUED→SUCCESS/FAILED，D-23/W7-C1） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
+
+        <!-- MinIO SDK：swe-hot/swe-cold 对象存储真实落桶（D-23兑现，M1硬边界；
+             key=UUID32 与本地 FileStore 同形，切换仅替换存储层） -->
+        <dependency>
+            <groupId>io.minio</groupId>
+            <artifactId>minio</artifactId>
+            <version>8.5.10</version>
+        </dependency>
+
+        <!-- SMTP邮件（UC-42邮箱验证码通道，A-06/A-07/A-10；未配置SMTP_HOST自动降级模拟发送） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
 
         <!-- Actuator：/actuator/health 健康探针（compose healthcheck与G1冒烟依赖） -->
@@ -119,7 +157,7 @@
             <version>5.8.36</version>
         </dependency>
 
-        <!-- BCrypt 慢哈希：只引入加密模块，不引入完整的 Spring Security 过滤链 -->
+        <!-- BCrypt 慢哈希：随 spring-security-crypto 提供（S-01，强度10） -->
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-crypto</artifactId>
@@ -130,10 +168,36 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- MockWebServer：OllamaLlmClient单测（七般响应夹具；R6单测禁真实Ollama） -->
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>mockwebserver</artifactId>
+            <version>4.12.0</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- ArchUnit依赖守卫（04-01 §五五条规则，D2债务项W6接入；置于根测试包） -->
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit5</artifactId>
+            <version>1.3.0</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
         <plugins>
+            <!-- Surefire：跨盘符booter（C盘Temp+D盘仓库）触发JDK URLClassPath校验拒绝
+                 → disableClassPathURLCheck=true；@{argLine}保留jacoco agent注入 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <argLine>@{argLine} -Djdk.net.URLClassPath.disableClassPathURLCheck=true</argLine>
+                </configuration>
+            </plugin>
+
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
@@ -172,12 +236,22 @@
                 </configuration>
             </plugin>
 
-            <!-- JaCoCo：W5=report-only（verify出报告不设阈值）；W6切enforcement：
-                 增加 execution check 目标 + rule element=BUNDLE, includes=LINE, limit minimum=0.60 -->
+            <!-- JaCoCo：W5=report-only（verify出报告不设阈值）；M1后切enforcement（D-25）：
+                 增加 execution check 目标 + rule element=BUNDLE, includes=LINE, limit minimum=0.60。
+                 D-24 核心口径：报告剔除数据类（dto/entity/model），M1门禁60%按核心口径判定 -->
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>0.8.12</version>
+                <configuration>
+                    <excludes>
+                        <exclude>**/dto/**</exclude>
+                        <exclude>**/entity/**</exclude>
+                        <exclude>**/model/**</exclude>
+                        <!-- D-24执行细化（W7-C2 PM批准）：SecurityConfig过滤器链Bean按惯例豁免 -->
+                        <exclude>**/config/SecurityConfig.class</exclude>
+                    </excludes>
+                </configuration>
                 <executions>
                     <execution>
                         <id>prepare-agent</id>

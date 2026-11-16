@@ -9,7 +9,7 @@ import java.util.List;
 /**
  * 五表RBAC数据访问（03-数据库设计 §3.2）。
  *
- * <p>角色/权限查询供 Sa-Token 鉴权数据源 {@code StpInterfaceImpl} 使用；
+ * <p>角色/权限查询供 JWT 过滤器鉴权装载（{@code JwtAuthenticationFilter}/{@code JwtService}）使用；
  * 权限集 Redis 缓存（TTL 30min + 变更广播失效）按 03-02 §五 在 UC-32 落地时接入。</p>
  */
 public interface RbacMapper {

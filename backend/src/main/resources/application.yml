@@ -24,6 +24,16 @@ spring:
     out-of-order: false
     # 红线（04-08 §四）：任何环境禁用 clean
     clean-disabled: true
+  rabbitmq:
+    # UC-16 解析异步链（W7-C1）：上传PENDING→发MQ→worker置QUEUED→SUCCESS/FAILED
+    host: ${RABBITMQ_HOST:localhost}
+    port: 5672
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    listener:
+      simple:
+        # 解析失败由 worker 捕获置 FAILED 后正常 ack，不 requeue 死循环
+        default-requeue-rejected: false
   data:
     redis:
       # 图形验证码、短信验证码都存放在 Redis；本地没有 Redis 时请先启动
@@ -43,28 +53,32 @@ spring:
       max-file-size: 20MB
       # 小文件批量上传时一次请求允许的总字节数
       max-request-size: 100MB
+  mail:
+    # UC-42邮箱验证码通道（A-06/A-07/A-10）：SMTP_*由.env注入；
+    # host为空时 MailSenderAutoConfiguration 不装配 JavaMailSender，EmailCodeService自动降级为模拟发送
+    host: ${SMTP_HOST:}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USER:}
+    password: ${SMTP_PASSWORD:}
+    default-encoding: UTF-8
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
 
 mybatis-plus:
   mapper-locations: classpath:mapper/*.xml
   configuration:
     map-underscore-to-camel-case: true
 
-sa-token:
-  # 前端请求头：Authorization: Bearer <token>
-  token-name: Authorization
-  token-prefix: Bearer
-  # token 有效期 30 天；30 分钟无操作则过期
-  timeout: 2592000
-  active-timeout: 1800
-  # 允许同一账号多端登录，每次登录签发独立 token
-  is-concurrent: true
-  is-share: false
-  token-style: uuid
-  is-log: false
-  # 只从请求头读取 token，不读 Cookie / 请求参数，避免 CSRF 与 token 泄漏
-  is-read-cookie: false
-  is-read-header: true
-  is-read-body: false
+jwt:
+  # HS512密钥：≥64字节，.env注入（S-14密钥零明文）；缺失时启动即失败（JwtService校验）
+  secret: ${JWT_SECRET:}
+  # S-10：AT 2h / RT 7d旋转
+  access-token-minutes: 120
+  refresh-token-days: 7
 
 auth:
   captcha:
@@ -73,17 +87,45 @@ auth:
     height: 40
     code-count: 4
     interfere-count: 20
-  sms:
+  email:
+    # 邮箱验证码（UC-42/43/44；D-19后唯一验证码通道）
     expire-seconds: 300
     cooldown-seconds: 60
+    hourly-limit: 5
     max-attempts: 5
-    # 课程作业没有真实短信通道：验证码只打日志，并按需在接口响应中返回
-    mock: true
+    # 未配置SMTP_HOST时模拟发送（验证码打日志，R-06账号申请中）；expose-code仅模拟模式生效
     expose-code: true
 
 filestore:
-  # 文件存储根目录（相对项目运行目录）
+  # 本地 FileStoreService 根目录（分片上传演示域沿用本地实现）
   base-dir: ./storage
+
+management:
+  health:
+    # SMTP账号办理中（SMTP_HOST/USER已填、PASSWORD空）：mail探针每次健康检查连SMTP刷
+    # AuthenticationFailedException 且拖低/actuator/health；账号就绪后可移除此行
+    mail:
+      enabled: false
+
+filestorage:
+  # 对象存储模式：minio（dev容器/生产，swe-hot真实落桶，D-23）/ local（无容器兜底+单测）
+  mode: ${FILESTORE_MODE:local}
+  endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+  access-key: ${MINIO_ACCESS_KEY:minioadmin}
+  secret-key: ${MINIO_SECRET_KEY:}
+  bucket-hot: swe-hot
+  bucket-cold: swe-cold
+
+ai:
+  # LLM基础设施配置（W7-C2；运行参数model/temperature/timeout/max_retry一律llm_config表读取，红线R4）
+  client: ollama                     # LlmClient装配开关（OllamaLlmClient默认；单测MockLlmClient不经此装配）
+  ollama:
+    base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+  semaphore:
+    permits: 2                       # 本地显存并发约束（03-01 §三）
+    queue-warn-seconds: 30           # 排队超30s打WARN（规范§三）
+  prompt:
+    text-limit: 12000                # 提取文本塞入模板前截断上限（保头保尾）
 
 llm:
   deepseek:

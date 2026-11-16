@@ -22,4 +22,12 @@ public class BusinessException extends RuntimeException {
         super(message);
         this.code = errorCode.getCode();
     }
+
+    /**
+     * 直接以错误码数值构造（用于同一 code 在不同场景承载不同文案，如 40101）。
+     */
+    public BusinessException(int code, String message) {
+        super(message);
+        this.code = code;
+    }
 }
