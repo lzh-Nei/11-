@@ -77,7 +77,7 @@ const router = createRouter({
           path: 'files',
           name: 'file-center',
           component: () => import('@/views/FileCenterView.vue'),
-          meta: { roles: ['TEACHER', 'ADMIN'] }
+          meta: { roles: ['ADMIN'] }
         },
         {
           path: 'modules',

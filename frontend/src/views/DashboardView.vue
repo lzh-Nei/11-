@@ -259,8 +259,8 @@ const cards = computed<QuickCard[]>(() => {
       to: '/modules?group=analysis&child=report'
     })
   }
-  list.push({ title: '文件中心', desc: '查看已上传文件并下载', icon: 'files', to: '/files' })
   if (isAdmin.value) {
+    list.push({ title: '文件中心', desc: '查看已上传文件并下载', icon: 'files', to: '/files' })
     list.push({
       title: '功能模块',
       desc: '用户、权限、班级、AI 与审计等管理功能',

@@ -68,15 +68,18 @@
             <div v-if="!readonly" class="panel">
               <h3>{{ isManual ? '手动评分' : '教师复核' }}</h3>
               <el-form label-position="top">
-                <el-form-item label="总分（0-100）" required>
-                  <el-input-number
-                    v-model="form.totalScore"
-                    :min="0"
-                    :max="100"
-                    :step="0.5"
-                    controls-position="right"
-                    style="width: 140px"
-                  />
+                <el-alert
+                  v-if="scoreExceeded"
+                  type="error"
+                  show-icon
+                  :closable="false"
+                  class="score-alert"
+                  :title="`总分超限：当前指标分合计 ${metricTotalText} 分，不能超过 100 分`"
+                />
+                <el-form-item label="总分（由指标分自动汇总，不可修改）">
+                  <div class="total-readonly" :class="{ over: scoreExceeded }">
+                    {{ metricTotalText }}
+                  </div>
                 </el-form-item>
                 <el-form-item v-for="(_, k) in form.metricScores" :key="k" :label="`${k}（0-100）`">
                   <el-input-number
@@ -87,6 +90,7 @@
                     controls-position="right"
                     style="width: 140px"
                     size="small"
+                    @change="onMetricChange"
                   />
                 </el-form-item>
                 <el-form-item label="复核意见（不少于10字，会留入历史记录）" required>
@@ -130,6 +134,7 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { evaluationApi, type EvaluationVO } from '@/api/evaluation'
+import { taskApi } from '@/api/task'
 import { formatDateTime } from '@/utils/format'
 import { toast } from '@/utils/toast'
 import PageShell from '@/components/ui/PageShell.vue'
@@ -156,19 +161,28 @@ const evaluation = ref<EvaluationVO | null>(null)
 const historyPanel = ref<{ reload: () => Promise<void> } | null>(null)
 let timer: number | undefined
 
-/* 复核表单：初始值镜像 AI 当前判（教师在此基础上改） */
+/* 复核表单：指标分是唯一输入，总分由指标分自动汇总 */
 const form = reactive<{
-  totalScore: number | null
   metricScores: Record<string, number>
   reviewComment: string
 }>({
-  totalScore: null,
   metricScores: {},
   reviewComment: ''
 })
 
 const isManual = computed(() => evaluation.value?.status === 'FAILED')
-const canSubmit = computed(() => form.totalScore != null && (form.reviewComment?.length ?? 0) >= 10)
+const metricTotal = computed(() =>
+  Object.values(form.metricScores).reduce((sum, value) => sum + (Number(value) || 0), 0)
+)
+const metricTotalText = computed(() => String(Number(metricTotal.value.toFixed(2))))
+const scoreExceeded = computed(() => metricTotal.value > 100)
+const hasMetrics = computed(() => Object.keys(form.metricScores).length > 0)
+const canSubmit = computed(
+  () =>
+    hasMetrics.value &&
+    !scoreExceeded.value &&
+    (form.reviewComment?.length ?? 0) >= 10
+)
 
 const metricRecord = computed<Record<string, number>>(() => {
   const src = evaluation.value?.metricScores ?? {}
@@ -179,11 +193,29 @@ const metricRecord = computed<Record<string, number>>(() => {
 
 function mirrorForm() {
   if (!evaluation.value) return
-  form.totalScore = evaluation.value.totalScore
   const src = evaluation.value.metricScores ?? {}
   const rec: Record<string, number> = {}
   for (const [k, v] of Object.entries(src)) rec[k] = Number(v) || 0
   form.metricScores = rec
+}
+
+/** FAILED 评价可能没有指标快照：从任务指标集补齐 0 分输入项 */
+async function ensureMetricTemplate() {
+  if (hasMetrics.value || !evaluation.value?.taskId) return
+  try {
+    const task = await taskApi.detail(evaluation.value.taskId)
+    const rec: Record<string, number> = {}
+    for (const metric of task.metrics) rec[metric.metricName] = 0
+    form.metricScores = rec
+  } catch {
+    // 指标加载失败时保持空态，提交按钮不可用
+  }
+}
+
+function onMetricChange() {
+  if (scoreExceeded.value) {
+    toast.warning(`总分超限：当前指标分合计 ${metricTotalText.value} 分，不能超过100分，请调低指标分后再提交`)
+  }
 }
 
 async function load() {
@@ -192,6 +224,7 @@ async function load() {
   try {
     evaluation.value = await evaluationApi.detail(id.value)
     mirrorForm()
+    await ensureMetricTemplate()
     if (evaluation.value.status === 'PENDING') {
       if (timer === undefined) timer = window.setInterval(load, 10000)
     } else if (timer !== undefined) {
@@ -208,9 +241,17 @@ async function load() {
 /** E-02 复核 / E-06 手动评分（ConfirmAction 闭环 → 表缓存主动失效 D-36） */
 async function onSubmitReview(done: () => void) {
   if (!evaluation.value) return done()
+  if (scoreExceeded.value) {
+    toast.warning(`总分超限：当前指标分合计 ${metricTotalText.value} 分，不能超过100分`)
+    return done()
+  }
+  if (!hasMetrics.value) {
+    toast.warning('暂无可评分的指标项，请刷新后重试')
+    return done()
+  }
   const payload = {
-    totalScore: Number(form.totalScore),
-    metricScores: Object.keys(form.metricScores).length ? form.metricScores : undefined,
+    totalScore: Number(metricTotal.value),
+    metricScores: { ...form.metricScores },
     reviewComment: form.reviewComment
   }
   try {
@@ -219,10 +260,10 @@ async function onSubmitReview(done: () => void) {
       : await evaluationApi.review(id.value, payload)
     evaluation.value = vo
     mirrorForm()
-    toast.success(`已提交，当前生效版本 v${vo.currentVersionNo}`)
+    toast.success(`已提交，当前生效版本 v${vo.currentVersionNo}，总分 ${vo.totalScore}`)
     await historyPanel.value?.reload()
   } catch (e) {
-    toast.error((e as { message?: string })?.message || '提交失败', '请检查意见长度与分数')
+    toast.error((e as { message?: string })?.message || '提交失败', '请检查意见长度与指标分')
   } finally {
     done()
   }
@@ -298,6 +339,26 @@ onBeforeUnmount(() => {
   margin: 0 0 12px;
   font-size: 15px;
   color: var(--aies-ink);
+}
+.score-alert {
+  margin-bottom: var(--aies-gap);
+}
+.total-readonly {
+  display: inline-flex;
+  align-items: center;
+  min-width: 140px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--aies-border);
+  border-radius: var(--aies-radius);
+  background: var(--aies-paper);
+  color: var(--aies-ink);
+  font: 600 16px var(--aies-mono, monospace);
+}
+.total-readonly.over {
+  border-color: #b91c1c;
+  color: #b91c1c;
+  background: #fef2f2;
 }
 .mono {
   font-family: var(--aies-mono, monospace);

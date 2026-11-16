@@ -77,7 +77,7 @@ const roleLabel = computed(() => {
 })
 const initial = computed(() => (auth.me?.realName || auth.me?.username || 'U').slice(0, 1))
 
-/** 左侧模块栏：功能模块 + 文件中心（仅教师/管理员）+ 个人中心 */
+/** 左侧模块栏：功能模块 + 文件中心（仅管理员）+ 个人中心 */
 const groups = computed<ModuleGroup[]>(() => {
   const items: ModuleItem[] = [
     {
@@ -96,7 +96,7 @@ const groups = computed<ModuleGroup[]>(() => {
         /^\/evaluations\/\d+(\/review)?$/.test(p)
     }
   ]
-  if (auth.role !== 'STUDENT') {
+  if (auth.role === 'ADMIN') {
     items.push({
       key: 'files',
       label: '文件中心',

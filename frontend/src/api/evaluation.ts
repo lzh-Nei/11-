@@ -4,6 +4,7 @@ import request from './request'
 export interface EvaluationVO {
   id: number
   submissionId: number
+  taskId: number | null
   status: 'PENDING' | 'AI_DONE' | 'REVIEWED' | 'FAILED'
   currentVersionNo: number
   totalScore: number | null
