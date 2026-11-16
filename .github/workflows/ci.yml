@@ -91,9 +91,8 @@ jobs:
           echo 'secret-scan OK'
 
   frontend:
-    name: frontend build (目录存在才跑)
+    name: frontend build
     runs-on: ubuntu-latest
-    if: ${{ hashFiles('frontend/package.json') != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
