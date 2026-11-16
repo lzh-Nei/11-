@@ -18,38 +18,54 @@
         :closable="false"
         class="first-login"
       />
-      <el-card>
-        <template #header>当前用户信息（GET /api/auth/me 装载）</template>
+
+      <PageHeader
+        :title="`欢迎，${auth.me?.realName || auth.me?.username || ''}`"
+        :subtitle="isTeacher ? '教师工作台 · 任务与评价总览' : '学习工作台 · 任务与提交总览'"
+      >
+        <a v-if="isTeacher" href="/report.html" target="_blank" rel="noopener">
+          <el-button type="primary">报表驾驶舱</el-button>
+        </a>
+        <template v-else>
+          <el-button type="primary" @click="router.push('/tasks')">我的任务</el-button>
+          <el-button @click="router.push('/submissions')">提交记录</el-button>
+        </template>
+      </PageHeader>
+
+      <!-- 四态齐全：骨架 → 错误重试 → 空 → 数据（统计卡行接真接口 overview） -->
+      <AppSkeleton v-if="loading" :rows="2" :row-height="86" />
+      <ErrorState v-else-if="loadError" title="报表加载失败" :message="loadError" @retry="loadOverview" />
+      <EmptyState
+        v-else-if="!stats.length"
+        description="暂无任务数据（等教师发布任务后这里会亮起来）"
+        :action-text="isTeacher ? '去报表驾驶舱' : undefined"
+        @action="noop"
+      />
+      <div v-else class="stat-grid">
+        <StatCard v-for="s in stats" :key="s.label" :label="s.label" :value="s.value" :footnote="s.footnote" />
+      </div>
+
+      <el-card class="section-card">
+        <template #header>当前用户信息（GET /api/auth/me）</template>
         <el-descriptions :column="2" border>
           <el-descriptions-item label="学号/工号">{{ auth.me?.username }}</el-descriptions-item>
           <el-descriptions-item label="姓名">{{ auth.me?.realName }}</el-descriptions-item>
           <el-descriptions-item label="角色">
-            <el-tag v-for="r in auth.me?.roles ?? []" :key="r" class="tag-gap">{{ r }}</el-tag>
+            <el-tag v-for="r in auth.me?.roles ?? []" :key="r" class="tag-gap" effect="dark" :type="roleTagType">{{ r }}</el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="邮箱">{{ auth.me?.email || '—' }}</el-descriptions-item>
         </el-descriptions>
       </el-card>
 
-      <el-card class="nav-card" v-if="auth.role === 'STUDENT'">
-        <template #header>学生工作台（M1 链路）</template>
-        <div class="nav-list">
-          <el-button type="primary" @click="router.push('/tasks')">我的任务</el-button>
-          <el-button type="success" @click="router.push('/submissions')">我的提交记录</el-button>
-        </div>
-      </el-card>
-
-      <el-card class="perm-card">
-        <template #header>权限清单（{{ auth.me?.permissions?.length ?? 0 }} 项）</template>
-        <div class="perm-list">
-          <el-tag
-            v-for="p in auth.me?.permissions ?? []"
-            :key="p"
-            type="info"
-            effect="plain"
-            class="tag-gap"
-          >
-            {{ p }}
-          </el-tag>
+      <el-card class="section-card">
+        <template #header>权限清单（{{ auth.me?.permissions?.length ?? 0 }} 项 · 按命名空间分组）</template>
+        <div class="perm-groups">
+          <div v-for="(perms, ns) in permGroups" :key="ns" class="perm-group">
+            <div class="ns-title">{{ nsLabel(ns) }} · {{ perms.length }}</div>
+            <div class="perm-list">
+              <span v-for="p in perms" :key="p" class="perm-chip" :title="p">{{ permLabel(p) }}</span>
+            </div>
+          </div>
         </div>
       </el-card>
     </el-main>
@@ -57,69 +73,149 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import PageHeader from '@/components/ui/PageHeader.vue'
+import StatCard from '@/components/ui/StatCard.vue'
+import AppSkeleton from '@/components/ui/AppSkeleton.vue'
+import ErrorState from '@/components/ui/ErrorState.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
+import { reportApi, type ReportOverview } from '@/api/report'
+import { permLabel, nsLabel } from '@/constants/permissions'
 
 const router = useRouter()
 const auth = useAuthStore()
 
+const loading = ref(false)
+const loadError = ref<string | null>(null)
+const overview = ref<ReportOverview | null>(null)
+
+const isTeacher = computed(() => auth.role === 'TEACHER' || auth.role === 'ADMIN')
 const roleTagType = computed(() => {
   if (auth.role === 'ADMIN') return 'danger'
   if (auth.role === 'TEACHER') return 'warning'
   return 'success'
 })
 
+/* 统计卡派生（fromTasks 同 report.html v3 口径：真实 ReportOverviewDTO 无顶层标量） */
+const stats = computed(() => {
+  const tasks = overview.value?.tasks
+  if (!Array.isArray(tasks)) return []
+  const sum = (k: 'submitted' | 'scored') => tasks.reduce((a, t) => a + (Number(t[k]) || 0), 0)
+  const subs = sum('submitted')
+  const scored = sum('scored')
+  return [
+    { label: isTeacher.value ? '任务总数' : '我的任务', value: tasks.length, footnote: '' },
+    { label: '提交总数', value: subs, footnote: '' },
+    { label: '已出分', value: scored, footnote: '' },
+    { label: '待批阅', value: Math.max(subs - scored, 0), footnote: '' }
+  ]
+})
+
+/* 权限清单：中文化 + 命名空间分组（禁裸英文权限点） */
+const permGroups = computed<Record<string, string[]>>(() => {
+  const groups: Record<string, string[]> = {}
+  for (const p of auth.me?.permissions ?? []) {
+    const ns = String(p).split(':')[0]
+    ;(groups[ns] = groups[ns] || []).push(String(p))
+  }
+  return groups
+})
+
+async function loadOverview() {
+  loading.value = true
+  loadError.value = null
+  try {
+    overview.value = isTeacher.value ? await reportApi.overview() : await reportApi.overviewMe()
+  } catch (e) {
+    const msg = (e as { message?: string })?.message
+    loadError.value = msg || '网络或服务暂时不可用，请稍后重试'
+  } finally {
+    loading.value = false
+  }
+}
+
+function noop() {}
+
 async function onLogout() {
   await auth.logout()
   router.push('/login')
 }
+
+onMounted(loadOverview)
 </script>
 
 <style scoped>
 .home {
   min-height: 100vh;
-  background: #f5f7fa;
+  background: var(--aies-paper);
 }
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #fff;
-  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+  background: var(--aies-surface);
+  border-bottom: 1px solid var(--aies-border);
 }
 .brand {
   font-size: 17px;
   font-weight: 600;
+  color: var(--aies-ink);
 }
 .user-zone {
   display: flex;
   align-items: center;
   gap: 12px;
 }
+.hello {
+  font-size: 13px;
+  color: var(--aies-ink2);
+}
 .main {
-  max-width: 960px;
+  max-width: 1080px;
   margin: 0 auto;
+  padding-top: var(--aies-gap-lg);
 }
 .first-login {
-  margin-bottom: 16px;
+  margin-bottom: var(--aies-gap);
 }
-.perm-card {
-  margin-top: 16px;
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--aies-gap);
 }
-.nav-card {
-  margin-top: 16px;
+.section-card {
+  margin-top: var(--aies-gap-lg);
+  --el-card-border-radius: var(--aies-radius-lg);
 }
-.nav-list {
+.tag-gap {
+  margin-right: 4px;
+}
+.perm-groups {
   display: flex;
+  flex-direction: column;
   gap: 12px;
+}
+.ns-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--aies-ink3);
+  margin-bottom: 6px;
+  font-family: var(--aies-mono, monospace);
 }
 .perm-list {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
-.tag-gap {
-  margin-right: 4px;
+.perm-chip {
+  display: inline-flex;
+  padding: 4px 12px;
+  border-radius: var(--aies-radius-pill);
+  background: var(--aies-paper);
+  border: 1px solid var(--aies-border);
+  font-size: 12.5px;
+  color: var(--aies-ink2);
 }
 </style>
