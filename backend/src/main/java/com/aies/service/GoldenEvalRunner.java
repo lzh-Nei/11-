@@ -102,6 +102,44 @@ public class GoldenEvalRunner implements CommandLineRunner {
         }
         pool.shutdown();
 
+        // 失败样本自动重试一轮（W10-C2顺手项：GPU双槽并发负载超时漂移，失败样本逐轮随机漂移，
+        // 重跑自愈+幂等回写安全——消除人工干预；仅重试FAILED行，SKIP为配置性跳过不重试）
+        List<Integer> failedIdx = new ArrayList<>();
+        for (int i = 0; i < tableRows.size(); i++) {
+            if (tableRows.get(i).contains("FAILED")) {
+                failedIdx.add(i);
+            }
+        }
+        if (!failedIdx.isEmpty()) {
+            log.warn("第一轮失败{}个样本，自动重试一轮（GPU负载漂移自愈）: {}",
+                    failedIdx.size(), failedIdx.stream()
+                            .map(i -> samples.get(i).getSampleFileKey()
+                                    .substring(samples.get(i).getSampleFileKey().lastIndexOf('/') + 1))
+                            .toList());
+            java.util.concurrent.ExecutorService retryPool =
+                    java.util.concurrent.Executors.newFixedThreadPool(2);
+            List<java.util.concurrent.Future<String>> retryFutures = new ArrayList<>();
+            for (int idx : failedIdx) {
+                GoldenDataset retrySample = samples.get(idx);
+                retryFutures.add(retryPool.submit(() -> evaluateOne(retrySample, template, cfg, nameWeight)));
+            }
+            for (int j = 0; j < failedIdx.size(); j++) {
+                tableRows.set(failedIdx.get(j), retryFutures.get(j).get());
+            }
+            retryPool.shutdown();
+            // 重试后全量重新统计（首轮成功行原样保留+重试行替换）
+            evaluated = 0;
+            consistent = 0;
+            for (String row : tableRows) {
+                if (!row.contains("FAILED") && !row.contains("SKIP")) {
+                    evaluated++;
+                    if (row.contains("一致")) {
+                        consistent++;
+                    }
+                }
+            }
+        }
+
         log.info("=== 黄金集偏差分布表（逐样本 |AI-教师| vs 教师总分×5%）===");
         log.info("样本            | 教师总分 | AI总分 | |Δ|   | 阈值  | 指标偏差                    | 判定   | 重试 | 耗时");
         tableRows.forEach(log::info);

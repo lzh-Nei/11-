@@ -14,7 +14,7 @@ docker compose -f compose-dev.yml ps   # 8/8 healthy 即就绪
 冒烟口径（G1）：
 
 ```bash
-curl http://localhost:8081/api/health        # 期望 {"status":"UP"}（经nginx→app→actuator）
+curl http://localhost:8082/api/health        # 期望 {"status":"UP"}（经nginx→app→actuator）
 curl http://localhost:8080/actuator/health   # 期望 {"status":"UP"}（直连）
 ```
 
@@ -25,7 +25,7 @@ ollama 模型卷持久化，断点续拉，仅首次慢（约 4.7GB）。
 
 | 服务 | 容器端口 | dev 宿主端口 | 改道原因 |
 |------|:---:|:---:|----------|
-| nginx | 80 / 443 | **8081 / 9443** | 宿主原生 Apache(httpd) 占 80/443 |
+| nginx | 80 / 443 | **8082 / 9443** | 宿主 8081 被 nexus 私服占用（W10-C2 改映射，D-32 裁决不停 nexus） |
 | mysql | 3306 | **13306** | 宿主原生 MySQL 占 3306/33060 |
 | redis | 6379 | **6380** | 宿主原生 Redis 占 6379 |
 | rabbitmq | 5672 / 15672 | 5672 / 15672（直连） | 无冲突；15672=管理台 |

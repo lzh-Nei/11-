@@ -186,7 +186,7 @@ services:
   nginx:
     image: nginx:alpine
     ports:
-      - "8081:80"            # dev改道8081：宿主原生Apache(httpd)占80/443；标准链路W11生产环境恢复80
+      - "8082:80"            # dev改道8082：宿主8081被nexus私服占用（D-32裁决改映射不停nexus）；标准链路W11生产环境恢复80
       - "9443:443"
     volumes:
       - ./docker/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
