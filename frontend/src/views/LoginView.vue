@@ -1,138 +1,71 @@
 <template>
+  <!-- 登录页（WP8-B0 试点改造）：暖纸底 + 白卡 + 品牌琥珀；逻辑收口在 LoginForm -->
   <div class="login-wrap">
-    <el-card class="login-card">
-      <template #header>
-        <div class="title">AIES 教学AI检查评价系统</div>
-      </template>
-      <el-form label-position="top" @submit.prevent="onSubmit">
-        <el-form-item label="学号 / 工号">
-          <el-input v-model="form.username" placeholder="请输入账号" autocomplete="username" />
-        </el-form-item>
-        <el-form-item label="密码">
-          <el-input
-            v-model="form.password"
-            type="password"
-            placeholder="请输入密码"
-            show-password
-            autocomplete="current-password"
-          />
-        </el-form-item>
-        <el-form-item label="图形验证码">
-          <div class="captcha-row">
-            <el-input v-model="form.captchaCode" placeholder="区分大小写" @keyup.enter="onSubmit" />
-            <img
-              v-if="captcha"
-              :src="captcha.image"
-              class="captcha-img"
-              title="点击刷新"
-              alt="图形验证码"
-              @click="refreshCaptcha"
-            />
-          </div>
-        </el-form-item>
-        <el-button
-          type="primary"
-          class="submit-btn"
-          :loading="loading"
-          :disabled="cooldownSeconds > 0"
-          @click="onSubmit"
-        >
-          {{ cooldownSeconds > 0 ? `操作过于频繁（${cooldownSeconds}s）` : '登 录' }}
-        </el-button>
-        <div class="links">
-          <router-link to="/register">注册账号</router-link>
-          <router-link to="/forgot-password">忘记密码</router-link>
-        </div>
-      </el-form>
-    </el-card>
+    <div class="login-card">
+      <div class="brand-mark">A</div>
+      <div class="title">AIES 教学AI检查评价系统</div>
+      <p class="subtitle">登录后进入你的教学 / 学习工作台</p>
+      <LoginForm @success="goHome" />
+    </div>
+    <p class="foot-hint">同源部署 · 验证码与主应用同一 /api/auth/captcha 端点（A-04）</p>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { authApi } from '@/api/auth'
-import { useAuthStore } from '@/stores/auth'
-import { storeToRefs } from 'pinia'
+import LoginForm from '@/components/business/LoginForm.vue'
 
 const router = useRouter()
-const auth = useAuthStore()
-const { cooldownSeconds } = storeToRefs(auth)
-
-const form = reactive({ username: '', password: '', captchaCode: '' })
-const captcha = ref<{ captchaId: string; image: string } | null>(null)
-const loading = ref(false)
-
-async function refreshCaptcha() {
-  captcha.value = await authApi.captcha()
-  form.captchaCode = ''
+function goHome() {
+  router.push('/')
 }
-
-async function onSubmit() {
-  if (!form.username || !form.password || !form.captchaCode) {
-    ElMessage.warning('请填写账号、密码与图形验证码')
-    return
-  }
-  loading.value = true
-  try {
-    // 登录闭环：login存双token → /me装载userStore → 进首页（D-18两步走）
-    const result = await authApi.login({
-      username: form.username,
-      password: form.password,
-      captchaId: captcha.value?.captchaId ?? '',
-      captchaCode: form.captchaCode
-    })
-    auth.setTokens(result)
-    await auth.loadMe()
-    ElMessage.success(`欢迎，${auth.me?.realName || form.username}`)
-    router.push('/')
-  } finally {
-    loading.value = false
-  }
-}
-
-onMounted(refreshCaptcha)
 </script>
 
 <style scoped>
 .login-wrap {
   min-height: 100vh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #1f2d3d 0%, #2b4a6f 100%);
+  gap: 16px;
+  background: var(--aies-paper);
+  padding: 24px;
 }
 .login-card {
-  width: 380px;
+  width: 400px;
+  max-width: 100%;
+  background: var(--aies-surface);
+  border: 1px solid var(--aies-border);
+  border-radius: var(--aies-radius-lg);
+  box-shadow: var(--aies-shadow);
+  padding: 32px 32px 24px;
+}
+.brand-mark {
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 12px;
+  border-radius: 12px;
+  background: var(--aies-brand);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font: 700 20px var(--aies-mono, monospace);
 }
 .title {
   text-align: center;
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 600;
+  color: var(--aies-ink);
 }
-.captcha-row {
-  display: flex;
-  gap: 8px;
-  width: 100%;
+.subtitle {
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--aies-ink3);
+  margin: 4px 0 20px;
 }
-.captcha-img {
-  height: 32px;
-  cursor: pointer;
-  border-radius: 4px;
-  border: 1px solid #dcdfe6;
-}
-.submit-btn {
-  width: 100%;
-}
-.links {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 12px;
-  font-size: 13px;
-}
-.links a {
-  color: var(--el-color-primary);
-  text-decoration: none;
+.foot-hint {
+  font-size: 12px;
+  color: var(--aies-ink3);
 }
 </style>

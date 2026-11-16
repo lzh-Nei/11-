@@ -16,8 +16,15 @@
   --aies-brand-hover: #9a4207;
   --aies-radius: 8px;
   --aies-radius-lg: 12px;
+  --aies-radius-pill: 999px;
   --aies-shadow: 0 2px 12px rgba(28, 25, 23, 0.06);
   --aies-shadow-lg: 0 10px 30px rgba(28, 25, 23, 0.1);
+  /* WP8-B0 风格基因定稿：hover 加深一档（近影+泛影双层）+ 轻浮起 */
+  --aies-shadow-hover: 0 2px 6px rgba(28, 25, 23, 0.1), 0 10px 24px rgba(28, 25, 23, 0.08);
+  --aies-lift: translateY(-1px);
+  /* 布局韵律：16/24 两档（卡片间距 16 / 区块与页边距 24） */
+  --aies-gap: 16px;
+  --aies-gap-lg: 24px;
   --aies-t: 220ms ease-out;
 
   /* ElementPlus 主题覆盖：默认蓝 → 品牌琥珀（light 阶梯为 #b45309 混白精确值） */
