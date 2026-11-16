@@ -57,7 +57,7 @@
               <el-form-item label="总分（0-100）" required>
                 <el-input-number v-model="form.totalScore" :min="0" :max="100" :step="0.5" controls-position="right" style="width:140px" />
               </el-form-item>
-              <el-form-item v-for="(v, k) in form.metricScores" :key="k" :label="`${k}（0-100）`">
+              <el-form-item v-for="(_, k) in form.metricScores" :key="k" :label="`${k}（0-100）`">
                 <el-input-number v-model="form.metricScores[k]" :min="0" :max="100" :step="0.5" controls-position="right" style="width:140px" size="small" />
               </el-form-item>
               <el-form-item label="复核意见（≥10 字，留痕进历史版本）" required>
