@@ -38,7 +38,9 @@ const emit = defineEmits<{ open: [] }>()
   box-shadow: var(--aies-shadow);
   padding: var(--aies-gap-lg);
   cursor: pointer;
-  transition: box-shadow var(--aies-t), transform var(--aies-t);
+  transition:
+    box-shadow var(--aies-t),
+    transform var(--aies-t);
 }
 .task-card:hover {
   box-shadow: var(--aies-shadow-hover);

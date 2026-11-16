@@ -70,4 +70,25 @@ request.interceptors.response.use(
   }
 )
 
+/**
+ * 二进制直下（302→MinIO 等跨域重定向 axios 拦截器不适用）：
+ * fetch 携带 AT 跟随重定向（跨域跳转时浏览器自动剥离 Authorization，签名 URL 本就不需鉴权），
+ * 返回响应体 Blob；业务码 JSON（code≠0）与 HTTP 错误统一抛 Error(message)。
+ */
+export async function fetchBlob(url: string): Promise<Blob> {
+  const auth = useAuthStore()
+  const resp = await fetch(url, {
+    headers: auth.accessToken ? { Authorization: `Bearer ${auth.accessToken}` } : undefined
+  })
+  if (resp.status === 401 || resp.status === 403) {
+    throw new Error(`下载失败（${resp.status}，登录态可能已过期）`)
+  }
+  const contentType = resp.headers.get('content-type') ?? ''
+  if (contentType.includes('application/json')) {
+    const body = (await resp.json()) as { message?: string }
+    throw new Error(body.message || '下载失败')
+  }
+  return await resp.blob()
+}
+
 export default request

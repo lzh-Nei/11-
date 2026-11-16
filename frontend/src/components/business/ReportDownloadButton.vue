@@ -1,6 +1,13 @@
 <template>
   <!-- 报告关联原件下载（ReportDownloadButton）：submissionId → S-03 签名URL（5min）→ 302 MinIO 直连 -->
-  <el-button type="primary" plain size="small" :loading="loading" :disabled="!submissionId" @click="download(submissionId)">
+  <el-button
+    type="primary"
+    plain
+    size="small"
+    :loading="loading"
+    :disabled="!submissionId"
+    @click="download(submissionId)"
+  >
     下载提交原件（签名URL 5分钟有效）
   </el-button>
 </template>

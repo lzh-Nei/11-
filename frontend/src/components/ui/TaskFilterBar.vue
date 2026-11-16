@@ -17,17 +17,14 @@
 <script setup lang="ts">
 import { statusMeta } from '@/constants/status'
 
-withDefaults(
-  defineProps<{ modelValue: string; options?: { value: string; label: string }[] }>(),
-  {
-    options: () => [
-      { value: '', label: '全部' },
-      { value: 'PUBLISHED', label: statusMeta('PUBLISHED').label },
-      { value: 'DRAFT', label: statusMeta('DRAFT').label },
-      { value: 'CLOSED', label: statusMeta('CLOSED').label }
-    ]
-  }
-)
+withDefaults(defineProps<{ modelValue: string; options?: { value: string; label: string }[] }>(), {
+  options: () => [
+    { value: '', label: '全部' },
+    { value: 'PUBLISHED', label: statusMeta('PUBLISHED').label },
+    { value: 'DRAFT', label: statusMeta('DRAFT').label },
+    { value: 'CLOSED', label: statusMeta('CLOSED').label }
+  ]
+})
 const emit = defineEmits<{ 'update:modelValue': [v: string] }>()
 </script>
 

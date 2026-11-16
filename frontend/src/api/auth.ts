@@ -85,6 +85,10 @@ export const authApi = {
   async login(payload: LoginPayload): Promise<LoginResult> {
     return (await request.post('/auth/login', payload)) as unknown as LoginResult
   },
+  /** A-03 刷新令牌（UC-31）：RT 旋转，旧 RT 即废；无效→40101 */
+  async refresh(refreshToken: string): Promise<LoginResult> {
+    return (await request.post('/auth/refresh', { refreshToken })) as unknown as LoginResult
+  },
   /** A-07 邮箱验证码登录（UC-42）：签发 AT/RT 同 A-01 */
   async loginByEmail(payload: { username: string; emailCode: string }): Promise<LoginResult> {
     return (await request.post('/auth/login/email', payload)) as unknown as LoginResult

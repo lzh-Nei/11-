@@ -25,10 +25,13 @@
 import { computed } from 'vue'
 import { scoreLevel, SCORE_LEVEL_LABEL } from '@/utils/format'
 
-const props = withDefaults(defineProps<{ score: number | null; size?: 'mini' | 'normal'; showLevel?: boolean }>(), {
-  size: 'normal',
-  showLevel: true
-})
+const props = withDefaults(
+  defineProps<{ score: number | null; size?: 'mini' | 'normal'; showLevel?: boolean }>(),
+  {
+    size: 'normal',
+    showLevel: true
+  }
+)
 
 const radius = 30
 const circumference = 2 * Math.PI * radius

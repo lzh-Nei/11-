@@ -1,4 +1,4 @@
-import request from './request'
+import request, { fetchBlob } from './request'
 import type { PageResult } from './task'
 
 /** 提交记录行（S-02 / UC-17：含解析状态与评价状态；evaluationId=W7-C2加法细化，UC-21跳转锚点） */
@@ -56,5 +56,9 @@ export const submissionApi = {
   /** S-03 提交详情（签名URL+文本预览） */
   async detail(id: number): Promise<SubmissionDetail> {
     return (await request.get(`/submissions/${id}`)) as unknown as SubmissionDetail
+  },
+  /** S-04 下载原件（302→MinIO 预签名直连）：二进制链路不经 axios 拦截器，返回文件 Blob */
+  async download(id: number): Promise<Blob> {
+    return await fetchBlob(`/api/submissions/${id}/download`)
   }
 }

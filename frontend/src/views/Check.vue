@@ -1,5 +1,5 @@
 <template>
-  <div class="page">
+  <PageShell>
     <PageHeader title="任务管理" subtitle="教师视角：创建 / 发布 / 全状态跟踪（T-01/T-03，复核域 W8）">
       <el-button @click="router.push('/')">返回首页</el-button>
     </PageHeader>
@@ -39,13 +39,31 @@
         <el-form-item label="评分指标（权重合计必须 = 100）">
           <div class="metric-editor">
             <div v-for="(m, i) in draft.metrics" :key="i" class="metric-row">
-              <el-input v-model="m.metricName" placeholder="指标名（如：代码质量）" style="flex:1" />
-              <el-input-number v-model="m.weight" :min="1" :max="100" controls-position="right" style="width:110px" />
+              <el-input v-model="m.metricName" placeholder="指标名（如：代码质量）" style="flex: 1" />
+              <el-input-number
+                v-model="m.weight"
+                :min="1"
+                :max="100"
+                controls-position="right"
+                style="width: 110px"
+              />
               <span class="mono">%（第 {{ i + 1 }} 项）</span>
-              <el-button text type="danger" :disabled="draft.metrics.length <= 1" @click="draft.metrics.splice(i, 1)">删</el-button>
+              <el-button
+                text
+                type="danger"
+                :disabled="draft.metrics.length <= 1"
+                @click="draft.metrics.splice(i, 1)"
+                >删</el-button
+              >
             </div>
             <div class="metric-foot">
-              <el-button size="small" plain @click="draft.metrics.push({ metricName: '', weight: 20, sortOrder: draft.metrics.length + 1 })">
+              <el-button
+                size="small"
+                plain
+                @click="
+                  draft.metrics.push({ metricName: '', weight: 20, sortOrder: draft.metrics.length + 1 })
+                "
+              >
                 + 添加指标
               </el-button>
               <span class="weight-sum" :class="{ bad: weightSum !== 100 }">Σ = {{ weightSum }}%</span>
@@ -59,7 +77,9 @@
           @execute="onCreate"
         >
           <template #default="{ trigger, loading }">
-            <el-button type="primary" :loading="loading" :disabled="!canCreate" @click="trigger">创建任务（DRAFT）</el-button>
+            <el-button type="primary" :loading="loading" :disabled="!canCreate" @click="trigger"
+              >创建任务（DRAFT）</el-button
+            >
           </template>
         </ConfirmAction>
       </el-form>
@@ -73,22 +93,23 @@
       <EmptyState v-else-if="!tasks.length" description="暂无任务" />
       <div v-else class="card-list">
         <TaskCard v-for="t in tasks" :key="t.id" :task="t">
-          <el-button
-            v-if="t.status === 'DRAFT'"
-            type="primary"
-            size="small"
-            @click="confirmPublish(t)"
-          >
+          <el-button v-if="t.status === 'DRAFT'" type="primary" size="small" @click="confirmPublish(t)">
             发布任务
           </el-button>
           <span v-else class="dim">{{ t.status === 'PUBLISHED' ? '已发布（指标锁定）' : '已关闭' }}</span>
         </TaskCard>
       </div>
       <div v-if="total > size" class="pager">
-        <el-pagination v-model:current-page="page" :page-size="size" :total="total" layout="total, prev, pager, next" @current-change="load" />
+        <el-pagination
+          v-model:current-page="page"
+          :page-size="size"
+          :total="total"
+          layout="total, prev, pager, next"
+          @current-change="load"
+        />
       </div>
     </section>
-  </div>
+  </PageShell>
 </template>
 
 <script setup lang="ts">
@@ -96,6 +117,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { taskApi, type TaskInfo, type TaskCreatePayload } from '@/api/task'
 import { toast } from '@/utils/toast'
+import PageShell from '@/components/ui/PageShell.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import TaskCard from '@/components/ui/TaskCard.vue'
 import TaskFilterBar from '@/components/ui/TaskFilterBar.vue'
@@ -127,7 +149,9 @@ const draft = reactive<TaskCreatePayload>({
 })
 
 const weightSum = computed(() => draft.metrics.reduce((a, m) => a + (m.weight || 0), 0))
-const canCreate = computed(() => draft.title && draft.deadline && draft.classId > 0 && weightSum.value === 100)
+const canCreate = computed(
+  () => draft.title && draft.deadline && draft.classId > 0 && weightSum.value === 100
+)
 
 async function onCreate(done: () => void) {
   try {
@@ -183,11 +207,6 @@ onMounted(load)
 </script>
 
 <style scoped>
-.page {
-  max-width: 1080px;
-  margin: 0 auto;
-  padding: var(--aies-gap-lg) 16px 80px;
-}
 .lock-tip {
   margin-bottom: var(--aies-gap);
 }

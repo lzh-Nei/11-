@@ -65,23 +65,35 @@
       <div class="table-card">
         <table>
           <thead>
-            <tr><th>原始 API 数据</th><th>禁止显示</th><th>必须渲染为</th></tr>
+            <tr>
+              <th>原始 API 数据</th>
+              <th>禁止显示</th>
+              <th>必须渲染为</th>
+            </tr>
           </thead>
           <tbody class="mono-src">
             <tr>
               <td>2026-11-16T12:03:44Z</td>
               <td class="bad">ISO 原串</td>
-              <td><b>{{ formatDateTime('2026-11-16T12:03:44Z') }}</b>（列表态：<i>{{ formatRelative('2026-11-16T12:03:44Z') }}</i>）</td>
+              <td>
+                <b>{{ formatDateTime('2026-11-16T12:03:44Z') }}</b>（列表态：<i>{{
+                  formatRelative('2026-11-16T12:03:44Z')
+                }}</i
+                >）
+              </td>
             </tr>
             <tr>
               <td>"PENDING" / "AI_DONE" / "REVIEWED"</td>
               <td class="bad">大写英文</td>
-              <td><StatusTag status="PENDING" /> <StatusTag status="AI_DONE" /> <StatusTag status="REVIEWED" /> <StatusTag status="FAILED" /> <StatusTag status="DRAFT" /> <StatusTag status="PUBLISHED" /></td>
+              <td>
+                <StatusTag status="PENDING" /> <StatusTag status="AI_DONE" /> <StatusTag status="REVIEWED" />
+                <StatusTag status="FAILED" /> <StatusTag status="DRAFT" /> <StatusTag status="PUBLISHED" />
+              </td>
             </tr>
             <tr>
               <td>87.5</td>
               <td class="bad">裸分数</td>
-              <td style="display:flex;gap:18px;align-items:center">
+              <td style="display: flex; gap: 18px; align-items: center">
                 <ScoreDisplay :score="92" size="mini" />
                 <ScoreDisplay :score="74" size="mini" />
                 <ScoreDisplay :score="58" size="mini" />
@@ -99,7 +111,9 @@
             <tr>
               <td>1048576</td>
               <td class="bad">裸字节数</td>
-              <td><b>{{ formatBytes(1048576) }}</b>（832 KB 文件 → {{ formatBytes(851968) }}）</td>
+              <td>
+                <b>{{ formatBytes(1048576) }}</b>（832 KB 文件 → {{ formatBytes(851968) }}）
+              </td>
             </tr>
           </tbody>
         </table>
@@ -110,10 +124,22 @@
     <section class="sg-block">
       <h2>④ 业务容器（DataTableShell / FileUploadZone / ChartPanel）</h2>
       <div class="stack">
-        <DataTableShell :rows="[{ a: 1 }, { a: 2 }, { a: 3 }]" :total="42" :page="1" :page-size="10" empty-text="暂无提交">
+        <DataTableShell
+          :rows="[{ a: 1 }, { a: 2 }, { a: 3 }]"
+          :total="42"
+          :page="1"
+          :page-size="10"
+          empty-text="暂无提交"
+        >
           <table class="demo-table">
             <thead>
-              <tr><th>任务</th><th>学生</th><th>状态</th><th>提交时间</th><th>得分</th></tr>
+              <tr>
+                <th>任务</th>
+                <th>学生</th>
+                <th>状态</th>
+                <th>提交时间</th>
+                <th>得分</th>
+              </tr>
             </thead>
             <tbody>
               <tr v-for="r in demoRows" :key="r.id" class="row-click" @click="noop">
@@ -121,7 +147,11 @@
                 <td>{{ r.student }}</td>
                 <td><StatusTag :status="r.status" /></td>
                 <td>{{ formatDateTime(r.at) }}</td>
-                <td><ScoreDisplay v-if="r.score != null" :score="r.score" size="mini" /><i v-else class="dim">—</i></td>
+                <td>
+                  <ScoreDisplay v-if="r.score != null" :score="r.score" size="mini" /><i v-else class="dim"
+                    >—</i
+                  >
+                </td>
               </tr>
             </tbody>
           </table>
@@ -178,10 +208,38 @@ import { formatDateTime, formatRelative, formatBytes, maskId } from '@/utils/for
 
 /* 样板演示数据（全站唯一 mock 处，横幅已标注） */
 const demoRows = [
-  { id: 1, task: '实训作业1 · Word 文档格式检查', student: 'S2024001 陈同学', status: 'REVIEWED', at: '2026-11-16T12:03:44Z', score: 92 },
-  { id: 2, task: 'C2任务2 · 代码结构分析', student: 'S2024002 林同学', status: 'AI_DONE', at: '2026-11-16T09:41:00Z', score: 74 },
-  { id: 3, task: '算法作业3 · 动态规划', student: 'S2024003 王同学', status: 'PENDING', at: '2026-11-15T18:20:00Z', score: null },
-  { id: 4, task: '实训作业1 · Word 文档格式检查', student: 'S2024004 赵同学', status: 'FAILED', at: '2026-11-15T14:02:00Z', score: null }
+  {
+    id: 1,
+    task: '实训作业1 · Word 文档格式检查',
+    student: 'S2024001 陈同学',
+    status: 'REVIEWED',
+    at: '2026-11-16T12:03:44Z',
+    score: 92
+  },
+  {
+    id: 2,
+    task: 'C2任务2 · 代码结构分析',
+    student: 'S2024002 林同学',
+    status: 'AI_DONE',
+    at: '2026-11-16T09:41:00Z',
+    score: 74
+  },
+  {
+    id: 3,
+    task: '算法作业3 · 动态规划',
+    student: 'S2024003 王同学',
+    status: 'PENDING',
+    at: '2026-11-15T18:20:00Z',
+    score: null
+  },
+  {
+    id: 4,
+    task: '实训作业1 · Word 文档格式检查',
+    student: 'S2024004 赵同学',
+    status: 'FAILED',
+    at: '2026-11-15T14:02:00Z',
+    score: null
+  }
 ]
 const bars = [
   { label: '0-59', h: 22, c: '#b91c1c' },

@@ -1,5 +1,5 @@
 <template>
-  <div class="page">
+  <PageShell>
     <PageHeader title="复核工作台" :subtitle="`教师视角 · 评价 #${route.params.id}（UC-22/23/24/25）`">
       <el-button @click="router.push('/')">返回首页</el-button>
     </PageHeader>
@@ -21,7 +21,9 @@
         <div class="band-left">
           <ScoreDisplay :score="evaluation.totalScore" />
           <StatusTag :status="evaluation.status" />
-          <span class="dim">当前生效 v{{ evaluation.currentVersionNo }} · {{ formatDateTime(evaluation.updateTime) }}</span>
+          <span class="dim"
+            >当前生效 v{{ evaluation.currentVersionNo }} · {{ formatDateTime(evaluation.updateTime) }}</span
+          >
           <span v-if="evaluation.traceId" class="mono dim">trace {{ maskId(evaluation.traceId) }}</span>
         </div>
         <div class="band-actions">
@@ -35,13 +37,21 @@
             @execute="onReEvaluate"
           >
             <template #default="{ trigger, loading }">
-              <el-button size="small" type="warning" plain :loading="loading" @click="trigger">重评（E-03）</el-button>
+              <el-button size="small" type="warning" plain :loading="loading" @click="trigger"
+                >重评（E-03）</el-button
+              >
             </template>
           </ConfirmAction>
         </div>
       </section>
 
-      <template v-if="evaluation.status === 'AI_DONE' || evaluation.status === 'REVIEWED' || evaluation.status === 'FAILED'">
+      <template
+        v-if="
+          evaluation.status === 'AI_DONE' ||
+          evaluation.status === 'REVIEWED' ||
+          evaluation.status === 'FAILED'
+        "
+      >
         <section class="review-grid">
           <!-- 左：AI 原判（只读参照） -->
           <div class="panel">
@@ -55,14 +65,35 @@
             <h3>{{ isManual ? '手动评分（E-06 / UC-24）' : '教师复核（E-02 / UC-22）' }}</h3>
             <el-form label-position="top">
               <el-form-item label="总分（0-100）" required>
-                <el-input-number v-model="form.totalScore" :min="0" :max="100" :step="0.5" controls-position="right" style="width:140px" />
+                <el-input-number
+                  v-model="form.totalScore"
+                  :min="0"
+                  :max="100"
+                  :step="0.5"
+                  controls-position="right"
+                  style="width: 140px"
+                />
               </el-form-item>
               <el-form-item v-for="(_, k) in form.metricScores" :key="k" :label="`${k}（0-100）`">
-                <el-input-number v-model="form.metricScores[k]" :min="0" :max="100" :step="0.5" controls-position="right" style="width:140px" size="small" />
+                <el-input-number
+                  v-model="form.metricScores[k]"
+                  :min="0"
+                  :max="100"
+                  :step="0.5"
+                  controls-position="right"
+                  style="width: 140px"
+                  size="small"
+                />
               </el-form-item>
               <el-form-item label="复核意见（≥10 字，留痕进历史版本）" required>
-                <el-input v-model="form.reviewComment" type="textarea" :rows="3" maxlength="300" show-word-limit
-                  placeholder="说明改分/确认理由：依据、偏差、处理方式……" />
+                <el-input
+                  v-model="form.reviewComment"
+                  type="textarea"
+                  :rows="3"
+                  maxlength="300"
+                  show-word-limit
+                  placeholder="说明改分/确认理由：依据、偏差、处理方式……"
+                />
               </el-form-item>
               <ConfirmAction
                 :title="isManual ? '提交手动评分' : '提交复核'"
@@ -76,7 +107,9 @@
                   </el-button>
                 </template>
               </ConfirmAction>
-              <span v-if="form.reviewComment && form.reviewComment.length < 10" class="dim">意见不足 10 字（后端将拒绝）</span>
+              <span v-if="form.reviewComment && form.reviewComment.length < 10" class="dim"
+                >意见不足 10 字（后端将拒绝）</span
+              >
             </el-form>
           </div>
         </section>
@@ -94,7 +127,9 @@
         />
         <el-table v-else-if="history.length" :data="history" stripe size="small">
           <el-table-column prop="versionNo" label="版本" width="70">
-            <template #default="{ row }"><span class="mono">v{{ row.versionNo }}</span></template>
+            <template #default="{ row }"
+              ><span class="mono">v{{ row.versionNo }}</span></template
+            >
           </el-table-column>
           <el-table-column prop="source" label="来源" width="110" />
           <el-table-column label="总分" width="90">
@@ -116,21 +151,27 @@
           </el-table-column>
         </el-table>
         <EmptyState v-else description="暂无历史版本" />
-        <div v-if="nextCursor" style="margin-top:10px">
+        <div v-if="nextCursor" style="margin-top: 10px">
           <el-button size="small" plain @click="loadHistory(nextCursor)">加载更早版本</el-button>
         </div>
       </section>
     </template>
-  </div>
+  </PageShell>
 
   <!-- E-05 版本快照抽屉 -->
-  <el-drawer v-model="versionDrawer" :title="`版本快照 v${viewing?.currentVersionNo ?? ''}（E-05）`" size="40%">
+  <el-drawer
+    v-model="versionDrawer"
+    :title="`版本快照 v${viewing?.currentVersionNo ?? ''}（E-05）`"
+    size="40%"
+  >
     <el-descriptions v-if="viewing" :column="2" border>
       <el-descriptions-item label="状态"><StatusTag :status="viewing.status" /></el-descriptions-item>
-      <el-descriptions-item label="总分"><span class="mono">{{ viewing.totalScore ?? '—' }}</span></el-descriptions-item>
+      <el-descriptions-item label="总分"
+        ><span class="mono">{{ viewing.totalScore ?? '—' }}</span></el-descriptions-item
+      >
     </el-descriptions>
-    <DimensionRadar v-if="viewing?.metricScores" :scores="viewMetric" :size="220" style="margin-top:14px" />
-    <SuggestionList v-if="viewing?.aiComment" :comment="viewing.aiComment" style="margin-top:14px" />
+    <DimensionRadar v-if="viewing?.metricScores" :scores="viewMetric" :size="220" style="margin-top: 14px" />
+    <SuggestionList v-if="viewing?.aiComment" :comment="viewing.aiComment" style="margin-top: 14px" />
   </el-drawer>
 </template>
 
@@ -140,6 +181,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { evaluationApi, type EvaluationVO, type EvaluationHistoryItem } from '@/api/evaluation'
 import { formatDateTime, maskId } from '@/utils/format'
 import { toast } from '@/utils/toast'
+import PageShell from '@/components/ui/PageShell.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import ScoreDisplay from '@/components/ui/ScoreDisplay.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
@@ -164,16 +206,18 @@ const viewing = ref<EvaluationVO | null>(null)
 let timer: number | undefined
 
 /* 复核表单：初始值镜像 AI 当前判（教师在此基础上改） */
-const form = reactive<{ totalScore: number | null; metricScores: Record<string, number>; reviewComment: string }>({
+const form = reactive<{
+  totalScore: number | null
+  metricScores: Record<string, number>
+  reviewComment: string
+}>({
   totalScore: null,
   metricScores: {},
   reviewComment: ''
 })
 
 const isManual = computed(() => evaluation.value?.status === 'FAILED')
-const canSubmit = computed(
-  () => form.totalScore != null && (form.reviewComment?.length ?? 0) >= 10
-)
+const canSubmit = computed(() => form.totalScore != null && (form.reviewComment?.length ?? 0) >= 10)
 
 const metricRecord = computed<Record<string, number>>(() => {
   const src = evaluation.value?.metricScores ?? {}
@@ -241,7 +285,9 @@ async function onSubmitReview(done: () => void) {
     reviewComment: form.reviewComment
   }
   try {
-    const vo = isManual.value ? await evaluationApi.manualScore(id, payload) : await evaluationApi.review(id, payload)
+    const vo = isManual.value
+      ? await evaluationApi.manualScore(id, payload)
+      : await evaluationApi.review(id, payload)
     evaluation.value = vo
     mirrorForm()
     toast.success(`已提交：生效 v${vo.currentVersionNo}，报表缓存已主动失效`)
@@ -283,11 +329,6 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.page {
-  max-width: 1080px;
-  margin: 0 auto;
-  padding: var(--aies-gap-lg) 16px 80px;
-}
 .tip {
   margin-bottom: var(--aies-gap);
 }

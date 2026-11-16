@@ -36,5 +36,9 @@ export const reportApi = {
   /** 学生个人报表（report:view） */
   async overviewMe(): Promise<ReportOverview> {
     return (await request.get('/reports/overview/me')) as unknown as ReportOverview
+  },
+  /** 缓存强制重建（report:refresh；教师/学生 scope 由权限点天然隔离） */
+  async refresh(): Promise<void> {
+    await request.post('/reports/refresh')
   }
 }

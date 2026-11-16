@@ -1,5 +1,5 @@
 <template>
-  <div class="page">
+  <PageShell>
     <PageHeader title="我的任务" subtitle="学生视角：本班已发布任务（GET /api/tasks）">
       <el-button @click="router.push('/')">返回首页</el-button>
     </PageHeader>
@@ -8,10 +8,7 @@
 
     <AppSkeleton v-if="loading" :rows="3" :row-height="110" class="mt" />
     <ErrorState v-else-if="error" :message="error" @retry="load" />
-    <EmptyState
-      v-else-if="!tasks.length"
-      description="暂无已发布任务——教师发布后这里会亮起来"
-    />
+    <EmptyState v-else-if="!tasks.length" description="暂无已发布任务——教师发布后这里会亮起来" />
     <div v-else class="card-list">
       <TaskCard v-for="t in tasks" :key="t.id" :task="t" @open="router.push(`/tasks/${t.id}/submit`)">
         <el-button
@@ -34,13 +31,14 @@
         @current-change="load"
       />
     </div>
-  </div>
+  </PageShell>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { taskApi, type TaskInfo } from '@/api/task'
+import PageShell from '@/components/ui/PageShell.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import TaskCard from '@/components/ui/TaskCard.vue'
 import TaskFilterBar from '@/components/ui/TaskFilterBar.vue'
@@ -84,11 +82,6 @@ onMounted(load)
 </script>
 
 <style scoped>
-.page {
-  max-width: 1080px;
-  margin: 0 auto;
-  padding: var(--aies-gap-lg) 16px 80px;
-}
 .filter-row {
   margin-bottom: var(--aies-gap);
 }

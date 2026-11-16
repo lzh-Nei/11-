@@ -11,7 +11,15 @@
       stroke-width="1"
     />
     <!-- 轴线 + 轴标签 -->
-    <line v-for="(v, i) in vertices(1)" :key="'ax' + i" :x1="cx" :y1="cy" :x2="v.x" :y2="v.y" stroke="#e7e4de" />
+    <line
+      v-for="(v, i) in vertices(1)"
+      :key="'ax' + i"
+      :x1="cx"
+      :y1="cy"
+      :x2="v.x"
+      :y2="v.y"
+      stroke="#e7e4de"
+    />
     <text
       v-for="(p, i) in labelPositions"
       :key="'lb' + i"
@@ -37,10 +45,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-const props = withDefaults(
-  defineProps<{ scores: Record<string, number>; size?: number; max?: number }>(),
-  { size: 260, max: 100 }
-)
+const props = withDefaults(defineProps<{ scores: Record<string, number>; size?: number; max?: number }>(), {
+  size: 260,
+  max: 100
+})
 
 const cx = computed(() => props.size / 2)
 const cy = computed(() => props.size / 2 + 6)
@@ -70,10 +78,14 @@ function ringPoints(ring: number) {
 }
 
 const dataVertices = computed(() =>
-  names.value.map((name, i) => pointAt(i, Math.min(Math.max(Number(props.scores[name] ?? 0) / props.max, 0), 1)))
+  names.value.map((name, i) =>
+    pointAt(i, Math.min(Math.max(Number(props.scores[name] ?? 0) / props.max, 0), 1))
+  )
 )
 
-const dataPoints = computed(() => dataVertices.value.map((v) => `${v.x.toFixed(1)},${v.y.toFixed(1)}`).join(' '))
+const dataPoints = computed(() =>
+  dataVertices.value.map((v) => `${v.x.toFixed(1)},${v.y.toFixed(1)}`).join(' ')
+)
 
 const labelPositions = computed(() =>
   names.value.map((_, i) => {

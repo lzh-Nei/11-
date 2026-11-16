@@ -1,5 +1,5 @@
 <template>
-  <div class="page">
+  <PageShell :width="860">
     <PageHeader title="评价报告" :subtitle="`UC-21 · 评价 #${route.params.id}（E-01 当前值）`">
       <el-button @click="router.back()">返回</el-button>
     </PageHeader>
@@ -41,9 +41,13 @@
         </section>
 
         <el-descriptions :column="3" border class="meta">
-          <el-descriptions-item label="评价状态"><StatusTag :status="evaluation.status" /></el-descriptions-item>
+          <el-descriptions-item label="评价状态"
+            ><StatusTag :status="evaluation.status"
+          /></el-descriptions-item>
           <el-descriptions-item label="生效版本">v{{ evaluation.currentVersionNo }}</el-descriptions-item>
-          <el-descriptions-item label="更新时间">{{ formatDateTime(evaluation.updateTime) }}</el-descriptions-item>
+          <el-descriptions-item label="更新时间">{{
+            formatDateTime(evaluation.updateTime)
+          }}</el-descriptions-item>
           <el-descriptions-item v-if="evaluation.traceId" label="TraceID（教师可见）" :span="3">
             <span class="mono">{{ maskId(evaluation.traceId) }}</span>
           </el-descriptions-item>
@@ -55,7 +59,7 @@
         </div>
       </template>
     </template>
-  </div>
+  </PageShell>
 </template>
 
 <script setup lang="ts">
@@ -63,6 +67,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { evaluationApi, type EvaluationVO } from '@/api/evaluation'
 import { formatDateTime, maskId } from '@/utils/format'
+import PageShell from '@/components/ui/PageShell.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import ScoreDisplay from '@/components/ui/ScoreDisplay.vue'
 import DimensionRadar from '@/components/ui/DimensionRadar.vue'
@@ -113,11 +118,6 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.page {
-  max-width: 860px;
-  margin: 0 auto;
-  padding: var(--aies-gap-lg) 16px 80px;
-}
 .score-band {
   display: flex;
   gap: var(--aies-gap-lg);

@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "format": "prettier --write \"src/**/*.{vue,ts,js}\" vite.config.ts"
   },
   "dependencies": {
     "axios": "^1.7.7",
@@ -17,6 +18,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.1.4",
+    "prettier": "^3.10.1",
     "typescript": "~5.6.3",
     "vite": "^5.4.10",
     "vue-tsc": "^2.1.10"

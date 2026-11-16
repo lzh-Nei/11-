@@ -1,111 +1,100 @@
 <template>
-  <div class="forgot-wrap">
-    <el-card class="forgot-card">
-      <template #header>
-        <div class="title">AIES 找回密码</div>
-      </template>
-      <el-steps :active="step - 1" simple finish-status="success" class="steps">
-        <el-step title="身份校验" />
-        <el-step title="重置密码" />
-      </el-steps>
+  <!-- 找回密码（A-09/A-10 / UC-44）：AuthCard 壳 + CaptchaInput + EmailCodeInput 组件化 -->
+  <AuthCard title="AIES 找回密码">
+    <el-steps :active="step - 1" simple finish-status="success" class="steps">
+      <el-step title="身份校验" />
+      <el-step title="重置密码" />
+    </el-steps>
 
-      <!-- 步骤1：学号+邮箱+图形码（A-09，S-13防枚举统一文案） -->
-      <el-form v-if="step === 1" label-position="top" @submit.prevent="onCheckIdentity">
-        <el-form-item label="学号">
-          <el-input v-model="form.username" placeholder="请输入学号" autocomplete="username" />
-        </el-form-item>
-        <el-form-item label="绑定邮箱">
-          <el-input v-model="form.email" placeholder="注册时绑定的邮箱" />
-        </el-form-item>
-        <el-form-item label="图形验证码">
-          <div class="captcha-row">
-            <el-input v-model="form.captchaCode" placeholder="区分大小写" @keyup.enter="onCheckIdentity" />
-            <img
-              v-if="captcha"
-              :src="captcha.image"
-              class="captcha-img"
-              title="点击刷新"
-              alt="图形验证码"
-              @click="refreshCaptcha"
-            />
-          </div>
-        </el-form-item>
-        <el-button type="primary" class="submit-btn" :loading="loading" @click="onCheckIdentity">
-          下一步
-        </el-button>
-        <div class="links">
-          <router-link to="/login">返回登录</router-link>
-        </div>
-      </el-form>
+    <!-- 步骤1：学号+邮箱+图形码（A-09，S-13防枚举统一文案） -->
+    <el-form v-if="step === 1" label-position="top" @submit.prevent="onCheckIdentity">
+      <el-form-item label="学号">
+        <el-input v-model="form.username" placeholder="请输入学号" autocomplete="username" />
+      </el-form-item>
+      <el-form-item label="绑定邮箱">
+        <el-input v-model="form.email" placeholder="注册时绑定的邮箱" />
+      </el-form-item>
+      <el-form-item label="图形验证码">
+        <CaptchaInput
+          v-model:code="form.captchaCode"
+          :image="captcha?.image ?? null"
+          @refresh="refreshCaptcha"
+          @submit="onCheckIdentity"
+        />
+      </el-form-item>
+      <el-button type="primary" class="submit-btn" :loading="loading" @click="onCheckIdentity">
+        下一步
+      </el-button>
+      <div class="links">
+        <router-link to="/login">返回登录</router-link>
+      </div>
+    </el-form>
 
-      <!-- 步骤2：重发重置码（需新图形码）+ 邮箱码 + 新密码（A-10） -->
-      <el-form v-else label-position="top" @submit.prevent="onReset">
-        <el-alert
-          type="success"
-          show-icon
-          :closable="false"
-          title="如该账号存在，重置邮件已发送"
-          class="hint"
+    <!-- 步骤2：重发重置码（需新图形码）+ 邮箱码 + 新密码（A-10） -->
+    <el-form v-else label-position="top" @submit.prevent="onReset">
+      <el-alert
+        type="success"
+        show-icon
+        :closable="false"
+        title="如该账号存在，重置邮件已发送"
+        class="hint"
+      />
+      <!-- UC-44 B计划口径：40004=SMTP不可用降级提示 -->
+      <el-alert
+        v-if="smtpDown"
+        type="warning"
+        show-icon
+        :closable="false"
+        title="邮件服务暂不可用，演示请使用账号密码登录"
+        class="hint"
+      />
+      <el-form-item label="图形验证码">
+        <CaptchaInput
+          v-model:code="form.captchaCode"
+          :image="captcha?.image ?? null"
+          @refresh="refreshCaptcha"
+          @submit="onSendCode"
         />
-        <!-- UC-44 B计划口径：40004=SMTP不可用降级提示 -->
-        <el-alert
-          v-if="smtpDown"
-          type="warning"
-          show-icon
-          :closable="false"
-          title="邮件服务暂不可用，演示请使用账号密码登录"
-          class="hint"
+      </el-form-item>
+      <el-form-item label="邮箱验证码">
+        <EmailCodeInput
+          ref="codeInput"
+          v-model:code="form.emailCode"
+          scene="RESET_PASSWORD"
+          :username="form.username"
+          :email="form.email"
+          :captcha-id="captcha?.captchaId ?? ''"
+          :captcha-code="form.captchaCode"
+          send-label="发送重置码"
+          @sent="refreshCaptcha"
+          @smtp-down="smtpDown = true"
         />
-        <el-form-item label="图形验证码">
-          <div class="captcha-row">
-            <el-input v-model="form.captchaCode" placeholder="未收到邮件可重发，需先填图形码" @keyup.enter="onSendCode" />
-            <img
-              v-if="captcha"
-              :src="captcha.image"
-              class="captcha-img"
-              title="点击刷新"
-              alt="图形验证码"
-              @click="refreshCaptcha"
-            />
-          </div>
-        </el-form-item>
-        <el-form-item label="邮箱验证码">
-          <div class="code-row">
-            <el-input v-model="form.emailCode" placeholder="6位数字" />
-            <el-button :loading="sending" :disabled="sendDisabled" @click="onSendCode">
-              {{ sendButtonText }}
-            </el-button>
-          </div>
-        </el-form-item>
-        <el-form-item label="新密码">
-          <el-input
-            v-model="form.newPassword"
-            type="password"
-            placeholder="至少8位，同时含字母和数字"
-            show-password
-            autocomplete="new-password"
-            @keyup.enter="onReset"
-          />
-        </el-form-item>
-        <el-button type="primary" class="submit-btn" :loading="loading" @click="onReset">
-          重置密码
-        </el-button>
-      </el-form>
-    </el-card>
-  </div>
+      </el-form-item>
+      <el-form-item label="新密码">
+        <el-input
+          v-model="form.newPassword"
+          type="password"
+          placeholder="至少8位，同时含字母和数字"
+          show-password
+          autocomplete="new-password"
+          @keyup.enter="onReset"
+        />
+      </el-form-item>
+      <el-button type="primary" class="submit-btn" :loading="loading" @click="onReset"> 重置密码 </el-button>
+    </el-form>
+  </AuthCard>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { authApi } from '@/api/auth'
-import { useAuthStore } from '@/stores/auth'
-import { storeToRefs } from 'pinia'
+import AuthCard from '@/components/ui/AuthCard.vue'
+import CaptchaInput from '@/components/ui/CaptchaInput.vue'
+import EmailCodeInput from '@/components/business/EmailCodeInput.vue'
 
 const router = useRouter()
-const auth = useAuthStore()
-const { cooldownSeconds } = storeToRefs(auth)
 
 const step = ref(1)
 const form = reactive({
@@ -117,11 +106,7 @@ const form = reactive({
 })
 const captcha = ref<{ captchaId: string; image: string } | null>(null)
 const loading = ref(false)
-const sending = ref(false)
-const countdown = ref(0)
 const smtpDown = ref(false)
-
-let timer: number | undefined
 
 async function refreshCaptcha() {
   captcha.value = await authApi.captcha()
@@ -152,53 +137,12 @@ async function onCheckIdentity() {
   }
 }
 
-/** 步骤2 重发重置码（A-06 scene=RESET_PASSWORD）；40004=SMTP不可用→B计划降级提示 */
-async function onSendCode() {
-  if (!form.captchaCode) {
-    ElMessage.warning('请先填写图形验证码')
-    return
-  }
-  sending.value = true
-  try {
-    await authApi.emailCode({
-      username: form.username,
-      email: form.email,
-      scene: 'RESET_PASSWORD',
-      captchaId: captcha.value?.captchaId ?? '',
-      captchaCode: form.captchaCode
-    })
-    ElMessage.success('发送成功，请查收邮箱')
-    startCountdown()
-    await refreshCaptcha()
-  } catch (e) {
-    // 拦截器已提示后端message；此处按UC-44 B计划口径补充持久降级提示
-    if ((e as { code?: number })?.code === 40004) {
-      smtpDown.value = true
-    }
-  } finally {
-    sending.value = false
-  }
+/** 步骤2 重发重置码（A-06 scene=RESET_PASSWORD）：发送逻辑收口在 EmailCodeInput，回车兜底转调其 send */
+function onSendCode() {
+  codeInput.value?.send()
 }
 
-/** 60s防重发倒计时（后端单邮箱冷却60s，S-12频控） */
-function startCountdown() {
-  countdown.value = 60
-  if (timer !== undefined) window.clearInterval(timer)
-  timer = window.setInterval(() => {
-    countdown.value--
-    if (countdown.value <= 0) {
-      window.clearInterval(timer)
-      timer = undefined
-    }
-  }, 1000)
-}
-
-const sendDisabled = computed(() => countdown.value > 0 || cooldownSeconds.value > 0)
-const sendButtonText = computed(() => {
-  if (countdown.value > 0) return `${countdown.value}s后可重发`
-  if (cooldownSeconds.value > 0) return `操作过于频繁（${cooldownSeconds.value}s）`
-  return '发送重置码'
-})
+const codeInput = ref<InstanceType<typeof EmailCodeInput> | null>(null)
 
 /** 提交重置（A-10）：弱密码→30013、码无效→30009由拦截器统一提示；成功即回登录页 */
 async function onReset() {
@@ -221,49 +165,14 @@ async function onReset() {
 }
 
 onMounted(refreshCaptcha)
-onUnmounted(() => {
-  if (timer !== undefined) window.clearInterval(timer)
-})
 </script>
 
 <style scoped>
-.forgot-wrap {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--aies-paper);
-  padding: 24px;
-}
-.forgot-card {
-  width: 400px;
-  max-width: 100%;
-  border-radius: var(--aies-radius-lg);
-  box-shadow: var(--aies-shadow);
-  border: 1px solid var(--aies-border);
-}
-.title {
-  text-align: center;
-  font-size: 18px;
-  font-weight: 600;
-}
 .steps {
   margin-bottom: 16px;
 }
 .hint {
   margin-bottom: 12px;
-}
-.code-row,
-.captcha-row {
-  display: flex;
-  gap: 8px;
-  width: 100%;
-}
-.captcha-img {
-  height: 32px;
-  cursor: pointer;
-  border-radius: 4px;
-  border: 1px solid #dcdfe6;
 }
 .submit-btn {
   width: 100%;

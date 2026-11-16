@@ -77,9 +77,7 @@ const dragging = ref(false)
 
 const sentLabel = computed(() => formatBytes(props.sentBytes))
 const totalLabel = computed(() => formatBytes(props.totalBytes))
-const speed = computed(() =>
-  props.bytesPerSecond > 0 ? `${formatBytes(props.bytesPerSecond)}/s` : '—'
-)
+const speed = computed(() => (props.bytesPerSecond > 0 ? `${formatBytes(props.bytesPerSecond)}/s` : '—'))
 
 function onPick(e: Event) {
   const f = (e.target as HTMLInputElement).files?.[0]
@@ -98,7 +96,9 @@ function onDrop(e: DragEvent) {
   border: 1.5px dashed var(--aies-border);
   border-radius: var(--aies-radius-lg);
   background: var(--aies-paper);
-  transition: border-color var(--aies-t), background var(--aies-t);
+  transition:
+    border-color var(--aies-t),
+    background var(--aies-t);
 }
 .upload-zone.dragging {
   border-color: var(--aies-brand);

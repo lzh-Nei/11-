@@ -1,5 +1,5 @@
 <template>
-  <div class="page">
+  <PageShell>
     <PageHeader title="提交记录" subtitle="学生视角：本人全部提交（S-02 服务端过滤 + S-03 详情）">
       <el-button @click="router.push('/')">返回首页</el-button>
     </PageHeader>
@@ -40,8 +40,13 @@
         <el-table-column label="操作" width="180" fixed="right">
           <template #default="{ row }">
             <el-button size="small" text type="primary" @click="openDetail(row.id)">详情</el-button>
-            <el-button size="small" text type="success" :disabled="!row.evaluationId"
-              @click="router.push(`/evaluations/${row.evaluationId}`)">
+            <el-button
+              size="small"
+              text
+              type="success"
+              :disabled="!row.evaluationId"
+              @click="router.push(`/evaluations/${row.evaluationId}`)"
+            >
               评价报告
             </el-button>
           </template>
@@ -53,21 +58,38 @@
     <el-drawer v-model="drawer" title="提交详情（S-03）" size="45%">
       <el-descriptions v-if="detail" :column="2" border>
         <el-descriptions-item label="文件名" :span="2">
-          <FileLink :name="detail.fileName" :size="detail.fileSize" @download="download(detail.downloadUrl)" />
+          <FileLink
+            :name="detail.fileName"
+            :size="detail.fileSize"
+            @download="download(detail.downloadUrl)"
+          />
         </el-descriptions-item>
         <el-descriptions-item label="版本">v{{ detail.versionNo }}</el-descriptions-item>
         <el-descriptions-item label="类型">{{ detail.fileType }}</el-descriptions-item>
-        <el-descriptions-item label="解析状态"><StatusTag :status="detail.parseStatus" /></el-descriptions-item>
-        <el-descriptions-item label="评价状态"><StatusTag :status="detail.evaluationStatus" /></el-descriptions-item>
+        <el-descriptions-item label="解析状态"
+          ><StatusTag :status="detail.parseStatus"
+        /></el-descriptions-item>
+        <el-descriptions-item label="评价状态"
+          ><StatusTag :status="detail.evaluationStatus"
+        /></el-descriptions-item>
       </el-descriptions>
 
       <div class="drawer-actions">
-        <el-button type="primary" size="small" :disabled="!detail?.downloadUrl" @click="download(detail!.downloadUrl)">
+        <el-button
+          type="primary"
+          size="small"
+          :disabled="!detail?.downloadUrl"
+          @click="download(detail!.downloadUrl)"
+        >
           下载原件（签名URL 5分钟有效）
         </el-button>
         <!-- UC-21（W7-C2）：评价报告跳转（FAILED 展示 40003 提示） -->
-        <el-button type="success" size="small" :disabled="!detail?.evaluationId"
-          @click="router.push(`/evaluations/${detail!.evaluationId}`)">
+        <el-button
+          type="success"
+          size="small"
+          :disabled="!detail?.evaluationId"
+          @click="router.push(`/evaluations/${detail!.evaluationId}`)"
+        >
           查看评价报告
         </el-button>
       </div>
@@ -78,7 +100,7 @@
       </template>
       <el-empty v-else-if="detail" description="暂无提取文本（解析未完成或失败）" :image-size="80" />
     </el-drawer>
-  </div>
+  </PageShell>
 </template>
 
 <script setup lang="ts">
@@ -87,6 +109,7 @@ import { useRouter } from 'vue-router'
 import { submissionApi, type SubmissionMine, type SubmissionDetail } from '@/api/submission'
 import { formatDateTime } from '@/utils/format'
 import { toast } from '@/utils/toast'
+import PageShell from '@/components/ui/PageShell.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import DataTableShell from '@/components/ui/DataTableShell.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
@@ -132,11 +155,6 @@ onMounted(load)
 </script>
 
 <style scoped>
-.page {
-  max-width: 1080px;
-  margin: 0 auto;
-  padding: var(--aies-gap-lg) 16px 80px;
-}
 .drawer-actions {
   margin: var(--aies-gap) 0;
 }

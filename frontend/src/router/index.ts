@@ -15,9 +15,19 @@ const router = createRouter({
     { path: '/login', name: 'login', component: LoginView, meta: { public: true } },
     // W8-C3 UC-43/44：注册与找回密码（公开路由，与/login同级）
     { path: '/register', name: 'register', component: RegisterView, meta: { public: true } },
-    { path: '/forgot-password', name: 'forgot-password', component: ForgotPasswordView, meta: { public: true } },
+    {
+      path: '/forgot-password',
+      name: 'forgot-password',
+      component: ForgotPasswordView,
+      meta: { public: true }
+    },
     // WP8-B0 设计系统样板页（风格裁决门，公开路由；全站唯一允许 mock 处）
-    { path: '/style-guide', name: 'style-guide', component: () => import('@/views/StyleGuideView.vue'), meta: { public: true } },
+    {
+      path: '/style-guide',
+      name: 'style-guide',
+      component: () => import('@/views/StyleGuideView.vue'),
+      meta: { public: true }
+    },
     { path: '/', name: 'home', component: HomeView },
     // M1 学生链路页（W7-C1）：任务列表 → 提交作业 → 提交记录
     { path: '/tasks', name: 'student-tasks', component: StudentTasks },
@@ -27,7 +37,11 @@ const router = createRouter({
     { path: '/evaluations/:id', name: 'evaluation-report', component: EvaluationReport },
     // WP8-B3 教师工作台落位（Evaluate/Check 占位启用；页面内自校 TEACHER 权限）
     { path: '/tasks/manage', name: 'teacher-tasks', component: () => import('@/views/Check.vue') },
-    { path: '/evaluations/:id/review', name: 'teacher-review', component: () => import('@/views/Evaluate.vue') }
+    {
+      path: '/evaluations/:id/review',
+      name: 'teacher-review',
+      component: () => import('@/views/Evaluate.vue')
+    }
   ]
 })
 

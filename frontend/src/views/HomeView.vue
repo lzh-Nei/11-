@@ -45,7 +45,13 @@
         @action="noop"
       />
       <div v-else class="stat-grid">
-        <StatCard v-for="s in stats" :key="s.label" :label="s.label" :value="s.value" :footnote="s.footnote" />
+        <StatCard
+          v-for="s in stats"
+          :key="s.label"
+          :label="s.label"
+          :value="s.value"
+          :footnote="s.footnote"
+        />
       </div>
 
       <el-card class="section-card">
@@ -54,7 +60,14 @@
           <el-descriptions-item label="学号/工号">{{ auth.me?.username }}</el-descriptions-item>
           <el-descriptions-item label="姓名">{{ auth.me?.realName }}</el-descriptions-item>
           <el-descriptions-item label="角色">
-            <el-tag v-for="r in auth.me?.roles ?? []" :key="r" class="tag-gap" effect="dark" :type="roleTagType">{{ r }}</el-tag>
+            <el-tag
+              v-for="r in auth.me?.roles ?? []"
+              :key="r"
+              class="tag-gap"
+              effect="dark"
+              :type="roleTagType"
+              >{{ r }}</el-tag
+            >
           </el-descriptions-item>
           <el-descriptions-item label="邮箱">{{ auth.me?.email || '—' }}</el-descriptions-item>
         </el-descriptions>
@@ -70,15 +83,13 @@
           <div v-for="(perms, ns) in permGroups" :key="ns" class="perm-group">
             <div class="ns-title">{{ nsLabel(ns) }} · {{ perms.length }}</div>
             <div class="perm-list">
-              <el-tooltip
-                v-for="p in perms"
-                :key="p"
-                :content="permTooltip(p)"
-                placement="top"
-              >
+              <el-tooltip v-for="p in perms" :key="p" :content="permTooltip(p)" placement="top">
                 <button
                   class="perm-chip"
-                  :class="{ reserved: permEntry(p)?.kind === 'reserved', action: permEntry(p)?.kind === 'action' }"
+                  :class="{
+                    reserved: permEntry(p)?.kind === 'reserved',
+                    action: permEntry(p)?.kind === 'action'
+                  }"
                   type="button"
                   @click="onPermClick(p)"
                 >
@@ -277,7 +288,11 @@ onMounted(loadOverview)
   color: var(--aies-ink2);
   cursor: pointer;
   font-family: inherit;
-  transition: box-shadow var(--aies-t), transform var(--aies-t), border-color var(--aies-t), color var(--aies-t);
+  transition:
+    box-shadow var(--aies-t),
+    transform var(--aies-t),
+    border-color var(--aies-t),
+    color var(--aies-t);
 }
 .perm-chip:hover {
   border-color: var(--aies-brand);

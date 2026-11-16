@@ -1,5 +1,5 @@
 <template>
-  <div class="page">
+  <PageShell :width="860">
     <PageHeader title="提交作业" :subtitle="`UC-16 · 任务 #${taskId}（S-01 multipart 直传）`">
       <el-button @click="router.push('/tasks')">返回任务列表</el-button>
     </PageHeader>
@@ -72,9 +72,13 @@
 
       <!-- 分片上传演示区（upload×5 真实承载：S-06 链路可视化——产物 fileId 不入提交表，桥接端点待补，见发现项台账） -->
       <el-collapse class="shard-demo">
-        <el-collapse-item title="分片上传演示（S-06 upload×5 链路：init → chunk → corrupt → 重传 → complete）">
+        <el-collapse-item
+          title="分片上传演示（S-06 upload×5 链路：init → chunk → corrupt → 重传 → complete）"
+        >
           <div class="shard-actions">
-            <el-button size="small" @click="demoBatch" :loading="batching">U-04 小文件批量上传（batch）</el-button>
+            <el-button size="small" @click="demoBatch" :loading="batching"
+              >U-04 小文件批量上传（batch）</el-button
+            >
             <el-button size="small" @click="demoShard" :loading="sharding" :disabled="!file">
               走分片链上传当前选中文件（init/chunk/complete）
             </el-button>
@@ -83,14 +87,14 @@
             </el-button>
           </div>
           <pre v-if="shardLog" class="shard-log">{{ shardLog }}</pre>
-          <p class="dim" style="margin-top:8px">
+          <p class="dim" style="margin-top: 8px">
             说明：分片链真实上传至 MinIO（2MB/片、断点续传、MD5 坏块检测与定向重传闭环）。当前后端无
             fileId→提交记录 桥接端点（发现项 F-08 已登记），产物仅为文件存储，不产生提交版本。
           </p>
         </el-collapse-item>
       </el-collapse>
     </template>
-  </div>
+  </PageShell>
 </template>
 
 <script setup lang="ts">
@@ -100,6 +104,7 @@ import { taskApi, type TaskInfo } from '@/api/task'
 import { submissionApi } from '@/api/submission'
 import { uploadApi } from '@/api/upload'
 import { toast } from '@/utils/toast'
+import PageShell from '@/components/ui/PageShell.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import FileUploadZone from '@/components/ui/FileUploadZone.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
@@ -114,7 +119,17 @@ const taskId = Number(route.params.id)
 
 const loading = ref(false)
 const error = ref<string | null>(null)
-const task = ref<TaskInfo>({ id: 0, title: '', description: '', teacherId: 0, classId: 0, deadline: '', status: '', createTime: '', metrics: [] })
+const task = ref<TaskInfo>({
+  id: 0,
+  title: '',
+  description: '',
+  teacherId: 0,
+  classId: 0,
+  deadline: '',
+  status: '',
+  createTime: '',
+  metrics: []
+})
 const file = ref<File | null>(null)
 const latestVersion = ref(0)
 
@@ -290,11 +305,6 @@ onMounted(load)
 </script>
 
 <style scoped>
-.page {
-  max-width: 860px;
-  margin: 0 auto;
-  padding: var(--aies-gap-lg) 16px 80px;
-}
 .detail-card {
   background: var(--aies-surface);
   border: 1px solid var(--aies-border);

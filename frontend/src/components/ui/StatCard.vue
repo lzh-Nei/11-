@@ -12,7 +12,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-const props = defineProps<{ label: string; value: number | string | null; unit?: string; footnote?: string }>()
+const props = defineProps<{
+  label: string
+  value: number | string | null
+  unit?: string
+  footnote?: string
+}>()
 const display = computed(() => (props.value == null ? '—' : String(props.value)))
 </script>
 
@@ -23,7 +28,9 @@ const display = computed(() => (props.value == null ? '—' : String(props.value
   border-radius: var(--aies-radius-lg);
   box-shadow: var(--aies-shadow);
   padding: 18px var(--aies-gap-lg);
-  transition: box-shadow var(--aies-t), transform var(--aies-t);
+  transition:
+    box-shadow var(--aies-t),
+    transform var(--aies-t);
 }
 .stat-card:hover {
   box-shadow: var(--aies-shadow-hover);

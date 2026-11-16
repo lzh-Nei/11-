@@ -71,9 +71,21 @@ export const PERM_ROUTE: Record<string, PermEntry> = {
   'submission:view': { kind: 'route', to: '/submissions', hint: '进入提交记录' },
   'submission:mine': { kind: 'route', to: '/submissions', hint: '进入我的提交' },
   'evaluation:view': { kind: 'route', to: '/submissions', hint: '从提交记录进入评价报告' },
-  'evaluation:review': { kind: 'action', act: 'dashboard', hint: '复核工作台按评价进入：驾驶舱看数据 → 打开评价报告' },
-  'evaluation:re-evaluate': { kind: 'action', act: 'dashboard', hint: '重评在复核工作台内操作（按评价进入）' },
-  'evaluation:history:view': { kind: 'action', act: 'dashboard', hint: '版本链在复核工作台内查看（按评价进入）' },
+  'evaluation:review': {
+    kind: 'action',
+    act: 'dashboard',
+    hint: '复核工作台按评价进入：驾驶舱看数据 → 打开评价报告'
+  },
+  'evaluation:re-evaluate': {
+    kind: 'action',
+    act: 'dashboard',
+    hint: '重评在复核工作台内操作（按评价进入）'
+  },
+  'evaluation:history:view': {
+    kind: 'action',
+    act: 'dashboard',
+    hint: '版本链在复核工作台内查看（按评价进入）'
+  },
   'report:view': { kind: 'action', act: 'dashboard', hint: '打开报表驾驶舱' },
   'report:view:teacher': { kind: 'action', act: 'dashboard', hint: '打开教师聚合驾驶舱' },
   'report:refresh': { kind: 'action', act: 'dashboard', hint: '刷新按钮在驾驶舱内' },

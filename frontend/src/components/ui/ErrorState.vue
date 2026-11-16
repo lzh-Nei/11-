@@ -11,10 +11,11 @@
 </template>
 
 <script setup lang="ts">
-withDefaults(
-  defineProps<{ title?: string; message?: string; retryable?: boolean }>(),
-  { title: '加载失败', message: '网络或服务暂时不可用，请稍后重试', retryable: true }
-)
+withDefaults(defineProps<{ title?: string; message?: string; retryable?: boolean }>(), {
+  title: '加载失败',
+  message: '网络或服务暂时不可用，请稍后重试',
+  retryable: true
+})
 const emit = defineEmits<{ retry: [] }>()
 </script>
 

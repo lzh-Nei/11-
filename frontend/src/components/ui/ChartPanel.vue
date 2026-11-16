@@ -18,7 +18,14 @@ import ErrorState from './ErrorState.vue'
 import EmptyState from './EmptyState.vue'
 
 withDefaults(
-  defineProps<{ title: string; hint?: string; loading?: boolean; error?: string | null; empty?: boolean; emptyText?: string }>(),
+  defineProps<{
+    title: string
+    hint?: string
+    loading?: boolean
+    error?: string | null
+    empty?: boolean
+    emptyText?: string
+  }>(),
   { loading: false, error: null, empty: false, emptyText: '暂无数据' }
 )
 const emit = defineEmits<{ retry: [] }>()

@@ -41,5 +41,8 @@ function trigger() {
     })
 }
 
-defineExpose({ notifySuccess: (m: string) => ElMessage.success(m), notifyError: (m: string) => ElMessage.error(m) })
+defineExpose({
+  notifySuccess: (m: string) => ElMessage.success(m),
+  notifyError: (m: string) => ElMessage.error(m)
+})
 </script>

@@ -39,7 +39,12 @@ const DEFAULT_CHUNK = 2 * 1024 * 1024 // 2MB 分片
 
 export const uploadApi = {
   /** U-01 初始化：返回 uploadId 与服务端已有分片（断点续传依据） */
-  async init(fileName: string, fileSize: number, lastModified: number, chunkSize = DEFAULT_CHUNK): Promise<InitResponse> {
+  async init(
+    fileName: string,
+    fileSize: number,
+    lastModified: number,
+    chunkSize = DEFAULT_CHUNK
+  ): Promise<InitResponse> {
     const totalChunks = Math.max(1, Math.ceil(fileSize / chunkSize))
     const form = new FormData()
     form.append('fileName', fileName)
