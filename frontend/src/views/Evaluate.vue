@@ -1,8 +1,6 @@
 <template>
   <PageShell>
-    <PageHeader title="复核工作台" :subtitle="`教师视角 · 评价 #${route.params.id}（UC-22/23/24/25）`">
-      <el-button @click="router.push('/')">返回首页</el-button>
-    </PageHeader>
+    <PageHeader title="复核工作台" :subtitle="`教师视角 · 评价 #${route.params.id}（UC-22/23/24/25）`" />
 
     <AppSkeleton v-if="loading && !evaluation" :rows="3" :row-height="80" />
     <ErrorState v-else-if="error" :message="error" @retry="load" />
@@ -123,7 +121,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { evaluationApi, type EvaluationVO } from '@/api/evaluation'
 import { formatDateTime, maskId } from '@/utils/format'
 import { toast } from '@/utils/toast'
@@ -136,7 +134,6 @@ import ConfirmAction from '@/components/ui/ConfirmAction.vue'
 import EvaluationHistoryPanel from '@/components/business/EvaluationHistoryPanel.vue'
 
 const route = useRoute()
-const router = useRouter()
 const id = Number(route.params.id)
 
 const loading = ref(false)

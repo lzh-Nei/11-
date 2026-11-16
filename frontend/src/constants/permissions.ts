@@ -63,39 +63,36 @@ export type PermEntry =
 export const PERM_ROUTE: Record<string, PermEntry> = {
   'auth:logout': { kind: 'action', act: 'logout', hint: '退出登录' },
   'user:me': { kind: 'action', act: 'profile', hint: '定位到个人信息卡' },
-  'task:create': { kind: 'route', to: '/tasks/manage', hint: '进入任务管理创建' },
-  'task:publish': { kind: 'route', to: '/tasks/manage', hint: '进入任务管理发布草稿' },
+  'task:create': { kind: 'route', to: '/tasks/manage', hint: '进入任务管理模块创建' },
+  'task:publish': { kind: 'route', to: '/tasks/manage', hint: '进入任务管理模块发布草稿' },
   'task:edit': { kind: 'reserved', hint: '编辑端点为 V1 预留（T-02 未开放），M3 管理端规划' },
-  'task:view': { kind: 'route', to: '/tasks', hint: '进入任务列表' },
-  'task:mine': { kind: 'route', to: '/tasks', hint: '进入我的任务' },
-  'submission:upload': { kind: 'route', to: '/tasks', hint: '选择任务提交作业' },
-  'submission:view': { kind: 'route', to: '/submissions', hint: '进入提交记录' },
-  'submission:mine': { kind: 'route', to: '/submissions', hint: '进入我的提交' },
-  'evaluation:view': { kind: 'route', to: '/submissions', hint: '从提交记录进入评价报告' },
-  'evaluation:review': {
-    kind: 'action',
-    act: 'dashboard',
-    hint: '复核工作台按评价进入：驾驶舱看数据 → 打开评价报告'
+  'task:view': { kind: 'route', to: '/tasks', hint: '进入任务模块（学生任务中心 / 教师任务管理）' },
+  'task:mine': { kind: 'route', to: '/tasks', hint: '进入任务中心' },
+  'submission:upload': { kind: 'route', to: '/tasks', hint: '在任务中心选择任务提交作业' },
+  'submission:view': {
+    kind: 'route',
+    to: '/submissions',
+    hint: '进入提交模块（学生提交档案 / 教师评价复核）'
   },
-  'evaluation:re-evaluate': {
-    kind: 'action',
-    act: 'dashboard',
-    hint: '重评在复核工作台内操作（按评价进入）'
-  },
+  'submission:mine': { kind: 'route', to: '/submissions', hint: '进入提交档案模块' },
+  'evaluation:view': { kind: 'route', to: '/my-evaluations', hint: '进入我的评价模块（报告新窗口打开）' },
+  'evaluation:review': { kind: 'route', to: '/review', hint: '进入评价复核模块' },
+  'evaluation:re-evaluate': { kind: 'route', to: '/review', hint: '在评价复核工作台内操作重评' },
   'evaluation:history:view': {
-    kind: 'action',
-    act: 'dashboard',
-    hint: '版本链在复核工作台内查看（按评价进入）'
+    kind: 'route',
+    to: '/review',
+    hint: '版本链在评价复核工作台内查看'
   },
-  'report:view': { kind: 'action', act: 'dashboard', hint: '打开报表驾驶舱' },
+  'report:view': { kind: 'action', act: 'dashboard', hint: '打开报表驾驶舱（新窗口）' },
   'report:view:student': {
     kind: 'route',
     to: '/',
-    hint: '首页统计卡展示本人报表数据（提交/出分/待批阅）'
+    hint: '工作台统计卡展示本人报表数据（提交/出分/待批阅）'
   },
-  'report:view:teacher': { kind: 'action', act: 'dashboard', hint: '打开教师聚合驾驶舱' },
-  'report:refresh': { kind: 'action', act: 'dashboard', hint: '首页页头「刷新报表缓存」按钮' },
+  'report:view:teacher': { kind: 'action', act: 'dashboard', hint: '打开教师聚合驾驶舱（新窗口）' },
+  'report:refresh': { kind: 'action', act: 'dashboard', hint: '工作台页头「刷新报表缓存」按钮' },
   'report:export': { kind: 'reserved', hint: '导出端点预留，M3 报表导出规划' },
+  'user:manage': { kind: 'reserved', hint: '用户管理端点为 M3 管理端规划' },
   'class:manage': { kind: 'reserved', hint: '班级管理端点预留，M3 规划' },
   'role:manage': { kind: 'reserved', hint: '管理端预留，M3 规划' },
   'system:config': { kind: 'reserved', hint: '管理端预留，M3 规划' },

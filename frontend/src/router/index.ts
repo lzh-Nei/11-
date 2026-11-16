@@ -3,10 +3,12 @@ import { useAuthStore } from '@/stores/auth'
 import LoginView from '@/views/LoginView.vue'
 import RegisterView from '@/views/RegisterView.vue'
 import ForgotPasswordView from '@/views/ForgotPasswordView.vue'
-import HomeView from '@/views/HomeView.vue'
+import AppLayout from '@/components/layout/AppLayout.vue'
+import DashboardView from '@/views/DashboardView.vue'
 import StudentTasks from '@/views/StudentTasks.vue'
 import StudentSubmit from '@/views/StudentSubmit.vue'
 import StudentSubmissions from '@/views/StudentSubmissions.vue'
+import MyEvaluationsView from '@/views/MyEvaluationsView.vue'
 import EvaluationReport from '@/views/EvaluationReport.vue'
 
 const router = createRouter({
@@ -28,32 +30,73 @@ const router = createRouter({
       component: () => import('@/views/StyleGuideView.vue'),
       meta: { public: true }
     },
-    { path: '/', name: 'home', component: HomeView },
-    // M1 学生链路页（W7-C1）：任务列表 → 提交作业 → 提交记录
-    { path: '/tasks', name: 'student-tasks', component: StudentTasks },
-    { path: '/tasks/:id/submit', name: 'student-submit', component: StudentSubmit },
-    { path: '/submissions', name: 'student-submissions', component: StudentSubmissions },
-    // M1 演示终点画面（W7-C2 UC-21）：AI评价报告
-    { path: '/evaluations/:id', name: 'evaluation-report', component: EvaluationReport },
-    // WP8-B3 教师工作台落位（Evaluate/Check 占位启用；页面内自校 TEACHER 权限）
-    { path: '/tasks/manage', name: 'teacher-tasks', component: () => import('@/views/Check.vue') },
+
+    /* ══════════ 应用外壳（WP8-C1）：左侧模块导航 + 右侧模块页面
+       下钻页（提交作业/评价报告/复核台）同样挂在外壳下，新窗口打开时保持左右布局 ══════════ */
     {
-      path: '/evaluations/:id/review',
-      name: 'teacher-review',
-      component: () => import('@/views/Evaluate.vue')
+      path: '/',
+      component: AppLayout,
+      children: [
+        { path: '', name: 'dashboard', component: DashboardView },
+        {
+          path: 'tasks',
+          name: 'student-tasks',
+          component: StudentTasks,
+          meta: { roles: ['STUDENT'] }
+        },
+        {
+          path: 'tasks/manage',
+          name: 'teacher-tasks',
+          component: () => import('@/views/Check.vue'),
+          meta: { roles: ['TEACHER', 'ADMIN'] }
+        },
+        {
+          path: 'tasks/:id/submit',
+          name: 'student-submit',
+          component: StudentSubmit,
+          meta: { roles: ['STUDENT'] }
+        },
+        {
+          path: 'submissions',
+          name: 'student-submissions',
+          component: StudentSubmissions,
+          meta: { roles: ['STUDENT'] }
+        },
+        {
+          path: 'my-evaluations',
+          name: 'my-evaluations',
+          component: MyEvaluationsView,
+          meta: { roles: ['STUDENT'] }
+        },
+        { path: 'evaluations/:id', name: 'evaluation-report', component: EvaluationReport },
+        {
+          path: 'review',
+          name: 'review-hub',
+          component: () => import('@/views/ReviewHubView.vue'),
+          meta: { roles: ['TEACHER', 'ADMIN'] }
+        },
+        {
+          path: 'evaluations/:id/review',
+          name: 'teacher-review',
+          component: () => import('@/views/Evaluate.vue'),
+          meta: { roles: ['TEACHER', 'ADMIN'] }
+        },
+        { path: 'files', name: 'file-center', component: () => import('@/views/FileCenterView.vue') },
+        { path: 'account', name: 'account', component: () => import('@/views/AccountView.vue') },
+        {
+          path: 'change-password',
+          name: 'change-password',
+          component: () => import('@/views/ChangePasswordView.vue')
+        },
+        {
+          path: 'system',
+          name: 'system-admin',
+          component: () => import('@/views/SystemAdminView.vue'),
+          meta: { roles: ['ADMIN'] }
+        }
+      ]
     },
-    // WP8-B6 文件中心：分片上传产物清单 + 流式直下（/api/files + /api/download/{id}）
-    {
-      path: '/files',
-      name: 'file-center',
-      component: () => import('@/views/FileCenterView.vue')
-    },
-    // WP8-B8 登录后自助改密（UC-07：A-06 邮箱码 → A-10 重置，成功清态回登录）
-    {
-      path: '/change-password',
-      name: 'change-password',
-      component: () => import('@/views/ChangePasswordView.vue')
-    },
+
     // WP8-B6 全局错误页（#02）：403/500 直达 + history 兜底 404
     {
       path: '/403',
@@ -106,6 +149,12 @@ router.beforeEach(async (to) => {
     }
   }
   if (to.path === '/login' && auth.accessToken) return { path: '/' }
+  // 模块级角色门控（权限矩阵之外的角色硬边界，越权→403 页）
+  const roles = to.meta.roles as string[] | undefined
+  if (roles?.length && auth.me) {
+    const mine = auth.me.roles ?? []
+    if (!roles.some((r) => mine.includes(r))) return { path: '/403' }
+  }
   return true
 })
 

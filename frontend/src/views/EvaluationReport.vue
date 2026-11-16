@@ -1,7 +1,7 @@
 <template>
   <PageShell :width="860">
     <PageHeader title="评价报告" :subtitle="`UC-21 · 评价 #${route.params.id}（E-01 当前值）`">
-      <el-button @click="router.back()">返回</el-button>
+      <el-button size="small" :loading="loading" @click="load">刷新</el-button>
     </PageHeader>
 
     <AppSkeleton v-if="loading && !evaluation" :rows="3" :row-height="80" />
@@ -67,7 +67,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { evaluationApi, type EvaluationVO } from '@/api/evaluation'
 import { formatDateTime, maskId } from '@/utils/format'
 import { useAuthStore } from '@/stores/auth'
@@ -84,7 +84,6 @@ import ReportDownloadButton from '@/components/business/ReportDownloadButton.vue
 import EvaluationHistoryPanel from '@/components/business/EvaluationHistoryPanel.vue'
 
 const route = useRoute()
-const router = useRouter()
 const auth = useAuthStore()
 const loading = ref(false)
 const error = ref<string | null>(null)

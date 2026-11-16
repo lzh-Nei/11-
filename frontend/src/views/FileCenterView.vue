@@ -3,7 +3,6 @@
        数据真身：GET /api/files（FileController） → GET /api/download/{id}（DownloadController） -->
   <PageShell>
     <PageHeader title="文件中心" subtitle="分片上传产物 · 流式下载（支持 HTTP Range 断点续传）">
-      <el-button size="small" @click="router.push('/')">返回首页</el-button>
       <el-button size="small" :loading="loading" @click="load">刷新清单</el-button>
     </PageHeader>
 

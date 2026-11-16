@@ -2,9 +2,7 @@
   <!-- 登录后自助改密（UC-07）：复用邮箱验证码通道（A-06 scene=RESET_PASSWORD → A-10 重置）
        成功即作废该用户全部 RT（S-10），前端同步清态回登录页 -->
   <PageShell :width="860">
-    <PageHeader title="修改密码" subtitle="账号安全 · 邮箱验证码校验（A-06 / A-10，成功需重新登录）">
-      <el-button @click="router.push('/')">返回首页</el-button>
-    </PageHeader>
+    <PageHeader title="修改密码" subtitle="账号安全 · 邮箱验证码校验（A-06 / A-10，成功需重新登录）" />
 
     <el-alert
       v-if="!emailBound"

@@ -1,7 +1,7 @@
 <template>
   <PageShell :width="860">
     <PageHeader title="提交作业" :subtitle="`UC-16 · 任务 #${taskId}（S-01 multipart 直传）`">
-      <el-button @click="router.push('/tasks')">返回任务列表</el-button>
+      <el-button @click="router.push('/tasks')">返回任务中心</el-button>
     </PageHeader>
 
     <AppSkeleton v-if="loading" :rows="2" :row-height="70" />

@@ -1,7 +1,7 @@
 <template>
   <PageShell>
-    <PageHeader title="提交记录" subtitle="学生视角：本人全部提交（S-02 服务端过滤 + S-03 详情）">
-      <el-button @click="router.push('/')">返回首页</el-button>
+    <PageHeader title="提交档案" subtitle="学生视角：本人全部提交（S-02 服务端过滤 + S-03 详情）">
+      <el-button size="small" :loading="loading" @click="load">刷新</el-button>
     </PageHeader>
 
     <DataTableShell
@@ -45,9 +45,9 @@
               text
               type="success"
               :disabled="!row.evaluationId"
-              @click="router.push(`/evaluations/${row.evaluationId}`)"
+              @click="openReport(row.evaluationId)"
             >
-              评价报告
+              评价报告 ↗
             </el-button>
           </template>
         </el-table-column>
@@ -83,14 +83,14 @@
         >
           下载原件（签名URL 5分钟有效）
         </el-button>
-        <!-- UC-21（W7-C2）：评价报告跳转（FAILED 展示 40003 提示） -->
+        <!-- UC-21（W7-C2）：评价报告下钻页（新窗口，保留左右模块布局） -->
         <el-button
           type="success"
           size="small"
           :disabled="!detail?.evaluationId"
-          @click="router.push(`/evaluations/${detail!.evaluationId}`)"
+          @click="openReport(detail!.evaluationId)"
         >
-          查看评价报告
+          查看评价报告 ↗
         </el-button>
       </div>
 
@@ -98,9 +98,7 @@
       <section v-if="detail?.evaluationId" class="eval-block">
         <div class="eval-head">
           <h4>评价结果（E-01 · 当前生效）</h4>
-          <el-button link type="primary" @click="router.push(`/evaluations/${detail.evaluationId}`)">
-            完整报告 →
-          </el-button>
+          <el-button link type="primary" @click="openReport(detail.evaluationId)"> 完整报告 ↗ </el-button>
         </div>
         <AppSkeleton v-if="evalLoading" :rows="2" :row-height="56" />
         <ErrorState v-else-if="evalError" title="评价加载失败" :message="evalError" :retryable="false" />
@@ -138,6 +136,7 @@ import { submissionApi, type SubmissionMine, type SubmissionDetail } from '@/api
 import { evaluationApi, type EvaluationVO } from '@/api/evaluation'
 import { formatDateTime } from '@/utils/format'
 import { toast } from '@/utils/toast'
+import { openWindow } from '@/utils/window'
 import PageShell from '@/components/ui/PageShell.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import DataTableShell from '@/components/ui/DataTableShell.vue'
@@ -188,6 +187,12 @@ async function loadEvaluation(evaluationId: number | null) {
 function download(url: string) {
   // S-04：浏览器直接跳 302 签名URL（MinIO 私有桶直连）
   window.open(url, '_blank')
+}
+
+/** 评价报告为下钻页：新窗口打开（同一左右布局外壳） */
+function openReport(evaluationId: number | null) {
+  if (!evaluationId) return
+  openWindow(`/evaluations/${evaluationId}`)
 }
 
 async function load() {

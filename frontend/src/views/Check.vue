@@ -1,8 +1,6 @@
 <template>
   <PageShell>
-    <PageHeader title="任务管理" subtitle="教师视角：创建 / 发布 / 全状态跟踪（T-01/T-03，复核域 W8）">
-      <el-button @click="router.push('/')">返回首页</el-button>
-    </PageHeader>
+    <PageHeader title="任务管理" subtitle="教师视角：创建 / 发布 / 全状态跟踪（T-01/T-03，复核域 W8）" />
 
     <el-alert
       title="发布不可逆：DRAFT → PUBLISHED 后指标集与截止时间锁定，学生立即可见"
@@ -114,7 +112,6 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
 import { taskApi, type TaskInfo, type TaskCreatePayload } from '@/api/task'
 import { toast } from '@/utils/toast'
 import PageShell from '@/components/ui/PageShell.vue'
@@ -127,7 +124,6 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import ConfirmAction from '@/components/ui/ConfirmAction.vue'
 import { ElMessageBox } from 'element-plus'
 
-const router = useRouter()
 const loading = ref(false)
 const error = ref<string | null>(null)
 const tasks = ref<TaskInfo[]>([])

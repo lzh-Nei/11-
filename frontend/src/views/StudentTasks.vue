@@ -1,7 +1,7 @@
 <template>
   <PageShell>
-    <PageHeader title="我的任务" subtitle="学生视角：本班已发布任务（GET /api/tasks）">
-      <el-button @click="router.push('/')">返回首页</el-button>
+    <PageHeader title="任务中心" subtitle="学生视角：本班已发布任务（GET /api/tasks）">
+      <el-button size="small" :loading="loading" @click="load">刷新</el-button>
     </PageHeader>
 
     <TaskFilterBar v-model="filter" class="filter-row" @update:model-value="reload" />
@@ -10,14 +10,14 @@
     <ErrorState v-else-if="error" :message="error" @retry="load" />
     <EmptyState v-else-if="!tasks.length" description="暂无已发布任务——教师发布后这里会亮起来" />
     <div v-else class="card-list">
-      <TaskCard v-for="t in tasks" :key="t.id" :task="t" @open="router.push(`/tasks/${t.id}/submit`)">
+      <TaskCard v-for="t in tasks" :key="t.id" :task="t" @open="openSubmit(t.id)">
         <el-button
           type="primary"
           size="small"
           :disabled="isOverdue(t) || t.status === 'CLOSED'"
-          @click="router.push(`/tasks/${t.id}/submit`)"
+          @click="openSubmit(t.id)"
         >
-          提交作业
+          提交作业 ↗
         </el-button>
       </TaskCard>
     </div>
@@ -36,8 +36,8 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
 import { taskApi, type TaskInfo } from '@/api/task'
+import { openWindow } from '@/utils/window'
 import PageShell from '@/components/ui/PageShell.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import TaskCard from '@/components/ui/TaskCard.vue'
@@ -46,7 +46,6 @@ import AppSkeleton from '@/components/ui/AppSkeleton.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 
-const router = useRouter()
 const loading = ref(false)
 const error = ref<string | null>(null)
 const tasks = ref<TaskInfo[]>([])
@@ -62,6 +61,11 @@ function isOverdue(t: TaskInfo) {
 function reload() {
   page.value = 1
   load()
+}
+
+/** 提交作业为下钻页：新窗口打开，保持左右模块布局 */
+function openSubmit(taskId: number) {
+  openWindow(`/tasks/${taskId}/submit`)
 }
 
 async function load() {
