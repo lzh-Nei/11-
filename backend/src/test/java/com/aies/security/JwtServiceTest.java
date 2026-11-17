@@ -73,9 +73,10 @@ class JwtServiceTest {
     @Test
     void tamperedTokenRejected() {
         JwtService.TokenPair pair = jwtService.issueTokens(3L, "STUDENT");
-        String token = pair.accessToken();
-        char last = token.charAt(token.length() - 1);
-        String tampered = token.substring(0, token.length() - 1) + (last == 'a' ? 'b' : 'a');
+        String[] parts = pair.accessToken().split("\\.");
+        char first = parts[1].charAt(0);
+        parts[1] = (first == 'a' ? 'b' : 'a') + parts[1].substring(1);
+        String tampered = String.join(".", parts);
 
         assertThatThrownBy(() -> jwtService.parseAccessToken(tampered))
                 .isInstanceOfSatisfying(BusinessException.class,

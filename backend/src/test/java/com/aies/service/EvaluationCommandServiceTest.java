@@ -65,7 +65,8 @@ class EvaluationCommandServiceTest {
         service = new EvaluationCommandService(evaluationResultMapper, evaluationHistoryMapper,
                 mock(EvaluationAppealMapper.class), submissionMapper, taskMapper, taskService,
                 auditLogMapper, rabbitTemplate, new ObjectMapper(),
-                mock(org.springframework.context.ApplicationEventPublisher.class));
+                mock(org.springframework.context.ApplicationEventPublisher.class),
+                mock(com.aies.realtime.RealtimeNotifier.class));
     }
 
     private LoginPrincipal principal(long userId, String role) {

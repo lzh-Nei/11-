@@ -177,11 +177,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import { submissionApi, type SubmissionMine, type SubmissionDetail } from '@/api/submission'
 import { evaluationApi, type EvaluationVO } from '@/api/evaluation'
+import { useAuthStore } from '@/stores/auth'
+import { onRealtimeEvent } from '@/utils/realtime'
 import { formatDateTime } from '@/utils/format'
 import { saveBlob } from '@/utils/file'
 import { toast } from '@/utils/toast'
@@ -200,6 +202,7 @@ import SuggestionList from '@/components/ui/SuggestionList.vue'
 withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 
 const router = useRouter()
+const auth = useAuthStore()
 const loading = ref(false)
 const error = ref<string | null>(null)
 const rows = ref<SubmissionMine[]>([])
@@ -348,7 +351,18 @@ async function appealEvaluation() {
     toast.error((e as { message?: string })?.message || '申诉提交失败', '请稍后重试')
   }
 }
+const unsubscribeRealtime = onRealtimeEvent((event) => {
+  if (event.type !== 'evaluation.updated') return
+  const data = (event.data ?? {}) as { studentId?: number; evaluationId?: number }
+  if (data.studentId !== auth.me?.id) return
+  void load()
+  if (evaluation.value && data.evaluationId === evaluation.value.id) {
+    void loadEvaluation(data.evaluationId)
+  }
+})
+
 onMounted(load)
+onBeforeUnmount(unsubscribeRealtime)
 </script>
 
 <style scoped>

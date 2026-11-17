@@ -4,6 +4,13 @@
     <div class="meta">
       <b>{{ auth.me?.realName || auth.me?.username || '用户' }}</b>
       <span>{{ roleLabel }} · {{ auth.me?.username }}</span>
+      <span
+        class="rt-state"
+        :class="{ on: realtimeConnected }"
+        :title="realtimeConnected ? '实时通知已连接' : '实时通知重连中'"
+      >
+        <i></i>{{ realtimeConnected ? '实时在线' : '重连中' }}
+      </span>
     </div>
     <button type="button" class="logout" title="退出登录" @click="onLogout">退出</button>
   </div>
@@ -13,6 +20,7 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { realtimeConnected } from '@/utils/realtime'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -67,6 +75,27 @@ async function onLogout() {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.rt-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px !important;
+  color: #b45309 !important;
+}
+.rt-state i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #b45309;
+  flex: none;
+}
+.rt-state.on {
+  color: #15803d !important;
+}
+.rt-state.on i {
+  background: #15803d;
+  box-shadow: 0 0 0 2px rgba(21, 128, 61, 0.12);
 }
 .logout {
   border: 1px solid var(--aies-border);

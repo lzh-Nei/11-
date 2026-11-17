@@ -46,7 +46,7 @@ class EvaluationWorkerTest {
         evaluationService = mock(EvaluationService.class);
         traceRecorder = mock(TraceRecorder.class);
         worker = new EvaluationWorker(submissionMapper, evaluationResultMapper,
-                evaluationService, traceRecorder);
+                evaluationService, traceRecorder, mock(com.aies.realtime.RealtimeNotifier.class));
         when(evaluationResultMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
     }
 

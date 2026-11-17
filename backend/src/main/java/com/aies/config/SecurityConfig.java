@@ -46,7 +46,9 @@ public class SecurityConfig {
             "/api/auth/register",
             "/api/auth/password/**",
             "/api/health",
-            "/actuator/health"
+            "/actuator/health",
+            // WebSocket 握手在 handler 内校验 JWT（浏览器无法设置 Authorization 头）
+            "/ws/**"
     };
 
     @Bean

@@ -163,7 +163,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { adminApi, type AdminClass } from '@/api/admin'
 import {
@@ -171,6 +171,7 @@ import {
   type TeacherWorkflowRow
 } from '@/api/teacherWorkflow'
 import { useAuthStore } from '@/stores/auth'
+import { onRealtimeEvent } from '@/utils/realtime'
 import { formatDateTime } from '@/utils/format'
 import { toast } from '@/utils/toast'
 import DataTableShell from '@/components/ui/DataTableShell.vue'
@@ -291,10 +292,20 @@ function openHistory(row: TeacherWorkflowRow) {
   selectedRow.value = row
 }
 
+const unsubscribeRealtime = onRealtimeEvent((event) => {
+  if (event.type !== 'evaluation.updated') return
+  const data = (event.data ?? {}) as { teacherId?: number }
+  if (data.teacherId === auth.me?.id) {
+    void load()
+  }
+})
+
 onMounted(async () => {
   await loadClasses()
   await load()
 })
+
+onBeforeUnmount(unsubscribeRealtime)
 </script>
 
 <style scoped>

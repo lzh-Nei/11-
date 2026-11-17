@@ -8,6 +8,7 @@ import com.aies.mapper.EvaluationResultMapper;
 import com.aies.mapper.SubmissionMapper;
 import com.aies.model.EvalMessage;
 import com.aies.model.EvaluationOutcome;
+import com.aies.realtime.RealtimeNotifier;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +36,7 @@ public class EvaluationWorker {
     private final EvaluationResultMapper evaluationResultMapper;
     private final EvaluationService evaluationService;
     private final TraceRecorder traceRecorder;
+    private final RealtimeNotifier realtimeNotifier;
 
     @RabbitListener(queues = RabbitConfig.EVAL_QUEUE)
     public void onMessage(EvalMessage message) {
@@ -64,6 +66,7 @@ public class EvaluationWorker {
         EvaluationOutcome outcome;
         PromptTemplate template;
         String digest;
+        EvaluationResult saved;
         try {
             template = evaluationService.loadTemplate();
             if (template == null) {
@@ -83,7 +86,7 @@ public class EvaluationWorker {
                 outcome = evaluationService.runPipeline(prep);
             }
             // 事务双写（外部调用经代理保事务）；异常外抛→不requeue，留PENDING可恢复
-            evaluationService.persistEvaluation(submissionId, traceId, outcome,
+            saved = evaluationService.persistEvaluation(submissionId, traceId, outcome,
                     EvaluationService.SOURCE_AI_INITIAL);
         } catch (RuntimeException e) {
             // 前置失败（llm_config缺失/文本读取失败等）：收敛FAILED落库（40003），不让毒消息死循环
@@ -92,9 +95,10 @@ public class EvaluationWorker {
             traceId = java.util.UUID.randomUUID().toString().replace("-", "");
             template = null;
             digest = "";
-            evaluationService.persistEvaluation(submissionId, traceId, outcome,
+            saved = evaluationService.persistEvaluation(submissionId, traceId, outcome,
                     EvaluationService.SOURCE_AI_INITIAL);
         }
+        realtimeNotifier.notifyEvaluation(submission, saved, EvaluationService.SOURCE_AI_INITIAL);
         // 步骤6：留痕写冷桶（独立于事务——persistEvaluation 事务已提交，R2红线达成）
         traceRecorder.record(traceId, template, outcome, digest);
     }

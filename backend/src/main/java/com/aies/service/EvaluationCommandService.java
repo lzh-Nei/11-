@@ -19,6 +19,7 @@ import com.aies.mapper.EvaluationResultMapper;
 import com.aies.mapper.SubmissionMapper;
 import com.aies.mapper.TaskMapper;
 import com.aies.model.EvalMessage;
+import com.aies.realtime.RealtimeNotifier;
 import com.aies.security.LoginPrincipal;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -74,6 +75,7 @@ public class EvaluationCommandService {
     private final RabbitTemplate rabbitTemplate;
     private final ObjectMapper objectMapper;
     private final org.springframework.context.ApplicationEventPublisher eventPublisher;
+    private final RealtimeNotifier realtimeNotifier;
 
     /** E-02 教师复核改分（UC-22：前置AI_DONE；同事务history新版本+result当前值更新） */
     @Transactional
@@ -114,19 +116,22 @@ public class EvaluationCommandService {
                 || EvaluationService.STATUS_REVIEWED.equals(existing.getStatus()))) {
             throw new BusinessException(ErrorCode.PARAM_ERROR, "该提交已完成 AI 评价，无需重复发起");
         }
+        EvaluationResult result;
         if (existing == null) {
-            EvaluationResult result = new EvaluationResult();
+            result = new EvaluationResult();
             result.setSubmissionId(submissionId);
             result.setStatus(EvaluationService.STATUS_PENDING);
             result.setCurrentVersionNo(1);
             result.setUpdateTime(LocalDateTime.now());
             evaluationResultMapper.insert(result);
         } else {
-            existing.setStatus(EvaluationService.STATUS_PENDING);
-            existing.setErrorCode(null);
-            existing.setUpdateTime(LocalDateTime.now());
-            evaluationResultMapper.updateById(existing);
+            result = existing;
+            result.setStatus(EvaluationService.STATUS_PENDING);
+            result.setErrorCode(null);
+            result.setUpdateTime(LocalDateTime.now());
+            evaluationResultMapper.updateById(result);
         }
+        realtimeNotifier.notifyEvaluation(submission, result, EvaluationService.SOURCE_AI_INITIAL);
         sendEvalMessageAfterCommit(submissionId);
     }
 
@@ -178,6 +183,7 @@ public class EvaluationCommandService {
         if (evaluationResultMapper.updateById(result) == 0) {
             throw new BusinessException(ErrorCode.PARAM_ERROR, "重评并发冲突，请刷新后重试");
         }
+        realtimeNotifier.notifyEvaluation(ctx.submission(), result, "RE_EVALUATE");
         auditReEvaluate(evaluationId, result.getSubmissionId(), principal);
         sendEvalMessageAfterCommit(result.getSubmissionId());
         // 报表缓存主动失效（D-36：重评会改变分差分布/均分，教师与学生 scope 双失效）
@@ -232,6 +238,7 @@ public class EvaluationCommandService {
         history.setReviewerId(principal.userId());
         evaluationHistoryMapper.insert(history);
         resolveAppeal(evaluationId, principal);
+        realtimeNotifier.notifyEvaluation(ctx.submission(), result, SOURCE_TEACHER_REVIEW);
         log.info("复核完成: evaluationId={} version={} total={} reviewer={}",
                 evaluationId, nextVersion, total, principal.userId());
         // 报表缓存主动失效（D-36：事件经 common 解耦，报表侧 AFTER_COMMIT 监听；review/manualScore 共用本尾部）

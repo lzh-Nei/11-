@@ -70,6 +70,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { evaluationApi, type EvaluationVO } from '@/api/evaluation'
 import { formatDateTime } from '@/utils/format'
+import { onRealtimeEvent } from '@/utils/realtime'
 import { useAuthStore } from '@/stores/auth'
 import PageShell from '@/components/ui/PageShell.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
@@ -121,8 +122,17 @@ async function load() {
     loading.value = false
   }
 }
+const unsubscribeRealtime = onRealtimeEvent((event) => {
+  if (event.type !== 'evaluation.updated') return
+  const data = (event.data ?? {}) as { evaluationId?: number }
+  if (data.evaluationId === Number(route.params.id)) {
+    void load()
+  }
+})
+
 onMounted(load)
 onBeforeUnmount(() => {
+  unsubscribeRealtime()
   if (timer !== undefined) window.clearInterval(timer)
 })
 </script>
