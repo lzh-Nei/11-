@@ -1,18 +1,25 @@
 import { defineStore } from 'pinia'
 import { authApi, type LoginResult, type MeInfo } from '@/api/auth'
+import {
+  clearLegacyTokens,
+  clearSessionTokens,
+  getSessionTokens,
+  writeSessionTokens
+} from '@/utils/authSession'
 
-const AT_KEY = 'aies_at'
-const RT_KEY = 'aies_rt'
-
-/** 登录闭环的客户端状态：双token + /me 装载的用户/角色/权限 + 30010 冷却 */
+/** 登录闭环的客户端状态：双token + /me 装载的用户/角色/权限 + 30010 冷却
+ *  token 存 sessionStorage：每个标签页一个独立会话，多用户同时登录互不覆盖。 */
 export const useAuthStore = defineStore('auth', {
-  state: () => ({
-    accessToken: localStorage.getItem(AT_KEY) || '',
-    refreshToken: localStorage.getItem(RT_KEY) || '',
-    me: null as MeInfo | null,
-    firstLogin: false,
-    cooldownUntil: 0
-  }),
+  state: () => {
+    const { accessToken, refreshToken } = getSessionTokens()
+    return {
+      accessToken,
+      refreshToken,
+      me: null as MeInfo | null,
+      firstLogin: false,
+      cooldownUntil: 0
+    }
+  },
   getters: {
     role: (s) => s.me?.roles?.[0] ?? '',
     cooldownSeconds: (s) => Math.max(0, Math.ceil((s.cooldownUntil - Date.now()) / 1000))
@@ -22,8 +29,7 @@ export const useAuthStore = defineStore('auth', {
       this.accessToken = result.accessToken
       this.refreshToken = result.refreshToken
       this.firstLogin = result.firstLogin
-      localStorage.setItem(AT_KEY, result.accessToken)
-      localStorage.setItem(RT_KEY, result.refreshToken)
+      writeSessionTokens(result.accessToken, result.refreshToken)
     },
     async loadMe() {
       this.me = await authApi.me()
@@ -47,8 +53,9 @@ export const useAuthStore = defineStore('auth', {
       this.refreshToken = ''
       this.me = null
       this.firstLogin = false
-      localStorage.removeItem(AT_KEY)
-      localStorage.removeItem(RT_KEY)
+      clearSessionTokens()
+      // 兼容旧版本遗留的全局 token
+      clearLegacyTokens()
     }
   }
 })
