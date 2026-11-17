@@ -5,6 +5,7 @@ import com.aies.entity.User;
 import com.aies.mapper.RbacMapper;
 import com.aies.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.Collections;
@@ -19,6 +20,7 @@ import java.util.List;
  * 权限变更经 Redis 广播即时生效——不再使用代码内硬编码映射。</p>
  */
 @Component
+@ConditionalOnProperty(name = "sa-token.experiment.enabled", havingValue = "true")
 @RequiredArgsConstructor
 public class StpInterfaceImpl implements StpInterface {
 

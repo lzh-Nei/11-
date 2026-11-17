@@ -214,6 +214,7 @@ class EvaluationServiceTest {
 
         assertThat(saved.getStatus()).isEqualTo("AI_DONE");
         assertThat(saved.getCurrentVersionNo()).isEqualTo(1);
+        assertThat(saved.getUpdateTime()).isNotNull();
         ArgumentCaptor<EvaluationResult> resultCap = ArgumentCaptor.forClass(EvaluationResult.class);
         verify(evaluationResultMapper).insert(resultCap.capture());
         ArgumentCaptor<EvaluationHistory> histCap = ArgumentCaptor.forClass(EvaluationHistory.class);
@@ -234,6 +235,7 @@ class EvaluationServiceTest {
 
         assertThat(saved.getStatus()).isEqualTo("FAILED");
         assertThat(saved.getErrorCode()).isEqualTo(40003);
+        assertThat(saved.getUpdateTime()).isNotNull();
         verify(evaluationResultMapper).insert(saved);
         verify(evaluationHistoryMapper, never()).insert(any(EvaluationHistory.class));
     }

@@ -78,6 +78,7 @@ import LlmConfigPanel from '@/components/admin/LlmConfigPanel.vue'
 import PromptPanel from '@/components/admin/PromptPanel.vue'
 import GoldenPanel from '@/components/admin/GoldenPanel.vue'
 import ConfigPanel from '@/components/admin/ConfigPanel.vue'
+import MqMonitorPanel from '@/components/admin/MqMonitorPanel.vue'
 
 interface ModuleChild {
   key: string
@@ -244,6 +245,7 @@ const adminGroups: ModuleGroup[] = [
     icon: 'system',
     children: [
       { key: 'audit', label: '审计日志', icon: 'archive', component: AuditLogsPanel },
+      { key: 'mq', label: '消息队列', icon: 'chart', component: MqMonitorPanel },
       { key: 'config', label: '系统配置', icon: 'system', component: ConfigPanel }
     ]
   }

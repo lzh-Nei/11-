@@ -73,6 +73,12 @@ mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
 
+sa-token:
+  experiment:
+    # Sa-Token 试写代码默认关闭：运行期认证仍由 Spring Security/JWT 负责。
+    # 仅在需要对比学习时置为 true 才会装配 SaTokenConfigure 与 StpInterfaceImpl。
+    enabled: false
+
 jwt:
   # HS512密钥：≥64字节，.env注入（S-14密钥零明文）；缺失时启动即失败（JwtService校验）
   secret: ${JWT_SECRET:}

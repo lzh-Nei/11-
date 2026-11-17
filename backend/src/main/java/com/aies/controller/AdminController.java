@@ -16,6 +16,7 @@ import com.aies.dto.admin.AdminDtos.CreateUserRequest;
 import com.aies.dto.admin.AdminDtos.GoldenSampleVO;
 import com.aies.dto.admin.AdminDtos.LlmConfigVO;
 import com.aies.dto.admin.AdminDtos.LlmTestResult;
+import com.aies.dto.admin.AdminDtos.MqMonitorVO;
 import com.aies.dto.admin.AdminDtos.PromptDetailVO;
 import com.aies.dto.admin.AdminDtos.PromptTemplateVO;
 import com.aies.dto.admin.AdminDtos.SystemConfigVO;
@@ -32,6 +33,7 @@ import com.aies.service.AdminEvaluationService;
 import com.aies.service.AdminRbacService;
 import com.aies.service.AdminSystemService;
 import com.aies.service.AdminUserService;
+import com.aies.service.MqMonitorService;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -70,6 +72,7 @@ public class AdminController {
     private final AdminAiService aiService;
     private final AdminSystemService systemService;
     private final AdminEvaluationService evaluationService;
+    private final MqMonitorService mqMonitorService;
 
     /* ==================== 用户管理（user:manage） ==================== */
 
@@ -213,6 +216,14 @@ public class AdminController {
     @GetMapping("/system/config")
     public Result<SystemConfigVO> systemConfig() {
         return Result.success(systemService.config());
+    }
+
+    /* ==================== 消息队列监控（system:config，只读） ==================== */
+
+    @PreAuthorize("hasAuthority('" + PermissionConstants.SYSTEM_CONFIG + "')")
+    @GetMapping("/mq/status")
+    public Result<MqMonitorVO> mqStatus() {
+        return Result.success(mqMonitorService.status());
     }
 
     /* ==================== LLM 参数（llm:config） ==================== */

@@ -95,6 +95,50 @@ export interface AdminSystemConfig {
   goldenActiveCount: number
 }
 
+/** 消息队列监控（管理端只读）：broker 水位 + 数据库侧流水 */
+export interface AdminMqQueue {
+  key: 'parse' | 'eval'
+  label: string
+  queueName: string
+  exchange: string
+  routingKey: string
+  available: boolean
+  readyMessages: number | null
+  consumers: number | null
+  error: string | null
+}
+
+export interface AdminMqStats {
+  parseQueued: number
+  parseSuccess: number
+  parseFailed: number
+  evaluationPending: number
+  evaluationAiDone: number
+  evaluationReviewed: number
+  evaluationFailed: number
+}
+
+export interface AdminMqEvent {
+  submissionId: number
+  fileName: string | null
+  studentName: string | null
+  taskTitle: string | null
+  parseStatus: string | null
+  evaluationStatus: string | null
+  totalScore: number | null
+  aiModel: string | null
+  updateTime: string | null
+}
+
+export interface AdminMqMonitor {
+  rabbitConnected: boolean
+  broker: string
+  sampledAt: string
+  queues: AdminMqQueue[]
+  stats: AdminMqStats
+  recentEvents: AdminMqEvent[]
+}
+
 export interface AdminLlmConfig {
   id: number
   provider: string
@@ -236,6 +280,11 @@ export const adminApi = {
   /* 系统配置（只读快照） */
   async systemConfig(): Promise<AdminSystemConfig> {
     return (await request.get('/admin/system/config')) as unknown as AdminSystemConfig
+  },
+
+  /* 消息队列监控（只读） */
+  async mqStatus(): Promise<AdminMqMonitor> {
+    return (await request.get('/admin/mq/status')) as unknown as AdminMqMonitor
   },
 
   /* 管理端评价列表（管理员查看教师评价/复核历史） */

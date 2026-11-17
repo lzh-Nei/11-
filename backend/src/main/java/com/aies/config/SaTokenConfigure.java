@@ -1,6 +1,7 @@
 package com.aies.config;
 
 import cn.dev33.satoken.interceptor.SaInterceptor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -17,6 +18,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  * {@code handle -> SaRouter.match("/api/**").notMatch("/api/auth/**").check(r -> StpUtil.checkLogin())}。</p>
  */
 @Configuration
+@ConditionalOnProperty(name = "sa-token.experiment.enabled", havingValue = "true")
 public class SaTokenConfigure implements WebMvcConfigurer {
 
     @Override

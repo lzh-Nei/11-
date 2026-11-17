@@ -93,6 +93,14 @@
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
 
+        <!-- Sa-Token 试写代码依赖：默认不启用（sa-token.experiment.enabled=false），
+             保留实验代码可编译，运行期认证仍走 Spring Security。 -->
+        <dependency>
+            <groupId>cn.dev33</groupId>
+            <artifactId>sa-token-spring-boot3-starter</artifactId>
+            <version>1.39.0</version>
+        </dependency>
+
         <!-- JWT签发与解析（AT）：jjwt 0.12.x；RT为随机串存Redis（03-04 §2.1） -->
         <dependency>
             <groupId>io.jsonwebtoken</groupId>

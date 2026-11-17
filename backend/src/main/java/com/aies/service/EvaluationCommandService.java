@@ -119,10 +119,12 @@ public class EvaluationCommandService {
             result.setSubmissionId(submissionId);
             result.setStatus(EvaluationService.STATUS_PENDING);
             result.setCurrentVersionNo(1);
+            result.setUpdateTime(LocalDateTime.now());
             evaluationResultMapper.insert(result);
         } else {
             existing.setStatus(EvaluationService.STATUS_PENDING);
             existing.setErrorCode(null);
+            existing.setUpdateTime(LocalDateTime.now());
             evaluationResultMapper.updateById(existing);
         }
         sendEvalMessageAfterCommit(submissionId);
@@ -172,6 +174,7 @@ public class EvaluationCommandService {
         // FAILED无history行：current_version_no原样保留（重评成功写v1）
         result.setStatus(EvaluationService.STATUS_PENDING);
         result.setErrorCode(null);
+        result.setUpdateTime(LocalDateTime.now());
         if (evaluationResultMapper.updateById(result) == 0) {
             throw new BusinessException(ErrorCode.PARAM_ERROR, "重评并发冲突，请刷新后重试");
         }
@@ -211,6 +214,7 @@ public class EvaluationCommandService {
         result.setMetricScores(serializeMetrics(cmd.getMetricScores()));
         result.setReviewerId(principal.userId());
         result.setReviewTime(LocalDateTime.now());
+        result.setUpdateTime(LocalDateTime.now());
         result.setCurrentVersionNo(nextVersion);
         if (evaluationResultMapper.updateById(result) == 0) {
             throw new BusinessException(ErrorCode.PARAM_ERROR, "复核并发冲突，请刷新后重试");

@@ -6,6 +6,7 @@ import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.QueueBuilder;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
+import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
@@ -38,6 +39,12 @@ public class RabbitConfig {
     public static final String EVAL_QUEUE = "aies.eval.queue";
     public static final String EVAL_EXCHANGE = "aies.eval.exchange";
     public static final String EVAL_ROUTING_KEY = "eval.submit";
+
+    /** 管理端 MQ 监控只读查询队列水位（getQueueInfo），不声明/不消费 */
+    @Bean
+    public RabbitAdmin rabbitAdmin(ConnectionFactory connectionFactory) {
+        return new RabbitAdmin(connectionFactory);
+    }
 
     @Bean
     public Queue parseQueue() {

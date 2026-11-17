@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -175,6 +176,7 @@ public class EvaluationService {
             result.setAiComment(null);
             result.setAiModel(outcome.modelVersion());
             result.setTraceId(traceId);
+            result.setUpdateTime(LocalDateTime.now());
             if (isNew) {
                 evaluationResultMapper.insert(result);
             } else {
@@ -191,6 +193,7 @@ public class EvaluationService {
         result.setAiModel(outcome.modelVersion());
         result.setTraceId(traceId);
         result.setCurrentVersionNo(versionNo);
+        result.setUpdateTime(LocalDateTime.now());
         if (isNew) {
             evaluationResultMapper.insert(result);
         } else {

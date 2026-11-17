@@ -146,6 +146,7 @@ services:
       MYSQL_USER: root
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?请在.env设置MYSQL_PASSWORD}
       REDIS_HOST: redis
+      TZ: Asia/Shanghai           # 业务时间统一东八区：LocalDateTime.now() 与 MySQL DEFAULT CURRENT_TIMESTAMP 对齐
       JAVA_OPTS: "-XX:+UseZGC"
       FILESTORE_BASEDIR: /data/storage   # filestore.base-dir：/app为ro挂载，存储走独立卷
       JWT_SECRET: ${JWT_SECRET:?请在.env设置JWT_SECRET}   # HS512≥64字节（S-14零明文）

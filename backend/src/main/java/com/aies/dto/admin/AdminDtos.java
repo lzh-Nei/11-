@@ -233,4 +233,29 @@ public final class AdminDtos {
                                  long emailExpireSeconds, long emailCooldownSeconds,
                                  String llmModel, Integer activePromptVersion, long goldenActiveCount) {
     }
+
+    /* ==================== 消息队列监控（system:config） ==================== */
+
+    /** 单个队列快照：available=false 时 error 说明原因（例如 broker 未连上） */
+    public record MqQueueVO(String key, String label, String queueName, String exchange,
+                            String routingKey, boolean available, Integer readyMessages,
+                            Integer consumers, String error) {
+    }
+
+    /** 解析/评价流水线计数（按数据库状态汇总，不读取消息体） */
+    public record MqStatsVO(long parseQueued, long parseSuccess, long parseFailed,
+                            long evaluationPending, long evaluationAiDone,
+                            long evaluationReviewed, long evaluationFailed) {
+    }
+
+    /** 最近一次异步处理事件（提交 → 解析 → 评价的合并视图） */
+    public record MqEventVO(Long submissionId, String fileName, String studentName, String taskTitle,
+                            String parseStatus, String evaluationStatus, BigDecimal totalScore,
+                            String aiModel, LocalDateTime updateTime) {
+    }
+
+    /** 管理端 MQ 监控快照：连接状态 + 队列水位 + 数据库侧流水 + 最近事件 */
+    public record MqMonitorVO(boolean rabbitConnected, String broker, LocalDateTime sampledAt,
+                              List<MqQueueVO> queues, MqStatsVO stats, List<MqEventVO> recentEvents) {
+    }
 }

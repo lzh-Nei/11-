@@ -154,6 +154,7 @@ class EvaluationCommandServiceTest {
 
         assertThat(vo.getStatus()).isEqualTo("REVIEWED");
         assertThat(vo.getCurrentVersionNo()).isEqualTo(2);
+        assertThat(vo.getUpdateTime()).isNotNull();
         assertThat(vo.getTotalScore()).isEqualByComparingTo("80");
         ArgumentCaptor<EvaluationHistory> captor = ArgumentCaptor.forClass(EvaluationHistory.class);
         verify(evaluationHistoryMapper).insert(captor.capture());
