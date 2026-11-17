@@ -4,7 +4,12 @@
       <el-button size="small" :loading="loading" @click="load">刷新</el-button>
     </PageHeader>
 
-    <TaskFilterBar v-model="filter" class="filter-row" @update:model-value="reload" />
+    <TaskFilterBar
+      v-model="filter"
+      :options="filterOptions"
+      class="filter-row"
+      @update:model-value="reload"
+    />
 
     <AppSkeleton v-if="loading" :rows="3" :row-height="110" class="mt" />
     <ErrorState v-else-if="error" :message="error" @retry="load" />
@@ -40,6 +45,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { taskApi, type TaskInfo } from '@/api/task'
+import { statusMeta } from '@/constants/status'
 import { openWindow } from '@/utils/window'
 import PageShell from '@/components/ui/PageShell.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
@@ -59,6 +65,11 @@ const page = ref(1)
 const size = 10
 const total = ref(0)
 const filter = ref('PUBLISHED')
+const filterOptions = [
+  { value: '', label: '全部' },
+  { value: 'PUBLISHED', label: statusMeta('PUBLISHED').label },
+  { value: 'CLOSED', label: statusMeta('CLOSED').label }
+]
 
 function isOverdue(t: TaskInfo) {
   return t.status === 'CLOSED' || new Date(t.deadline).getTime() < Date.now()

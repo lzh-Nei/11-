@@ -117,6 +117,8 @@ filestorage:
   # 对象存储模式：minio（dev容器/生产，swe-hot真实落桶，D-23）/ local（无容器兜底+单测）
   mode: ${FILESTORE_MODE:local}
   endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+  # 浏览器可访问地址：签名URL必须用公网/宿主地址，容器内 minio:9000 浏览器无法解析
+  public-endpoint: ${MINIO_PUBLIC_ENDPOINT:}
   access-key: ${MINIO_ACCESS_KEY:minioadmin}
   secret-key: ${MINIO_SECRET_KEY:}
   bucket-hot: swe-hot

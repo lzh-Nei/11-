@@ -156,6 +156,7 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       FILESTORE_MODE: minio                # D-23兑现（W7-C1）：swe-hot真实落桶
       MINIO_ENDPOINT: http://minio:9000    # 容器内网络直连
+      MINIO_PUBLIC_ENDPOINT: http://localhost:9000  # 浏览器签名URL用宿主映射端口
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?请在.env设置MINIO_ROOT_PASSWORD}
       RABBITMQ_HOST: rabbitmq              # UC-16解析异步链（W7-C1）

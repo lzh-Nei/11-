@@ -18,6 +18,9 @@ public class FileStorageProperties {
     /** MinIO endpoint（如 http://minio:9000，容器内网络） */
     private String endpoint = "http://localhost:9000";
 
+    /** 浏览器可访问的 MinIO 公网 endpoint（签名URL用；空则回退 endpoint） */
+    private String publicEndpoint = "";
+
     /** MinIO 访问账号（.env 注入，与 minio-init 同源） */
     private String accessKey = "minioadmin";
 
@@ -44,6 +47,14 @@ public class FileStorageProperties {
 
     public void setEndpoint(String endpoint) {
         this.endpoint = endpoint;
+    }
+
+    public String getPublicEndpoint() {
+        return publicEndpoint;
+    }
+
+    public void setPublicEndpoint(String publicEndpoint) {
+        this.publicEndpoint = publicEndpoint;
     }
 
     public String getAccessKey() {

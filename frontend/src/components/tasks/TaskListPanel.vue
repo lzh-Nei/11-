@@ -30,7 +30,13 @@
       "
     />
     <div v-else class="card-list">
-      <TaskCard v-for="t in tasks" :key="t.id" :task="t">
+      <TaskCard
+        v-for="t in tasks"
+        :key="t.id"
+        :task="t"
+        :clickable="!readonly"
+        @open="openCard(t)"
+      >
         <template v-if="!readonly">
           <el-button
             v-if="t.status === 'PUBLISHED'"
@@ -94,7 +100,7 @@ import ErrorState from '@/components/ui/ErrorState.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import TaskFormDialog from '@/components/tasks/TaskFormDialog.vue'
 
-withDefaults(defineProps<{ readonly?: boolean }>(), { readonly: false })
+const props = withDefaults(defineProps<{ readonly?: boolean }>(), { readonly: false })
 
 const router = useRouter()
 const loading = ref(false)
@@ -132,6 +138,11 @@ function openCreate() {
 function openEdit(task: TaskInfo) {
   editingTask.value = task
   editOpen.value = true
+}
+
+function openCard(task: TaskInfo) {
+  if (props.readonly || task.status !== 'PUBLISHED') return
+  openEdit(task)
 }
 
 async function load() {

@@ -88,6 +88,14 @@ public class EvaluationQueryService {
             User reviewer = userMapper.selectById(result.getReviewerId());
             vo.setReviewerName(reviewer == null ? null : reviewer.getRealName());
         }
+        EvaluationAppeal appeal = appealMapper.selectOne(
+                new LambdaQueryWrapper<EvaluationAppeal>()
+                        .eq(EvaluationAppeal::getEvaluationId, evaluationId)
+                        .orderByDesc(EvaluationAppeal::getId)
+                        .last("LIMIT 1"));
+        if (appeal != null) {
+            vo.setAppealStatus(appeal.getStatus());
+        }
         vo.setErrorCode(result.getErrorCode());
         vo.setUpdateTime(result.getUpdateTime());
         // 教师视角另含trace_id（E-01响应要点）

@@ -62,7 +62,7 @@
         <div class="actions">
           <ConfirmAction
             title="提交作业"
-            message="提交后系统会自动检查并评分。本次提交会生成一个新版本，且不能撤回。确认提交？"
+            message="提交后系统会自动检查并评分。本次提交会生成一个新版本；在完成 AI 评价前，可在提交档案中取消。确认提交？"
             confirm-text="确认提交"
             @execute="onConfirmSubmit"
           >
@@ -127,6 +127,8 @@ const sentBytes = ref(0)
 const speed = ref(0)
 let speedTimer: number | undefined
 let lastLoaded = 0
+let uploadController: AbortController | null = null
+let uploadCanceled = false
 
 const MAX_BYTES = 20 * 1024 * 1024
 const ALLOWED = ['docx', 'pdf']
@@ -172,31 +174,44 @@ async function onSubmit() {
   if (!file.value) return
   uploading.value = true
   uploadFailed.value = false
+  uploadCanceled = false
   lastLoaded = 0
+  uploadController = new AbortController()
   speedTimer = window.setInterval(() => {
     speed.value = Math.max(0, sentBytes.value - lastLoaded)
     lastLoaded = sentBytes.value
   }, 1000)
   try {
-    const vo = await submissionApi.submit(taskId, file.value, trackSpeed)
+    const vo = await submissionApi.submit(taskId, file.value, trackSpeed, uploadController.signal)
     toast.success(`提交成功：已生成第 v${vo.versionNo} 版，系统正在检查评分`)
     latestVersion.value = vo.versionNo
     file.value = null
     percent.value = 100
   } catch (e) {
+    if ((e as { code?: string })?.code === 'ERR_CANCELED' || uploadCanceled) {
+      if (!uploadCanceled) toast.warning('已取消本次上传')
+      return
+    }
     uploadFailed.value = true
     toast.error((e as { message?: string })?.message || '提交失败', '请重试')
   } finally {
     uploading.value = false
     window.clearInterval(speedTimer)
+    uploadController = null
   }
 }
 
 function onCancel() {
+  uploadCanceled = true
+  uploadController?.abort()
   file.value = null
   uploading.value = false
+  uploadFailed.value = false
   percent.value = 0
-  toast.warning('已取消本次选择')
+  sentBytes.value = 0
+  speed.value = 0
+  if (speedTimer !== undefined) window.clearInterval(speedTimer)
+  toast.warning('已取消本次上传')
 }
 
 /** ConfirmAction 闭环：execute(done) → 真实提交 → done 收口 */

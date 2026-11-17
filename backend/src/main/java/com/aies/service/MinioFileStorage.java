@@ -31,6 +31,7 @@ import java.util.concurrent.TimeUnit;
 public class MinioFileStorage implements FileStorage {
 
     private final MinioClient client;
+    private final MinioClient presignClient;
     private final String bucketHot;
     private final String bucketCold;
 
@@ -39,9 +40,19 @@ public class MinioFileStorage implements FileStorage {
                 .endpoint(props.getEndpoint())
                 .credentials(props.getAccessKey(), props.getSecretKey())
                 .build();
+        String publicEndpoint = props.getPublicEndpoint();
+        if (publicEndpoint == null || publicEndpoint.isBlank()) {
+            publicEndpoint = props.getEndpoint();
+        }
+        this.presignClient = MinioClient.builder()
+                .endpoint(publicEndpoint)
+                .region("us-east-1")
+                .credentials(props.getAccessKey(), props.getSecretKey())
+                .build();
         this.bucketHot = props.getBucketHot();
         this.bucketCold = props.getBucketCold();
-        log.info("MinioFileStorage 装配: endpoint={}, bucket={}", props.getEndpoint(), bucketHot);
+        log.info("MinioFileStorage 装配: endpoint={}, publicEndpoint={}, bucket={}",
+                props.getEndpoint(), publicEndpoint, bucketHot);
     }
 
     @Override
@@ -105,7 +116,7 @@ public class MinioFileStorage implements FileStorage {
     public String presignedGetUrl(String key, int expirySeconds) {
         validateKey(key);
         try {
-            return client.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
+            return presignClient.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
                     .method(Method.GET)
                     .bucket(bucketHot)
                     .object(key)

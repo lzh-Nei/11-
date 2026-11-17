@@ -26,7 +26,13 @@
       @action="openCreate"
     />
     <div v-else class="card-list">
-      <TaskCard v-for="t in drafts" :key="t.id" :task="t">
+      <TaskCard
+        v-for="t in drafts"
+        :key="t.id"
+        :task="t"
+        :clickable="!readonly"
+        @open="openCard(t)"
+      >
         <template v-if="!readonly">
           <el-button size="small" type="primary" plain @click="openEdit(t)">继续编辑</el-button>
           <el-button size="small" type="success" plain @click="publish(t)">发布</el-button>
@@ -74,7 +80,7 @@ import ErrorState from '@/components/ui/ErrorState.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import TaskFormDialog from '@/components/tasks/TaskFormDialog.vue'
 
-withDefaults(defineProps<{ readonly?: boolean }>(), { readonly: false })
+const props = withDefaults(defineProps<{ readonly?: boolean }>(), { readonly: false })
 
 const loading = ref(false)
 const saving = ref(false)
@@ -94,6 +100,11 @@ function openCreate() {
 function openEdit(task: TaskInfo) {
   editingDraft.value = task
   editOpen.value = true
+}
+
+function openCard(task: TaskInfo) {
+  if (props.readonly) return
+  openEdit(task)
 }
 
 async function load() {

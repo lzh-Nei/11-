@@ -1,6 +1,6 @@
 <template>
-  <!-- 任务卡：标题+状态标签+指标权重 chips+截止徽标+主操作（列表铁律：整卡可点进详情） -->
-  <div class="task-card" @click="emit('open')">
+  <!-- 任务卡：标题+状态标签+指标权重 chips+截止徽标+主操作（clickable 时整卡可点进详情） -->
+  <div class="task-card" :class="{ clickable }" @click="clickable && emit('open')">
     <div class="tc-head">
       <b class="tc-title">{{ task.title }}</b>
       <StatusTag :status="task.status" />
@@ -33,7 +33,7 @@ import { formatDateTime } from '@/utils/format'
 import StatusTag from './StatusTag.vue'
 import DeadlineBadge from './DeadlineBadge.vue'
 
-defineProps<{ task: TaskInfo }>()
+withDefaults(defineProps<{ task: TaskInfo; clickable?: boolean }>(), { clickable: true })
 const emit = defineEmits<{ open: [] }>()
 </script>
 
@@ -44,12 +44,14 @@ const emit = defineEmits<{ open: [] }>()
   border-radius: var(--aies-radius-lg);
   box-shadow: var(--aies-shadow);
   padding: var(--aies-gap-lg);
-  cursor: pointer;
   transition:
     box-shadow var(--aies-t),
     transform var(--aies-t);
 }
-.task-card:hover {
+.task-card.clickable {
+  cursor: pointer;
+}
+.task-card.clickable:hover {
   box-shadow: var(--aies-shadow-hover);
   transform: var(--aies-lift);
 }

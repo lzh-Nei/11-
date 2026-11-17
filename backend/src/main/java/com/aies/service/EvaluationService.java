@@ -176,6 +176,8 @@ public class EvaluationService {
             result.setAiComment(null);
             result.setAiModel(outcome.modelVersion());
             result.setTraceId(traceId);
+            result.setReviewerId(null);
+            result.setReviewTime(null);
             result.setUpdateTime(LocalDateTime.now());
             if (isNew) {
                 evaluationResultMapper.insert(result);
@@ -193,6 +195,8 @@ public class EvaluationService {
         result.setAiModel(outcome.modelVersion());
         result.setTraceId(traceId);
         result.setCurrentVersionNo(versionNo);
+        result.setReviewerId(null);
+        result.setReviewTime(null);
         result.setUpdateTime(LocalDateTime.now());
         if (isNew) {
             evaluationResultMapper.insert(result);

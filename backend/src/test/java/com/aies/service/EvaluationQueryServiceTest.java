@@ -5,6 +5,7 @@ import com.aies.dto.EvaluationHistoryPageVO;
 import com.aies.dto.EvaluationHistoryVO;
 import com.aies.dto.EvaluationVO;
 import com.aies.entity.EvaluationHistory;
+import com.aies.entity.EvaluationAppeal;
 import com.aies.entity.EvaluationResult;
 import com.aies.entity.Submission;
 import com.aies.entity.Task;
@@ -43,6 +44,7 @@ class EvaluationQueryServiceTest {
     private SubmissionMapper submissionMapper;
     private TaskMapper taskMapper;
     private UserMapper userMapper;
+    private EvaluationAppealMapper appealMapper;
     private EvaluationQueryService service;
 
     @BeforeEach
@@ -53,8 +55,9 @@ class EvaluationQueryServiceTest {
         submissionMapper = mock(SubmissionMapper.class);
         taskMapper = mock(TaskMapper.class);
         userMapper = mock(UserMapper.class);
+        appealMapper = mock(EvaluationAppealMapper.class);
         service = new EvaluationQueryService(evaluationResultMapper, evaluationHistoryMapper,
-                submissionMapper, taskMapper, userMapper, mock(EvaluationAppealMapper.class),
+                submissionMapper, taskMapper, userMapper, appealMapper,
                 new ObjectMapper());
     }
 
@@ -124,6 +127,21 @@ class EvaluationQueryServiceTest {
         assertThat(vo.getTotalScore()).isEqualByComparingTo("80");
         assertThat(vo.getMetricScores()).containsEntry("代码质量", new BigDecimal("35"));
         assertThat(vo.getTraceId()).isNull();
+    }
+
+    /** 学生评价详情带申诉状态：已提交待复评时避免重复申请 */
+    @Test
+    void studentEvaluationExposesPendingAppealStatus() {
+        when(evaluationResultMapper.selectById(7L)).thenReturn(result("{}"));
+        when(submissionMapper.selectById(5L)).thenReturn(ownedBy(3L));
+        EvaluationAppeal appeal = new EvaluationAppeal();
+        appeal.setEvaluationId(7L);
+        appeal.setStatus("PENDING");
+        when(appealMapper.selectOne(any())).thenReturn(appeal);
+
+        EvaluationVO vo = service.getById(7L, principal(3L, "STUDENT"));
+
+        assertThat(vo.getAppealStatus()).isEqualTo("PENDING");
     }
 
     /** IDOR：学生查他人提交的评价 → 40400同形（防探测） */

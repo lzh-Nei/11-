@@ -58,6 +58,10 @@ request.interceptors.response.use(
     return Promise.reject(body)
   },
   (error) => {
+    // 主动取消（上传取消/页面切换）不按网络故障提示，由调用方决定文案
+    if (axios.isCancel(error) || (error as { code?: string })?.code === 'ERR_CANCELED') {
+      return Promise.reject(error)
+    }
     const status = error.response?.status
     const body = error.response?.data as ApiBody | undefined
     if (status === 401) {

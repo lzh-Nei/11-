@@ -43,6 +43,9 @@ public class EvaluationVO {
     /** 最近复核教师姓名 */
     private String reviewerName;
 
+    /** 学生申诉状态：PENDING/RESOLVED；无申诉为 null（学生端用于避免重复申请） */
+    private String appealStatus;
+
     /** 失败码（FAILED时40003） */
     private Integer errorCode;
 

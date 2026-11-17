@@ -364,7 +364,14 @@ public class TaskService {
             Long myClassId = (user == null) ? null : user.getClassId();
             wrapper.eq(Task::getClassId, myClassId == null ? -1L : myClassId);
             if (StringUtils.hasText(status)) {
-                wrapper.eq(Task::getStatus, status);
+                // 学生只允许查询已发布/已关闭；草稿状态不对外暴露
+                if (STATUS_DRAFT.equals(status)) {
+                    wrapper.eq(Task::getId, -1L);
+                } else {
+                    wrapper.eq(Task::getStatus, status);
+                }
+            } else {
+                wrapper.ne(Task::getStatus, STATUS_DRAFT);
             }
         } else {
             if (ROLE_TEACHER.equals(principal.role())) {

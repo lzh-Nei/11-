@@ -13,10 +13,11 @@ export const PERM_MODULE_LABEL: Record<string, string> = {
   submission: '提交',
   evaluation: '评价',
   report: '报表',
-  system: '系统'
+  system: '系统',
+  mq: '消息队列'
 }
 
-export const AUDIT_MODULES = ['auth', 'user', 'task', 'submission', 'evaluation', 'report', 'system']
+export const AUDIT_MODULES = ['auth', 'user', 'task', 'submission', 'evaluation', 'report', 'system', 'mq']
 
 export function roleLabel(code: string | null | undefined): string {
   if (!code) return '—'

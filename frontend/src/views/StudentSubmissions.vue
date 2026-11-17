@@ -24,7 +24,11 @@
       <el-table :data="rows" stripe>
         <el-table-column label="文件" min-width="220">
           <template #default="{ row }">
-            <FileLink :name="row.fileName" :size="row.fileSize" />
+            <FileLink
+              :name="row.fileName"
+              :size="row.fileSize"
+              @download="downloadSubmission(row.id, row.fileName)"
+            />
           </template>
         </el-table-column>
         <el-table-column label="版本" width="80">
@@ -136,8 +140,22 @@
       </template>
       <el-empty v-else description="暂无评价结果" />
       <template #footer>
+        <el-tag
+          v-if="evaluation?.appealStatus === 'PENDING'"
+          type="warning"
+          class="appeal-state"
+        >
+          复核申请处理中
+        </el-tag>
+        <el-tag
+          v-else-if="evaluation?.appealStatus === 'RESOLVED'"
+          type="success"
+          class="appeal-state"
+        >
+          复核申请已处理
+        </el-tag>
         <el-button
-          v-if="evaluation && evaluation.status === 'REVIEWED'"
+          v-if="evaluation && evaluation.status === 'REVIEWED' && !evaluation.appealStatus"
           type="warning"
           plain
           @click="appealEvaluation"
@@ -165,6 +183,7 @@ import { ElMessageBox } from 'element-plus'
 import { submissionApi, type SubmissionMine, type SubmissionDetail } from '@/api/submission'
 import { evaluationApi, type EvaluationVO } from '@/api/evaluation'
 import { formatDateTime } from '@/utils/format'
+import { saveBlob } from '@/utils/file'
 import { toast } from '@/utils/toast'
 import { openWindow } from '@/utils/window'
 import PageShell from '@/components/ui/PageShell.vue'
@@ -226,6 +245,16 @@ function fileKind(name: string): string {
 function download(url: string) {
   // S-04：浏览器直接跳 302 签名URL（MinIO 私有桶直连）
   window.open(url, '_blank')
+}
+
+/** 列表行下载：同源流式 Blob，避免预签名跨域和弹窗拦截 */
+async function downloadSubmission(id: number, fileName: string) {
+  try {
+    const blob = await submissionApi.download(id)
+    saveBlob(blob, fileName)
+  } catch (e) {
+    toast.error((e as { message?: string })?.message || '下载失败', '请稍后重试')
+  }
 }
 
 /** 评价报告为下钻页：新窗口打开（同一左右布局外壳） */
@@ -338,6 +367,9 @@ onMounted(load)
 }
 .eval-comment {
   margin-top: 10px;
+}
+.appeal-state {
+  margin-right: 8px;
 }
 .dim {
   font-size: 12px;

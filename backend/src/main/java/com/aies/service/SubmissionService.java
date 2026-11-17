@@ -235,6 +235,18 @@ public class SubmissionService {
         return fileStorage.presignedGetUrl(submission.getFileKey(), PRESIGN_EXPIRY_SECONDS);
     }
 
+    /** 同源流式下载（S-04 补充通道：浏览器 Blob 下载不走预签名跨域URL） */
+    public SubmissionFile openOriginal(long submissionId, LoginPrincipal principal) {
+        Submission submission = requireOwned(submissionId, principal);
+        return new SubmissionFile(submission.getFileName(),
+                submission.getFileSize() == null ? 0 : submission.getFileSize(),
+                fileStorage.openStream(submission.getFileKey()));
+    }
+
+    /** 下载流元信息（调用方负责关闭 stream） */
+    public record SubmissionFile(String fileName, long size, InputStream stream) {
+    }
+
     /** IDOR 防线（S-05/04-04 §三）：仅本人可见，非本人/不存在一律 40400 同形防探测 */
     private Submission requireOwned(long submissionId, LoginPrincipal principal) {
         Submission submission = submissionMapper.selectById(submissionId);

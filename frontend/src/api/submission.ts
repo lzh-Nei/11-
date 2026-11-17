@@ -36,7 +36,8 @@ export const submissionApi = {
   async submit(
     taskId: number,
     file: File,
-    onUploadProgress?: (e: { loaded: number; total?: number }) => void
+    onUploadProgress?: (e: { loaded: number; total?: number }) => void,
+    signal?: AbortSignal
   ): Promise<SubmissionVO> {
     const form = new FormData()
     form.append('taskId', String(taskId))
@@ -44,6 +45,7 @@ export const submissionApi = {
     return (await request.post('/submissions', form, {
       headers: { 'Content-Type': 'multipart/form-data' },
       onUploadProgress,
+      signal,
       timeout: 120000
     })) as unknown as SubmissionVO
   },
@@ -61,8 +63,8 @@ export const submissionApi = {
   async cancel(id: number): Promise<void> {
     await request.post(`/submissions/${id}/cancel`)
   },
-  /** S-04 下载原件（302→MinIO 预签名直连）：二进制链路不经 axios 拦截器，返回文件 Blob */
+  /** S-04 下载原件（同源流式通道，返回文件 Blob） */
   async download(id: number): Promise<Blob> {
-    return await fetchBlob(`/api/submissions/${id}/download`)
+    return await fetchBlob(`/api/submissions/${id}/download/stream`)
   }
 }

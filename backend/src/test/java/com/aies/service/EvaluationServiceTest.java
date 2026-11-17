@@ -248,11 +248,16 @@ class EvaluationServiceTest {
         pending.setSubmissionId(5L);
         pending.setStatus("PENDING");
         pending.setCurrentVersionNo(1);
+        pending.setReviewerId(2L);
+        pending.setReviewTime(java.time.LocalDateTime.now());
         when(evaluationResultMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(pending);
         EvaluationOutcome outcome = new EvaluationOutcome(true, new BigDecimal("70"),
                 "{}", "评语", 0, 100L, "qwen2.5:7b", null, null);
 
         svc.persistEvaluation(5L, "trace0003", outcome, EvaluationService.SOURCE_AI_INITIAL);
+
+        assertThat(pending.getReviewerId()).isNull();
+        assertThat(pending.getReviewTime()).isNull();
 
         verify(evaluationResultMapper).updateById(pending);
         verify(evaluationResultMapper, never()).insert(any(EvaluationResult.class));

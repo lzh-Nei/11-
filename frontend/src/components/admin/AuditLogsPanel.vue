@@ -98,7 +98,12 @@ const ACTION_LABELS: Record<string, string> = {
   DISABLE_GOLDEN: '停用基准样本',
   DELETE_FILE: '删除文件',
   HIDE_FILE: '从文件中心移除',
-  RE_EVALUATE: '重新评价'
+  RE_EVALUATE: '重新评价',
+  REPLAY_PARSE: '重放解析',
+  REPLAY_EVALUATION: '重放评价',
+  REPLAY_PARSE_BATCH: '批量重放解析',
+  REPLAY_EVALUATION_BATCH: '批量重放评价',
+  REPLAY_DLQ: '死信队列重放'
 }
 
 const actionOptions = Object.entries(ACTION_LABELS).map(([value, label]) => ({ value, label }))
@@ -118,6 +123,10 @@ function targetLabel(target: string | null): string {
   if (kind === 'prompt') return `提示词 ${value}`
   if (kind === 'evaluation') return `评价 #${value}`
   if (kind === 'file') return '文件'
+  if (kind === 'submission') {
+    return value === 'batch' ? '提交批处理' : `提交 #${value}`
+  }
+  if (kind === 'dlq') return `${value === 'parse' ? '解析' : '评价'}死信队列`
   return '其他对象'
 }
 

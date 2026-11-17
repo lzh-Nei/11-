@@ -49,10 +49,10 @@
       :page="page"
       :page-size="size"
       empty-text="还没有上传记录"
-      empty-action-text="去任务列表提交作业"
+      empty-action-text="查看教学任务"
       @retry="load"
       @page-change="(p: number) => (page = p)"
-      @empty-action="router.push('/tasks')"
+      @empty-action="router.push('/modules?group=teaching&child=task-list')"
     >
       <table class="file-table">
         <thead>

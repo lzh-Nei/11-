@@ -12,6 +12,7 @@ export interface EvaluationVO {
   aiComment: string | null
   aiModel?: string | null
   reviewerName?: string | null
+  appealStatus?: 'PENDING' | 'RESOLVED' | null
   errorCode: number | null
   updateTime: string
   traceId?: string | null

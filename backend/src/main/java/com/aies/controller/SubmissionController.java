@@ -22,6 +22,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
+
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
 /**
  * 提交接口（03-03 §六 S-01~S-04 契约；W7-C1 全量接入）。
@@ -69,6 +73,25 @@ public class SubmissionController {
         return ResponseEntity.status(HttpStatus.FOUND)
                 .header(HttpHeaders.LOCATION, url)
                 .build();
+    }
+
+    /** 同源流式下载：供浏览器 Blob 下载使用，避免预签名URL跨域/弹窗限制。 */
+    @PreAuthorize("hasAuthority('" + PermissionConstants.SUBMISSION_VIEW + "')")
+    @GetMapping("/{id}/download/stream")
+    public ResponseEntity<StreamingResponseBody> downloadStream(@PathVariable long id) {
+        SubmissionService.SubmissionFile file = submissionService.openOriginal(id, currentPrincipal());
+        StreamingResponseBody body = out -> {
+            try (var in = file.stream()) {
+                in.transferTo(out);
+            }
+        };
+        String encoded = URLEncoder.encode(file.fileName(), StandardCharsets.UTF_8)
+                .replace("+", "%20");
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .contentLength(file.size())
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + encoded)
+                .body(body);
     }
 
     /** 学生取消本人尚未完成评价的提交。 */
