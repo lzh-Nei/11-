@@ -282,9 +282,15 @@ export const adminApi = {
     return (await request.get('/admin/system/config')) as unknown as AdminSystemConfig
   },
 
-  /* 消息队列监控（只读） */
+  /* 消息队列监控与失败重放 */
   async mqStatus(): Promise<AdminMqMonitor> {
     return (await request.get('/admin/mq/status')) as unknown as AdminMqMonitor
+  },
+  async replayParse(submissionId: number): Promise<void> {
+    await request.post(`/admin/mq/submissions/${submissionId}/replay-parse`)
+  },
+  async replayEvaluation(submissionId: number): Promise<void> {
+    await request.post(`/admin/mq/submissions/${submissionId}/replay-evaluation`)
   },
 
   /* 管理端评价列表（管理员查看教师评价/复核历史） */

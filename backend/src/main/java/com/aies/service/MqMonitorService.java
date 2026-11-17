@@ -109,6 +109,8 @@ public class MqMonitorService {
     private List<MqEventVO> recentEvents() {
         List<Submission> submissions = submissionMapper.selectList(
                 new LambdaQueryWrapper<Submission>()
+                        .and(w -> w.eq(Submission::getCanceled, 0)
+                                .or().isNull(Submission::getCanceled))
                         .orderByDesc(Submission::getCreateTime)
                         .last("LIMIT " + RECENT_LIMIT));
         if (submissions.isEmpty()) {

@@ -1,11 +1,11 @@
 <template>
-  <!-- 消息队列监控（system:config，只读）：队列水位 / 流水线 / 最近异步处理 -->
+  <!-- 消息队列监控（system:config）：队列水位 / 流水线 / 最近异步处理与失败重放 -->
   <section class="panel">
     <div class="head">
       <div>
         <h3>消息队列</h3>
         <p class="hint">
-          观察文件解析与 AI 评价两条异步链路的队列水位、消费者与最近处理结果；页面只读，不消费、不重投消息。
+          观察文件解析与 AI 评价两条异步链路的队列水位、消费者与最近处理结果；监控为只读，失败记录可在表格中重新投递。
         </p>
       </div>
       <div class="tools">
@@ -119,7 +119,7 @@
       <section class="events">
         <header class="section-head">
           <h4>最近异步处理</h4>
-          <span>按最近提交时间展示，评价状态来自当前结果表</span>
+          <span>按最近提交时间展示；仅解析失败/评价失败可重放，已出分或已复核请走教师端重评</span>
         </header>
         <el-table :data="data.recentEvents" size="small" stripe empty-text="暂无提交记录">
           <el-table-column prop="fileName" label="文件" min-width="170" show-overflow-tooltip>
@@ -156,6 +156,31 @@
           <el-table-column label="更新时间" width="150">
             <template #default="{ row }">{{ formatDateTime(row.updateTime) }}</template>
           </el-table-column>
+          <el-table-column label="操作" width="118" fixed="right">
+            <template #default="{ row }">
+              <el-button
+                v-if="canReplayParse(row)"
+                size="small"
+                text
+                type="primary"
+                :loading="replayingKey === `parse-${row.submissionId}`"
+                @click.stop="replay('parse', row)"
+              >
+                重新解析
+              </el-button>
+              <el-button
+                v-else-if="canReplayEvaluation(row)"
+                size="small"
+                text
+                type="primary"
+                :loading="replayingKey === `eval-${row.submissionId}`"
+                @click.stop="replay('eval', row)"
+              >
+                {{ row.evaluationStatus ? '重新评价' : '发起评价' }}
+              </el-button>
+              <span v-else class="dim">—</span>
+            </template>
+          </el-table-column>
         </el-table>
       </section>
     </template>
@@ -166,7 +191,8 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { adminApi, type AdminMqMonitor, type AdminMqQueue } from '@/api/admin'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { adminApi, type AdminMqEvent, type AdminMqMonitor, type AdminMqQueue } from '@/api/admin'
 import { formatDateTime } from '@/utils/format'
 import AppSkeleton from '@/components/ui/AppSkeleton.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'
@@ -178,6 +204,7 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 const data = ref<AdminMqMonitor | null>(null)
 const autoRefresh = ref(false)
+const replayingKey = ref('')
 let timer: number | null = null
 
 const stats = computed(() => data.value?.stats ?? {
@@ -226,6 +253,42 @@ function queueTagType(q: AdminMqQueue): 'success' | 'warning' | 'danger' | 'info
   if ((q.consumers ?? 0) === 0) return 'warning'
   if ((q.readyMessages ?? 0) > 0) return 'warning'
   return 'success'
+}
+
+function canReplayParse(row: AdminMqEvent): boolean {
+  return row.parseStatus === 'FAILED'
+}
+
+function canReplayEvaluation(row: AdminMqEvent): boolean {
+  return row.parseStatus === 'SUCCESS'
+    && (row.evaluationStatus === 'FAILED' || row.evaluationStatus == null)
+}
+
+async function replay(kind: 'parse' | 'eval', row: AdminMqEvent) {
+  const actionName = kind === 'parse' ? '重新解析' : row.evaluationStatus ? '重新评价' : '发起评价'
+  try {
+    await ElMessageBox.confirm(
+      `确认对「${row.fileName || '该文件'}」${actionName}？系统会重置对应状态并重新投递消息。`,
+      '确认重放',
+      { type: 'warning', confirmButtonText: actionName, cancelButtonText: '取消' }
+    )
+  } catch {
+    return
+  }
+  replayingKey.value = `${kind}-${row.submissionId}`
+  try {
+    if (kind === 'parse') {
+      await adminApi.replayParse(row.submissionId)
+    } else {
+      await adminApi.replayEvaluation(row.submissionId)
+    }
+    ElMessage.success('已重新投递，稍后刷新查看处理结果')
+    await load()
+  } catch (e) {
+    ElMessage.error((e as { message?: string })?.message || '重放失败，请稍后重试')
+  } finally {
+    replayingKey.value = ''
+  }
 }
 
 async function load() {

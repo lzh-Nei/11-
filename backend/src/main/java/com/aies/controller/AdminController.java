@@ -34,6 +34,7 @@ import com.aies.service.AdminRbacService;
 import com.aies.service.AdminSystemService;
 import com.aies.service.AdminUserService;
 import com.aies.service.MqMonitorService;
+import com.aies.service.MqReplayService;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -73,6 +74,7 @@ public class AdminController {
     private final AdminSystemService systemService;
     private final AdminEvaluationService evaluationService;
     private final MqMonitorService mqMonitorService;
+    private final MqReplayService mqReplayService;
 
     /* ==================== 用户管理（user:manage） ==================== */
 
@@ -218,12 +220,26 @@ public class AdminController {
         return Result.success(systemService.config());
     }
 
-    /* ==================== 消息队列监控（system:config，只读） ==================== */
+    /* ==================== 消息队列监控与重放（system:config） ==================== */
 
     @PreAuthorize("hasAuthority('" + PermissionConstants.SYSTEM_CONFIG + "')")
     @GetMapping("/mq/status")
     public Result<MqMonitorVO> mqStatus() {
         return Result.success(mqMonitorService.status());
+    }
+
+    @PreAuthorize("hasAuthority('" + PermissionConstants.SYSTEM_CONFIG + "')")
+    @PostMapping("/mq/submissions/{id}/replay-parse")
+    public Result<Void> replayParse(@PathVariable("id") @Positive long id) {
+        mqReplayService.replayParse(id, PrincipalUtils.current());
+        return Result.success();
+    }
+
+    @PreAuthorize("hasAuthority('" + PermissionConstants.SYSTEM_CONFIG + "')")
+    @PostMapping("/mq/submissions/{id}/replay-evaluation")
+    public Result<Void> replayEvaluation(@PathVariable("id") @Positive long id) {
+        mqReplayService.replayEvaluation(id, PrincipalUtils.current());
+        return Result.success();
     }
 
     /* ==================== LLM 参数（llm:config） ==================== */
