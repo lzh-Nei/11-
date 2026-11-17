@@ -17,7 +17,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import LoginForm from '@/components/business/LoginForm.vue'
 import { systemApi } from '@/api/system'
@@ -46,11 +46,30 @@ const healthTitle = computed(() =>
       : '系统暂时无法连接，点击重试'
 )
 
+let probing = false
+let retryTimer: number | undefined
+
 async function probe() {
-  health.value = await systemApi.health()
+  if (probing) return
+  probing = true
+  try {
+    health.value = await systemApi.health()
+  } finally {
+    probing = false
+  }
 }
 
-onMounted(probe)
+onMounted(() => {
+  void probe()
+  // 应用/网关刚启动时首次探活可能失败：后台每 5 秒自动重试，避免登录页一直停在“不可用”
+  retryTimer = window.setInterval(() => {
+    if (health.value === false) void probe()
+  }, 5000)
+})
+
+onBeforeUnmount(() => {
+  if (retryTimer !== undefined) window.clearInterval(retryTimer)
+})
 </script>
 
 <style scoped>
