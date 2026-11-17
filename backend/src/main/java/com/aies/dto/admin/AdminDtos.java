@@ -35,6 +35,16 @@ public final class AdminDtos {
     public record AdminTeacherVO(Long id, String username, String realName) {
     }
 
+    /** 删除用户前的关联记录快照（强制删除需管理员二次确认） */
+    public record UserDeletionImpactVO(Long userId, String username, String realName,
+                                       List<String> roleCodes, boolean protectedAccount,
+                                       String protectedReason, long ownedClasses, long ownedTasks,
+                                       long ownedSubmissions, long ownedEvaluationResults,
+                                       long ownedEvaluationHistories, long appeals, long auditLogs,
+                                       long reportExports, long reviewReferences,
+                                       long unboundStudents, long totalRecords) {
+    }
+
     /** 管理端评价列表（管理员查看教师评价与复核历史入口） */
     public record AdminEvaluationVO(Long id, Long submissionId, Long taskId, String taskTitle,
                                     String studentName, String teacherName, String status,

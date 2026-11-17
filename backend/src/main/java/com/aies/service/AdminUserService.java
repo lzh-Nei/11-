@@ -6,6 +6,7 @@ import com.aies.dto.admin.AdminDtos.AdminTeacherVO;
 import com.aies.dto.admin.AdminDtos.AdminUserVO;
 import com.aies.dto.admin.AdminDtos.CreateUserRequest;
 import com.aies.dto.admin.AdminDtos.UpdateUserRequest;
+import com.aies.dto.admin.AdminDtos.UserDeletionImpactVO;
 import com.aies.entity.AuditLog;
 import com.aies.entity.EvaluationHistory;
 import com.aies.entity.EvaluationResult;
@@ -73,6 +74,7 @@ public class AdminUserService {
     private final SubmissionMapper submissionMapper;
     private final EvaluationHistoryMapper evaluationHistoryMapper;
     private final EvaluationResultMapper evaluationResultMapper;
+    private final UserCascadeService userCascadeService;
     private final PasswordEncoder passwordEncoder;
 
     /** 用户分页：keyword 匹配账号/姓名，status 与 roleCode 可组合筛选 */
@@ -296,11 +298,49 @@ public class AdminUserService {
                     "该用户存在关联数据，不能删除，请改为禁用");
         }
         redis.delete(AUTH_PERM_PREFIX + userId);
+        jwtService.revokeAllRefreshTokens(userId);
 
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("username", user.getUsername());
         detail.put("realName", user.getRealName());
         auditService.record(principal, "user", "DELETE_USER", "user:" + userId, detail);
+    }
+
+    /** 删除前影响快照：管理端据此决定普通删除或二次确认强制清理 */
+    public UserDeletionImpactVO deletionImpact(long userId, LoginPrincipal principal) {
+        User user = requireUser(userId);
+        List<String> roles = rbacMapper.selectRoleCodes(userId);
+        boolean self = principal.userId() == userId;
+        boolean admin = roles != null && roles.contains(ROLE_ADMIN);
+        boolean protectedAccount = self || admin;
+        String reason = self ? "不能删除当前登录账号"
+                : admin ? "管理员账号受保护，不能删除" : "";
+        return userCascadeService.impact(user, roles == null ? List.of() : roles,
+                protectedAccount, reason);
+    }
+
+    /** 强制删除：二次确认后清理该用户关联记录，再删除账号（整事务） */
+    @Transactional
+    public void forceDelete(long userId, LoginPrincipal principal) {
+        if (principal.userId() == userId) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "不能删除当前登录账号");
+        }
+        User user = requireUser(userId);
+        List<String> roles = rbacMapper.selectRoleCodes(userId);
+        if (roles != null && roles.contains(ROLE_ADMIN)) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "管理员账号受保护，不能删除");
+        }
+        UserDeletionImpactVO impact = userCascadeService.impact(user,
+                roles == null ? List.of() : roles, false, "");
+        userCascadeService.forceDelete(userId);
+        redis.delete(AUTH_PERM_PREFIX + userId);
+        jwtService.revokeAllRefreshTokens(userId);
+
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("username", user.getUsername());
+        detail.put("realName", user.getRealName());
+        detail.put("impact", impact);
+        auditService.record(principal, "user", "FORCE_DELETE_USER", "user:" + userId, detail);
     }
 
     /** 教师下拉（班级管理绑定授课教师） */

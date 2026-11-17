@@ -17,6 +17,26 @@ export interface AdminUser {
   createTime: string
 }
 
+export interface AdminUserDeletionImpact {
+  userId: number
+  username: string
+  realName: string
+  roleCodes: string[]
+  protectedAccount: boolean
+  protectedReason: string | null
+  ownedClasses: number
+  ownedTasks: number
+  ownedSubmissions: number
+  ownedEvaluationResults: number
+  ownedEvaluationHistories: number
+  appeals: number
+  auditLogs: number
+  reportExports: number
+  reviewReferences: number
+  unboundStudents: number
+  totalRecords: number
+}
+
 export interface AdminTeacher {
   id: number
   username: string
@@ -235,6 +255,12 @@ export const adminApi = {
   },
   async deleteUser(id: number): Promise<void> {
     await request.delete(`/admin/users/${id}`)
+  },
+  async userDeletionImpact(id: number): Promise<AdminUserDeletionImpact> {
+    return (await request.get(`/admin/users/${id}/deletion-impact`)) as unknown as AdminUserDeletionImpact
+  },
+  async forceDeleteUser(id: number): Promise<void> {
+    await request.delete(`/admin/users/${id}/force`)
   },
   async teachers(): Promise<AdminTeacher[]> {
     return (await request.get('/admin/teachers')) as unknown as AdminTeacher[]

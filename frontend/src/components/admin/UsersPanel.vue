@@ -436,21 +436,68 @@ async function toggleStatus(row: AdminUser) {
 }
 
 async function removeUser(row: AdminUser) {
+  let impact
+  try {
+    impact = await adminApi.userDeletionImpact(row.id)
+  } catch {
+    return
+  }
+  if (impact.protectedAccount) {
+    toast.warning(impact.protectedReason || '该账号受保护，不能删除')
+    return
+  }
+  if (impact.totalRecords === 0) {
+    try {
+      await ElMessageBox.confirm(
+        `删除「${row.realName}（${row.username}）」？该账号当前没有业务记录，删除不可恢复。`,
+        '删除用户',
+        { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }
+      )
+    } catch {
+      return
+    }
+    try {
+      await adminApi.deleteUser(row.id)
+      toast.success('用户已删除')
+      await load()
+    } catch {
+      // 拦截器已提示
+    }
+    return
+  }
+
+  const parts: string[] = []
+  if (impact.ownedClasses) parts.push(`班级 ${impact.ownedClasses} 个`)
+  if (impact.ownedTasks) parts.push(`任务 ${impact.ownedTasks} 个`)
+  if (impact.ownedSubmissions) parts.push(`提交 ${impact.ownedSubmissions} 条`)
+  if (impact.ownedEvaluationResults) parts.push(`评价 ${impact.ownedEvaluationResults} 条`)
+  if (impact.ownedEvaluationHistories) parts.push(`评价历史 ${impact.ownedEvaluationHistories} 条`)
+  if (impact.appeals) parts.push(`申诉 ${impact.appeals} 条`)
+  if (impact.auditLogs) parts.push(`审计记录 ${impact.auditLogs} 条`)
+  if (impact.reportExports) parts.push(`报表导出任务 ${impact.reportExports} 条`)
+  if (impact.reviewReferences) parts.push(`复核痕迹 ${impact.reviewReferences} 处（将匿名化保留）`)
+  if (impact.unboundStudents) parts.push(`${impact.unboundStudents} 名学生将解除班级绑定`)
+  const summary = parts.length ? parts.join('、') : '关联记录'
   try {
     await ElMessageBox.confirm(
-      `删除「${row.realName}（${row.username}）」：存在提交/任务/班级/评价或审计记录时会被拒绝；删除不可恢复。`,
-      '删除用户',
-      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }
+      `「${row.realName}（${row.username}）」存在 ${impact.totalRecords} 条关联记录：${summary}。\n\n强制删除会先清理这些记录，再删除账号；操作不可恢复。是否继续？`,
+      '强制删除用户',
+      {
+        type: 'error',
+        confirmButtonText: '清理并删除',
+        cancelButtonText: '取消',
+        confirmButtonClass: 'el-button--danger'
+      }
     )
   } catch {
     return
   }
   try {
-    await adminApi.deleteUser(row.id)
-    toast.success('用户已删除')
+    await adminApi.forceDeleteUser(row.id)
+    toast.success('用户及关联记录已删除')
     await load()
   } catch {
-    // 拦截器已提示（依赖数据/受保护账号等原因）
+    // 拦截器已提示
   }
 }
 

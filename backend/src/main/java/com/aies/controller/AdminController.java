@@ -26,6 +26,7 @@ import com.aies.dto.admin.AdminDtos.UpdateRolePermissionsRequest;
 import com.aies.dto.admin.AdminDtos.UpdateUserRolesRequest;
 import com.aies.dto.admin.AdminDtos.UpdateUserRequest;
 import com.aies.dto.admin.AdminDtos.UpdateUserStatusRequest;
+import com.aies.dto.admin.AdminDtos.UserDeletionImpactVO;
 import com.aies.security.PrincipalUtils;
 import com.aies.service.AdminAiService;
 import com.aies.service.AdminClassService;
@@ -107,6 +108,21 @@ public class AdminController {
     @DeleteMapping("/users/{id}")
     public Result<Void> deleteUser(@PathVariable("id") @Positive long id) {
         userService.delete(id, PrincipalUtils.current());
+        return Result.success();
+    }
+
+    /** 删除前关联记录快照（普通删除失败时，管理端据此提示是否强制清理） */
+    @PreAuthorize("hasAuthority('" + PermissionConstants.USER_MANAGE + "')")
+    @GetMapping("/users/{id}/deletion-impact")
+    public Result<UserDeletionImpactVO> userDeletionImpact(@PathVariable("id") @Positive long id) {
+        return Result.success(userService.deletionImpact(id, PrincipalUtils.current()));
+    }
+
+    /** 强制删除：清理关联记录后删除用户，必须由管理端二次确认后调用 */
+    @PreAuthorize("hasAuthority('" + PermissionConstants.USER_MANAGE + "')")
+    @DeleteMapping("/users/{id}/force")
+    public Result<Void> forceDeleteUser(@PathVariable("id") @Positive long id) {
+        userService.forceDelete(id, PrincipalUtils.current());
         return Result.success();
     }
 

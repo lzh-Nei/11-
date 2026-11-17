@@ -73,7 +73,9 @@ class JwtServiceTest {
     @Test
     void tamperedTokenRejected() {
         JwtService.TokenPair pair = jwtService.issueTokens(3L, "STUDENT");
-        String tampered = pair.accessToken().substring(0, pair.accessToken().length() - 2) + "xx";
+        String token = pair.accessToken();
+        char last = token.charAt(token.length() - 1);
+        String tampered = token.substring(0, token.length() - 1) + (last == 'a' ? 'b' : 'a');
 
         assertThatThrownBy(() -> jwtService.parseAccessToken(tampered))
                 .isInstanceOfSatisfying(BusinessException.class,

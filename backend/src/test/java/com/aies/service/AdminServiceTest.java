@@ -8,6 +8,7 @@ import com.aies.dto.admin.AdminDtos.CreatePromptRequest;
 import com.aies.dto.admin.AdminDtos.CreateUserRequest;
 import com.aies.dto.admin.AdminDtos.UpdateLlmConfigRequest;
 import com.aies.dto.admin.AdminDtos.UpdateUserRequest;
+import com.aies.dto.admin.AdminDtos.UserDeletionImpactVO;
 import com.aies.entity.AuditLog;
 import com.aies.entity.GoldenDataset;
 import com.aies.entity.LlmConfig;
@@ -94,6 +95,7 @@ class AdminServiceTest {
     private SubmissionMapper submissionMapper;
     private EvaluationHistoryMapper evaluationHistoryMapper;
     private EvaluationResultMapper evaluationResultMapper;
+    private UserCascadeService userCascadeService;
     private PasswordEncoder passwordEncoder;
 
     @BeforeEach
@@ -116,11 +118,13 @@ class AdminServiceTest {
         submissionMapper = mock(SubmissionMapper.class);
         evaluationHistoryMapper = mock(EvaluationHistoryMapper.class);
         evaluationResultMapper = mock(EvaluationResultMapper.class);
+        userCascadeService = mock(UserCascadeService.class);
         passwordEncoder = mock(PasswordEncoder.class);
 
         userService = new AdminUserService(userMapper, roleMapper, userRoleMapper, classMapper,
                 rbacMapper, jwtService, redis, auditService, auditLogMapper, taskMapper,
-                submissionMapper, evaluationHistoryMapper, evaluationResultMapper, passwordEncoder);
+                submissionMapper, evaluationHistoryMapper, evaluationResultMapper,
+                userCascadeService, passwordEncoder);
         rbacService = new AdminRbacService(roleMapper, permissionMapper, rolePermMapper,
                 userRoleMapper, redis, auditService);
         classService = new AdminClassService(classMapper, userMapper, taskMapper, rbacMapper, auditService);
@@ -354,6 +358,22 @@ class AdminServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("当前登录账号");
         verify(userMapper, never()).deleteById(anyLong());
+    }
+
+    @Test
+    void forceDeleteShouldCascadeRecordsAndAudit() {
+        when(userMapper.selectById(6L)).thenReturn(user(6L, "stu06", "STUDENT"));
+        when(rbacMapper.selectRoleCodes(6L)).thenReturn(List.of("STUDENT"));
+        UserDeletionImpactVO impact = new UserDeletionImpactVO(6L, "stu06", "测试6",
+                List.of("STUDENT"), false, "", 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1);
+        when(userCascadeService.impact(any(), anyList(), eq(false), eq(""))).thenReturn(impact);
+
+        userService.forceDelete(6L, admin);
+
+        verify(userCascadeService).forceDelete(6L);
+        verify(jwtService).revokeAllRefreshTokens(6L);
+        verify(auditService).record(eq(admin), eq("user"), eq("FORCE_DELETE_USER"),
+                eq("user:6"), any());
     }
 
     /* ==================== 角色权限 ==================== */

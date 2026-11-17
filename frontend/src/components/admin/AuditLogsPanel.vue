@@ -83,6 +83,7 @@ const ACTION_LABELS: Record<string, string> = {
   CREATE_USER: '新建用户',
   UPDATE_USER: '编辑用户',
   DELETE_USER: '删除用户',
+  FORCE_DELETE_USER: '强制删除用户',
   ASSIGN_ROLES: '分配角色',
   ENABLE_USER: '启用账号',
   DISABLE_USER: '禁用账号',
