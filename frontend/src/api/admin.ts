@@ -82,6 +82,55 @@ export interface AdminAuditLog {
   createTime: string
 }
 
+/** 运行日志条目（后端内存采集缓冲） */
+export interface AdminRuntimeLog {
+  seq: number
+  time: string
+  level: string
+  logger: string
+  thread: string
+  message: string
+  detail: string | null
+}
+
+export interface AdminRuntimeLogStats {
+  capacity: number
+  captured: number
+  total: number
+  errorCount: number
+  warnCount: number
+  startedAt: string
+  capturing: boolean
+}
+
+export interface AdminRuntimeLogPage {
+  stats: AdminRuntimeLogStats
+  records: AdminRuntimeLog[]
+  total: number
+  page: number
+  size: number
+}
+
+export interface AdminAuditBucket {
+  label: string
+  count: number
+}
+
+export interface AdminAuditTrend {
+  day: string
+  count: number
+}
+
+/** 审计窗口概览（总量/今日/近24h + 模块/动作分布 + 近7日趋势） */
+export interface AdminAuditStats {
+  total: number
+  today: number
+  last24h: number
+  byModule: AdminAuditBucket[]
+  byAction: AdminAuditBucket[]
+  trend: AdminAuditTrend[]
+}
+
 /** 管理端评价列表行（管理员查看教师评价/复核历史入口） */
 export interface AdminEvaluation {
   id: number
@@ -117,7 +166,7 @@ export interface AdminSystemConfig {
 
 /** 消息队列监控（管理端只读）：broker 水位 + 数据库侧流水 */
 export interface AdminMqQueue {
-  key: 'parse' | 'eval'
+  key: 'parse' | 'eval' | 'parseDlq' | 'evalDlq'
   label: string
   queueName: string
   exchange: string
@@ -150,11 +199,18 @@ export interface AdminMqEvent {
   updateTime: string | null
 }
 
+export interface AdminMqAlert {
+  alert: boolean
+  level: 'OK' | 'WARN' | 'ERROR'
+  messages: string[]
+}
+
 export interface AdminMqMonitor {
   rabbitConnected: boolean
   broker: string
   sampledAt: string
   queues: AdminMqQueue[]
+  alert: AdminMqAlert
   stats: AdminMqStats
   recentEvents: AdminMqEvent[]
 }
@@ -222,12 +278,16 @@ export interface AdminUserCreatePayload {
   roleCodes: string[]
 }
 
-/** 管理员编辑用户基础资料（用户名/角色/状态不走此载荷） */
+/** 管理员编辑用户全部资料（账号/角色/状态/密码留空表示不修改） */
 export interface AdminUserUpdatePayload {
+  username?: string
   realName: string
   email: string
   phone: string
   classId: number | null
+  status?: number
+  roleCodes?: string[]
+  newPassword?: string
 }
 
 export const adminApi = {
@@ -293,14 +353,33 @@ export const adminApi = {
     await request.delete(`/admin/classes/${id}`)
   },
 
-  /* 审计日志 */
+  /* 审计日志与运行日志采集（仅管理员） */
   async auditLogs(params: {
     page: number
     size: number
     module?: string
     action?: string
+    keyword?: string
+    operator?: string
+    start?: string
+    end?: string
   }): Promise<PageResult<AdminAuditLog>> {
     return (await request.get('/admin/audit-logs', { params })) as unknown as PageResult<AdminAuditLog>
+  },
+  async auditStats(): Promise<AdminAuditStats> {
+    return (await request.get('/admin/audit-logs/stats')) as unknown as AdminAuditStats
+  },
+  async runtimeLogs(params: {
+    page: number
+    size: number
+    level?: string
+    keyword?: string
+    logger?: string
+  }): Promise<AdminRuntimeLogPage> {
+    return (await request.get('/admin/logs/runtime', { params })) as unknown as AdminRuntimeLogPage
+  },
+  async clearRuntimeLogs(): Promise<void> {
+    await request.delete('/admin/logs/runtime')
   },
 
   /* 系统配置（只读快照） */

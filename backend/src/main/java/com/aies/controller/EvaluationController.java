@@ -2,19 +2,25 @@ package com.aies.controller;
 
 import com.aies.common.PermissionConstants;
 import com.aies.common.Result;
+import com.aies.dto.AppealVO;
 import com.aies.dto.EvaluationHistoryPageVO;
 import com.aies.dto.EvaluationHistoryVO;
 import com.aies.dto.EvaluationVO;
 import com.aies.dto.EvaluationAppealRequest;
+import com.aies.dto.RejectAppealRequest;
 import com.aies.dto.ReviewEvaluationRequest;
 import com.aies.security.LoginPrincipal;
 import com.aies.service.EvaluationAppealService;
 import com.aies.service.EvaluationCommandService;
 import com.aies.service.EvaluationQueryService;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -33,6 +39,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/evaluations")
 @RequiredArgsConstructor
+@Validated
 public class EvaluationController {
 
     private final EvaluationQueryService evaluationQueryService;
@@ -94,6 +101,52 @@ public class EvaluationController {
             @PathVariable long id,
             @Valid @RequestBody EvaluationAppealRequest request) {
         return Result.success(evaluationAppealService.appeal(id, request.getReason(), currentPrincipal()));
+    }
+
+    /** 学生本人申诉列表 */
+    @PreAuthorize("hasAuthority('" + PermissionConstants.SUBMISSION_UPLOAD + "')")
+    @GetMapping("/appeals/mine")
+    public Result<Page<AppealVO>> myAppeals(
+            @RequestParam(defaultValue = "1") @Min(value = 1, message = "页码最小为1") long page,
+            @RequestParam(defaultValue = "10") @Min(value = 1, message = "每页条数最小为1")
+            @Max(value = 100, message = "每页条数最大为100") long size) {
+        return Result.success(evaluationAppealService.mine(currentPrincipal().userId(), page, size));
+    }
+
+    /** 教师被指派的申诉列表 */
+    @PreAuthorize("hasAuthority('" + PermissionConstants.EVALUATION_REVIEW + "')")
+    @GetMapping("/appeals/assigned")
+    public Result<Page<AppealVO>> assignedAppeals(
+            @RequestParam(defaultValue = "1") @Min(value = 1, message = "页码最小为1") long page,
+            @RequestParam(defaultValue = "10") @Min(value = 1, message = "每页条数最小为1")
+            @Max(value = 100, message = "每页条数最大为100") long size) {
+        return Result.success(evaluationAppealService.assigned(
+                currentPrincipal().userId(), page, size));
+    }
+
+    /** 申诉详情（学生本人/被指派教师/管理员） */
+    @PreAuthorize("hasAnyAuthority('" + PermissionConstants.SUBMISSION_UPLOAD + "','"
+            + PermissionConstants.EVALUATION_REVIEW + "')")
+    @GetMapping("/appeals/{id}")
+    public Result<AppealVO> appealDetail(@PathVariable long id) {
+        return Result.success(evaluationAppealService.detail(id, currentPrincipal()));
+    }
+
+    /** 学生撤回申诉（仅 PENDING） */
+    @PreAuthorize("hasAuthority('" + PermissionConstants.SUBMISSION_UPLOAD + "')")
+    @PostMapping("/appeals/{id}/withdraw")
+    public Result<Void> withdrawAppeal(@PathVariable long id) {
+        evaluationAppealService.withdraw(id, currentPrincipal());
+        return Result.success(null);
+    }
+
+    /** 被指派教师驳回申诉（仅 PENDING，理由 5-500 字） */
+    @PreAuthorize("hasAuthority('" + PermissionConstants.EVALUATION_REVIEW + "')")
+    @PostMapping("/appeals/{id}/reject")
+    public Result<Void> rejectAppeal(@PathVariable long id,
+                                     @Valid @RequestBody RejectAppealRequest request) {
+        evaluationAppealService.reject(id, request.getReason(), currentPrincipal());
+        return Result.success(null);
     }
 
     /** 当前主体（JWT过滤器装配；未登录时此路径不可达） */

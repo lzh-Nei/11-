@@ -8,12 +8,14 @@ import com.aies.model.ParseMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.UUID;
 
 /**
@@ -39,54 +41,80 @@ public class ParseWorker {
     private static final String STATUS_FAILED = "FAILED";
     /** S-03 提取文本预览上限（全量落桶，DB 仅存 key） */
     static final String PARSED_PREFIX = "parsed/";
+    /** 单飞锁 TTL：覆盖大文件解析耗时，异常退出后由超时补偿兜底 */
+    private static final Duration LOCK_TTL = Duration.ofMinutes(15);
 
     private final SubmissionMapper submissionMapper;
     private final FileStorage fileStorage;
     private final ParseService parseService;
     private final RabbitTemplate rabbitTemplate;
+    private final MqProcessingGuard processingGuard;
 
-    @RabbitListener(queues = RabbitConfig.PARSE_QUEUE)
+    @RabbitListener(queues = RabbitConfig.PARSE_QUEUE, containerFactory = "parseListenerContainerFactory")
     public void onMessage(ParseMessage message) {
+        if (message == null || message.submissionId() <= 0) {
+            log.warn("解析消息非法，跳过: {}", message);
+            return;
+        }
         long id = message.submissionId();
-        Submission submission = submissionMapper.selectById(id);
-        if (submission == null) {
-            // 事务提交早于消息可见的极小窗口/脏消息：留 PENDING 可重放，跳过不 ack 失败
-            log.warn("解析消息对应提交不存在，跳过: submissionId={}", id);
+        String lockKey = "parse:" + id;
+        String token = processingGuard.tryLock(lockKey, LOCK_TTL);
+        if (token == null) {
+            log.info("同一提交正在解析，跳过重复投递: submissionId={}", id);
             return;
         }
-        if (STATUS_SUCCESS.equals(submission.getParseStatus())) {
-            log.info("重复投递跳过（已SUCCESS）: submissionId={}", id);
-            return;
-        }
-
-        submission.setParseStatus(STATUS_QUEUED);
-        submissionMapper.updateById(submission);
-        log.info("解析开始(QUEUED): submissionId={} file={}", id, submission.getFileName());
-
         try {
-            String text;
-            try (InputStream in = fileStorage.openStream(submission.getFileKey())) {
-                text = "pdf".equals(submission.getFileType())
-                        ? parseService.extractPdf(in)
-                        : parseService.extractDocx(in);
+            Submission submission = submissionMapper.selectById(id);
+            if (submission == null) {
+                // 事务提交早于消息可见的极小窗口/脏消息：留 PENDING 可重放，跳过不 ack 失败
+                log.warn("解析消息对应提交不存在，跳过: submissionId={}", id);
+                return;
             }
-            String textKey = PARSED_PREFIX + UUID.randomUUID().toString().replace("-", "") + ".txt";
-            byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
-            fileStorage.store(textKey, new ByteArrayInputStream(bytes), bytes.length);
+            if (STATUS_SUCCESS.equals(submission.getParseStatus())) {
+                log.info("重复投递跳过（已SUCCESS）: submissionId={}", id);
+                return;
+            }
 
-            submission.setParsedTextKey(textKey);
-            submission.setParseStatus(STATUS_SUCCESS);
+            submission.setParseStatus(STATUS_QUEUED);
             submissionMapper.updateById(submission);
-            log.info("解析SUCCESS: submissionId={} textKey={} chars={}", id, textKey, text.length());
-            // UC-20（W7-C2）：解析完成→评价链触发（MQ内部链路）；失败留SUCCESS可恢复
-            dispatchEvalMessage(id);
-        } catch (Exception e) {
-            submission.setParsedTextKey(null);
-            submission.setParseStatus(STATUS_FAILED);
-            submissionMapper.updateById(submission);
-            // 前端 UC-16 E4 口径：30002 提示转标准 PDF 重传（评价队列不进入）
-            log.warn("解析FAILED(UC-16 E4→30002): submissionId={} type={} err={}",
-                    id, submission.getFileType(), e.getMessage());
+            log.info("解析开始(QUEUED): submissionId={} file={}", id, submission.getFileName());
+
+            try {
+                String text = extractText(submission);
+                String textKey = PARSED_PREFIX + UUID.randomUUID().toString().replace("-", "") + ".txt";
+                byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
+                fileStorage.store(textKey, new ByteArrayInputStream(bytes), bytes.length);
+
+                submission.setParsedTextKey(textKey);
+                submission.setParseStatus(STATUS_SUCCESS);
+                submissionMapper.updateById(submission);
+                log.info("解析SUCCESS: submissionId={} textKey={} chars={}", id, textKey, text.length());
+                // UC-20（W7-C2）：解析完成→评价链触发（MQ内部链路）；失败留SUCCESS可恢复
+                dispatchEvalMessage(id);
+            } catch (Exception e) {
+                submission.setParsedTextKey(null);
+                submission.setParseStatus(STATUS_FAILED);
+                submissionMapper.updateById(submission);
+                // 前端 UC-16 E4 口径：30002 提示转标准 PDF 重传（评价队列不进入）
+                log.warn("解析FAILED(UC-16 E4→30002): submissionId={} type={} err={}",
+                        id, submission.getFileType(), e.getMessage());
+            }
+        } finally {
+            processingGuard.unlock(lockKey, token);
+        }
+    }
+
+    /** 显式分派：仅 pdf/docx 进入提取；其他类型（含历史图片行）明确失败而非误走 docx 分支 */
+    private String extractText(Submission submission) throws Exception {
+        try (InputStream in = fileStorage.openStream(submission.getFileKey())) {
+            if ("pdf".equals(submission.getFileType())) {
+                return parseService.extractPdf(in);
+            }
+            if ("docx".equals(submission.getFileType())) {
+                return parseService.extractDocx(in);
+            }
+            throw new IllegalArgumentException("暂不支持 " + submission.getFileType()
+                    + " 类型解析，请上传 docx 或可复制文本的 PDF");
         }
     }
 
@@ -94,7 +122,8 @@ public class ParseWorker {
     private void dispatchEvalMessage(long submissionId) {
         try {
             rabbitTemplate.convertAndSend(RabbitConfig.EVAL_EXCHANGE,
-                    RabbitConfig.EVAL_ROUTING_KEY, new EvalMessage(submissionId));
+                    RabbitConfig.EVAL_ROUTING_KEY, new EvalMessage(submissionId),
+                    new CorrelationData("eval-" + submissionId));
             log.info("评价消息已投递: submissionId={}", submissionId);
         } catch (Exception e) {
             log.error("评价消息发送失败(留SUCCESS可重评): submissionId={} err={}",

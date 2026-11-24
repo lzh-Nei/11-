@@ -18,6 +18,15 @@
     <ErrorState v-else-if="error && !data" :message="error" @retry="load" />
 
     <template v-else-if="data">
+      <el-alert
+        v-if="alertMessages.length"
+        :type="alertType"
+        show-icon
+        :closable="false"
+        class="alert"
+        :title="`队列告警：${alertMessages.join('；')}。请检查消费者与死信，并在下方按提交重放或排查。`"
+      />
+
       <div class="hero" :class="data.rabbitConnected ? 'ok' : 'bad'">
         <span class="pulse" aria-hidden="true"></span>
         <div class="hero-main">
@@ -36,6 +45,10 @@
             <span>消费者</span>
           </div>
           <div>
+            <b :class="{ danger: deadLetters > 0 }">{{ deadLetters }}</b>
+            <span>死信</span>
+          </div>
+          <div>
             <b>{{ stats.parseSuccess + stats.evaluationAiDone }}</b>
             <span>已完成</span>
           </div>
@@ -52,7 +65,7 @@
           <div class="queue-nums">
             <div>
               <b>{{ q.readyMessages ?? '—' }}</b>
-              <span>待消费</span>
+              <span>{{ isDlq(q) ? '死信积压' : '待消费' }}</span>
             </div>
             <div>
               <b>{{ q.consumers ?? '—' }}</b>
@@ -66,6 +79,9 @@
             <span class="mono">{{ q.routingKey }}</span>
           </p>
           <p v-if="!q.available" class="queue-error">{{ q.error || '队列不可用' }}</p>
+          <p v-else-if="isDlq(q) && (q.readyMessages ?? 0) > 0" class="queue-error">
+            存在死信，请在下方“最近异步处理”中按提交重放或排查
+          </p>
         </article>
       </div>
 
@@ -216,14 +232,32 @@ const stats = computed(() => data.value?.stats ?? {
   evaluationReviewed: 0,
   evaluationFailed: 0
 })
+const mainQueues = computed(() =>
+  (data.value?.queues ?? []).filter((q) => q.key === 'parse' || q.key === 'eval')
+)
+const deadLetterQueues = computed(() =>
+  (data.value?.queues ?? []).filter((q) => q.key.endsWith('Dlq'))
+)
 const totalReady = computed(() =>
-  (data.value?.queues ?? []).reduce((sum, q) => sum + (q.readyMessages ?? 0), 0)
+  mainQueues.value.reduce((sum, q) => sum + (q.readyMessages ?? 0), 0)
 )
 const totalConsumers = computed(() =>
-  (data.value?.queues ?? []).reduce((sum, q) => sum + (q.consumers ?? 0), 0)
+  mainQueues.value.reduce((sum, q) => sum + (q.consumers ?? 0), 0)
+)
+const deadLetters = computed(() =>
+  deadLetterQueues.value.reduce((sum, q) => sum + (q.readyMessages ?? 0), 0)
 )
 const parseQueue = computed(() => data.value?.queues.find((q) => q.key === 'parse') ?? null)
 const evalQueue = computed(() => data.value?.queues.find((q) => q.key === 'eval') ?? null)
+
+const alertMessages = computed(() => data.value?.alert?.messages ?? [])
+const alertType = computed<'warning' | 'error'>(() =>
+  data.value?.alert?.level === 'ERROR' ? 'error' : 'warning'
+)
+
+function isDlq(q: AdminMqQueue): boolean {
+  return q.key.endsWith('Dlq')
+}
 
 const statCards = computed(() => [
   { label: '解析排队', value: stats.value.parseQueued, tone: 'muted' },
@@ -237,6 +271,7 @@ const statCards = computed(() => [
 
 function queueText(q: AdminMqQueue): string {
   if (!q.available) return '不可用'
+  if (isDlq(q)) return (q.readyMessages ?? 0) > 0 ? '需处理' : '无积压'
   if ((q.consumers ?? 0) === 0) return '无消费者'
   if ((q.readyMessages ?? 0) > 0) return '处理中'
   return '空闲'
@@ -244,12 +279,14 @@ function queueText(q: AdminMqQueue): string {
 
 function queueTone(q: AdminMqQueue): string {
   if (!q.available) return 'bad'
+  if (isDlq(q)) return (q.readyMessages ?? 0) > 0 ? 'bad' : 'ok'
   if ((q.readyMessages ?? 0) > 0) return 'busy'
   return 'ok'
 }
 
 function queueTagType(q: AdminMqQueue): 'success' | 'warning' | 'danger' | 'info' {
   if (!q.available) return 'danger'
+  if (isDlq(q)) return (q.readyMessages ?? 0) > 0 ? 'danger' : 'success'
   if ((q.consumers ?? 0) === 0) return 'warning'
   if ((q.readyMessages ?? 0) > 0) return 'warning'
   return 'success'
@@ -349,6 +386,9 @@ onUnmounted(stopTimer)
   gap: 10px;
   flex: none;
 }
+.alert {
+  margin-bottom: var(--aies-gap);
+}
 .hero {
   display: flex;
   align-items: center;
@@ -409,6 +449,9 @@ onUnmounted(stopTimer)
   font: 600 20px var(--aies-mono, monospace);
   color: var(--aies-ink);
   line-height: 1.1;
+}
+.hero-metrics b.danger {
+  color: #b91c1c;
 }
 .hero-metrics span {
   font-size: 11.5px;

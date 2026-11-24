@@ -2,6 +2,8 @@ package com.aies.controller;
 
 import com.aies.model.ReportOverviewDTO;
 import com.aies.security.LoginPrincipal;
+import com.aies.service.ReportCsvFormatter;
+import com.aies.service.ReportExportService;
 import com.aies.service.ReportQueryService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -32,7 +34,8 @@ class ReportControllerTest {
     @BeforeEach
     void setUp() {
         reportQueryService = Mockito.mock(ReportQueryService.class);
-        mockMvc = MockMvcBuilders.standaloneSetup(new ReportController(reportQueryService)).build();
+        mockMvc = MockMvcBuilders.standaloneSetup(new ReportController(reportQueryService,
+                Mockito.mock(ReportExportService.class), new ReportCsvFormatter())).build();
         LoginPrincipal principal = new LoginPrincipal(2L, "jti", "raw", "TEACHER",
                 Long.MAX_VALUE);
         SecurityContextHolder.getContext().setAuthentication(

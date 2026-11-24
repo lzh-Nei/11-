@@ -25,10 +25,15 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * M3 管理端 AI 域配置模块（UC-33/37/38/39）。
@@ -44,6 +49,10 @@ public class AdminAiService {
 
     private static final String PLACEHOLDER_METRICS = "{metrics}";
     private static final String PLACEHOLDER_TEXT = "{parsed_text}";
+    private static final long MAX_SAMPLE_BYTES = 20L * 1024 * 1024;
+    private static final Map<String, String> SAMPLE_MIME_WHITELIST = Map.of(
+            "docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "pdf", "application/pdf");
 
     private final LlmConfigMapper llmConfigMapper;
     private final PromptTemplateMapper promptTemplateMapper;
@@ -52,6 +61,7 @@ public class AdminAiService {
     private final AdminAuditService auditService;
     private final ApiKeyCipher apiKeyCipher;
     private final LlmClient llmClient;
+    private final FileStorage fileStorage;
 
     /* ==================== LLM 参数 ==================== */
 
@@ -160,11 +170,7 @@ public class AdminAiService {
     /** 新建模板版本（默认不启用；必须含两个占位符，否则评分链会断） */
     @Transactional
     public PromptDetailVO createPrompt(CreatePromptRequest request, LoginPrincipal principal) {
-        String content = request.getContent().trim();
-        if (!content.contains(PLACEHOLDER_METRICS) || !content.contains(PLACEHOLDER_TEXT)) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR,
-                    "模板必须包含 {metrics} 与 {parsed_text} 两个占位符");
-        }
+        String content = validatePromptContent(request.getContent());
         List<PromptTemplate> latest = promptTemplateMapper.selectList(
                 new LambdaQueryWrapper<PromptTemplate>()
                         .orderByDesc(PromptTemplate::getVersionNo).last("LIMIT 1"));
@@ -197,6 +203,68 @@ public class AdminAiService {
         auditService.record(principal, "system", "ENABLE_PROMPT", "prompt:v" + target.getVersionNo(), detail);
     }
 
+    /** 编辑模板内容：仅未启用版本可改，占位符规则与新建一致 */
+    @Transactional
+    public PromptDetailVO updatePrompt(long id, CreatePromptRequest request, LoginPrincipal principal) {
+        PromptTemplate target = requirePrompt(id);
+        if (Integer.valueOf(1).equals(target.getEnabled())) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "启用中的版本不可编辑，请先停用");
+        }
+        String content = validatePromptContent(request.getContent());
+        promptTemplateMapper.update(null, new UpdateWrapper<PromptTemplate>()
+                .eq("id", id)
+                .set("content", content));
+
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("versionNo", target.getVersionNo());
+        detail.put("contentLength", content.length());
+        auditService.record(principal, "system", "UPDATE_PROMPT",
+                "prompt:v" + target.getVersionNo(), detail);
+        return new PromptDetailVO(target.getId(), target.getVersionNo(), target.getEnabled(),
+                content, target.getCreateTime());
+    }
+
+    /** 停用指定版本（启用版置0；未启用时拒绝以提示操作无效） */
+    @Transactional
+    public void disablePrompt(long id, LoginPrincipal principal) {
+        PromptTemplate target = requirePrompt(id);
+        if (!Integer.valueOf(1).equals(target.getEnabled())) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "该版本当前未启用");
+        }
+        promptTemplateMapper.update(null, new UpdateWrapper<PromptTemplate>()
+                .eq("id", id)
+                .set("enabled", 0));
+
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("versionNo", target.getVersionNo());
+        auditService.record(principal, "system", "DISABLE_PROMPT",
+                "prompt:v" + target.getVersionNo(), detail);
+    }
+
+    /** 删除模板版本：启用中拒绝；历史评价未记录 Prompt 版本引用，故仅以启用状态保护 */
+    @Transactional
+    public void deletePrompt(long id, LoginPrincipal principal) {
+        PromptTemplate target = requirePrompt(id);
+        if (Integer.valueOf(1).equals(target.getEnabled())) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "启用中的版本不可删除，请先停用");
+        }
+        promptTemplateMapper.deleteById(id);
+
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("versionNo", target.getVersionNo());
+        auditService.record(principal, "system", "DELETE_PROMPT",
+                "prompt:v" + target.getVersionNo(), detail);
+    }
+
+    private String validatePromptContent(String raw) {
+        String content = raw == null ? "" : raw.trim();
+        if (!content.contains(PLACEHOLDER_METRICS) || !content.contains(PLACEHOLDER_TEXT)) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR,
+                    "模板必须包含 {metrics} 与 {parsed_text} 两个占位符");
+        }
+        return content;
+    }
+
     /* ==================== 黄金数据集 ==================== */
 
     public Page<GoldenSampleVO> goldenSamples(long page, long size) {
@@ -225,6 +293,85 @@ public class AdminAiService {
         detail.put("active", active);
         auditService.record(principal, "system", active == 1 ? "ENABLE_GOLDEN" : "DISABLE_GOLDEN",
                 "golden:" + id, detail);
+    }
+
+    /** 新增黄金样本：docx/pdf ≤20MB，教师总分 0-100，指标 JSON 必须为对象，默认停用 */
+    @Transactional
+    public GoldenSampleVO createGoldenSample(MultipartFile file, BigDecimal teacherTotal,
+                                             String teacherMetrics, LoginPrincipal principal) {
+        if (file == null || file.isEmpty()) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "样本文件不能为空");
+        }
+        if (file.getSize() > MAX_SAMPLE_BYTES) {
+            throw new BusinessException(ErrorCode.FILE_TOO_LARGE);
+        }
+        String originalName = file.getOriginalFilename() == null ? "" : file.getOriginalFilename();
+        String ext = extensionOf(originalName);
+        String expectedMime = SAMPLE_MIME_WHITELIST.get(ext);
+        if (expectedMime == null || !expectedMime.equalsIgnoreCase(file.getContentType())) {
+            throw new BusinessException(ErrorCode.FILE_TYPE_UNSUPPORTED);
+        }
+        if (teacherTotal == null || teacherTotal.compareTo(BigDecimal.ZERO) < 0
+                || teacherTotal.compareTo(BigDecimal.valueOf(100)) > 0) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "教师总分需在0-100之间");
+        }
+        String metricsJson = null;
+        JsonNode metricsNode = null;
+        if (teacherMetrics != null && !teacherMetrics.isBlank()) {
+            try {
+                metricsNode = objectMapper.readTree(teacherMetrics);
+            } catch (Exception e) {
+                throw new BusinessException(ErrorCode.PARAM_ERROR, "教师指标分必须是合法JSON");
+            }
+            if (!metricsNode.isObject()) {
+                throw new BusinessException(ErrorCode.PARAM_ERROR, "教师指标分必须是JSON对象");
+            }
+            metricsJson = teacherMetrics.trim();
+        }
+
+        String key = "golden/" + UUID.randomUUID().toString().replace("-", "") + "." + ext;
+        try (InputStream in = file.getInputStream()) {
+            fileStorage.store(key, in, file.getSize());
+        } catch (IOException e) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR.getCode(), "样本文件落盘失败，请重试");
+        }
+
+        GoldenDataset sample = new GoldenDataset();
+        sample.setSampleFileKey(key);
+        sample.setTeacherTotal(teacherTotal);
+        sample.setTeacherMetrics(metricsJson);
+        sample.setActive(0);
+        goldenDatasetMapper.insert(sample);
+
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("sampleFileKey", key);
+        detail.put("teacherTotal", teacherTotal);
+        detail.put("active", 0);
+        auditService.record(principal, "system", "CREATE_GOLDEN",
+                "golden:" + sample.getId(), detail);
+        return new GoldenSampleVO(sample.getId(), key, teacherTotal, metricsNode, 0, null);
+    }
+
+    /** 删除黄金样本：启用中拒绝（先停用）；对象文件不回收（FileStorage 无删除契约） */
+    @Transactional
+    public void deleteGoldenSample(long id, LoginPrincipal principal) {
+        GoldenDataset sample = goldenDatasetMapper.selectById(id);
+        if (sample == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "黄金样本不存在");
+        }
+        if (Integer.valueOf(1).equals(sample.getActive())) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "启用中的样本不可删除，请先停用");
+        }
+        goldenDatasetMapper.deleteById(id);
+
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("sampleFileKey", sample.getSampleFileKey());
+        auditService.record(principal, "system", "DELETE_GOLDEN", "golden:" + id, detail);
+    }
+
+    private String extensionOf(String originalName) {
+        int dot = originalName.lastIndexOf('.');
+        return dot < 0 ? "" : originalName.substring(dot + 1).toLowerCase();
     }
 
     private PromptTemplate requirePrompt(long id) {

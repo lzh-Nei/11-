@@ -13,6 +13,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * ParseService 单测（UC-16 基本流第5步第一级解析：docx=POI / pdf=PDFBox，
@@ -63,12 +64,14 @@ class ParseServiceTest {
         assertThat(text).isEqualTo(text.trim());
     }
 
-    /** 例2 空文档不是解析失败——提取为空串（口径：仅损坏文件才 FAILED） */
+    /** 例2 空文本视为解析失败（扫描件/空文档不静默产出空内容） */
     @Test
-    void extractDocxEmptyDocumentYieldsBlank() throws IOException {
+    void extractDocxEmptyDocumentFails() throws IOException {
         byte[] bytes = docxBytes();
 
-        assertThat(parseService.extractDocx(new ByteArrayInputStream(bytes))).isEmpty();
+        assertThatThrownBy(() -> parseService.extractDocx(new ByteArrayInputStream(bytes)))
+                .isInstanceOf(IOException.class)
+                .hasMessageContaining("未提取到可解析文本");
     }
 
     /** 例3 pdf 文本提取（PDFBox 3.x Loader 路径） */

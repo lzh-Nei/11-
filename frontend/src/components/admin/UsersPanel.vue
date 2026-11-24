@@ -125,18 +125,18 @@
     <!-- 新建 / 编辑用户 -->
     <el-dialog
       v-model="editorDialog"
-      :title="editorMode === 'create' ? '新建用户' : '编辑用户'"
-      width="560px"
+      :title="editorMode === 'create' ? '新建用户' : '编辑用户（全部资料）'"
+      width="620px"
     >
       <el-form label-position="top">
         <div class="form-grid">
           <el-form-item label="学号 / 工号" required>
             <el-input
               v-model="form.username"
-              :disabled="editorMode === 'edit'"
               placeholder="4-20位字母、数字或下划线"
               maxlength="20"
             />
+            <span v-if="editorMode === 'edit'" class="field-hint">修改后立即生效，历史数据不受影响</span>
           </el-form-item>
           <el-form-item label="姓名" required>
             <el-input v-model="form.realName" placeholder="请输入姓名" maxlength="32" />
@@ -151,6 +151,16 @@
             autocomplete="new-password"
           />
           <span class="field-hint">新账号首次登录会被要求修改初始密码</span>
+        </el-form-item>
+        <el-form-item v-else label="重置密码（选填）">
+          <el-input
+            v-model="form.newPassword"
+            type="password"
+            placeholder="留空表示不修改；至少8位且同时含字母和数字"
+            show-password
+            autocomplete="new-password"
+          />
+          <span class="field-hint">填写后该账号首次登录需改密，现有登录会话立即失效</span>
         </el-form-item>
         <div class="form-grid">
           <el-form-item label="邮箱（选填）">
@@ -171,14 +181,25 @@
               />
             </el-select>
           </el-form-item>
-          <el-form-item v-if="editorMode === 'create'" label="角色" required>
-            <el-checkbox-group v-model="form.roleCodes">
-              <el-checkbox v-for="r in assignableRoles" :key="r.roleCode" :value="r.roleCode">
-                {{ roleLabel(r.roleCode) }}
-              </el-checkbox>
-            </el-checkbox-group>
+          <el-form-item v-if="editorMode === 'edit'" label="账号状态">
+            <el-switch
+              v-model="form.status"
+              :active-value="1"
+              :inactive-value="0"
+              active-text="正常"
+              inactive-text="禁用"
+            />
+            <span class="field-hint">禁用后账号无法登录，现有登录会话立即失效</span>
           </el-form-item>
         </div>
+        <el-form-item label="角色" required>
+          <el-checkbox-group v-model="form.roleCodes">
+            <el-checkbox v-for="r in assignableRoles" :key="r.roleCode" :value="r.roleCode">
+              {{ roleLabel(r.roleCode) }}
+            </el-checkbox>
+          </el-checkbox-group>
+          <span class="field-hint">管理员角色不可通过此处分配；当前登录账号与管理员账号受保护</span>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="editorDialog = false">取消</el-button>
@@ -247,9 +268,11 @@ const form = reactive({
   username: '',
   realName: '',
   password: '',
+  newPassword: '',
   email: '',
   phone: '',
   classId: null as number | null,
+  status: 1,
   roleCodes: [] as string[]
 })
 
@@ -321,9 +344,11 @@ function resetForm() {
   form.username = ''
   form.realName = ''
   form.password = ''
+  form.newPassword = ''
   form.email = ''
   form.phone = ''
   form.classId = null
+  form.status = 1
   form.roleCodes = []
 }
 
@@ -345,15 +370,17 @@ async function openEdit(row: AdminUser) {
   form.username = row.username
   form.realName = row.realName ?? ''
   form.password = ''
+  form.newPassword = ''
   form.email = row.email ?? ''
   form.phone = row.phone ?? ''
   form.classId = row.classId
+  form.status = row.status
   form.roleCodes = [...row.roleCodes]
   editorDialog.value = true
 }
 
 function validateEditor(): boolean {
-  if (editorMode.value === 'create' && !/^[A-Za-z0-9_]{4,20}$/.test(form.username.trim())) {
+  if (!/^[A-Za-z0-9_]{4,20}$/.test(form.username.trim())) {
     toast.warning('学号/工号需为4-20位字母、数字或下划线')
     return false
   }
@@ -365,6 +392,14 @@ function validateEditor(): boolean {
     toast.warning('初始密码需至少8位，且同时包含字母和数字')
     return false
   }
+  if (
+    editorMode.value === 'edit' &&
+    form.newPassword &&
+    !/^(?=.*[A-Za-z])(?=.*\d).{8,32}$/.test(form.newPassword)
+  ) {
+    toast.warning('新密码需至少8位，且同时包含字母和数字')
+    return false
+  }
   if (!emailValid.value) {
     toast.warning('邮箱格式不正确')
     return false
@@ -373,7 +408,7 @@ function validateEditor(): boolean {
     toast.warning('手机号格式不正确')
     return false
   }
-  if (editorMode.value === 'create' && form.roleCodes.length === 0) {
+  if (form.roleCodes.length === 0) {
     toast.warning('至少选择一个角色')
     return false
   }
@@ -396,13 +431,18 @@ async function saveEditor() {
       })
       toast.success('用户已创建，初始密码首次登录需修改')
     } else if (editingUser.value) {
-      await adminApi.updateUser(editingUser.value.id, {
+      const payload: Parameters<typeof adminApi.updateUser>[1] = {
+        username: form.username.trim(),
         realName: form.realName.trim(),
         email: form.email.trim(),
         phone: form.phone.trim(),
-        classId: form.classId ?? null
-      })
-      toast.success('用户资料已更新')
+        classId: form.classId ?? null,
+        status: form.status,
+        roleCodes: form.roleCodes
+      }
+      if (form.newPassword) payload.newPassword = form.newPassword
+      await adminApi.updateUser(editingUser.value.id, payload)
+      toast.success(form.newPassword ? '用户资料已更新，密码已重置' : '用户资料已更新')
     }
     editorDialog.value = false
     await load()

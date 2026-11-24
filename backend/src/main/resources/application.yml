@@ -30,10 +30,16 @@ spring:
     port: 5672
     username: ${RABBITMQ_USER:guest}
     password: ${RABBITMQ_PASSWORD:guest}
+    # 发布确认：correlated 记录 nack，returns 记录不可路由消息
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
     listener:
       simple:
         # 解析失败由 worker 捕获置 FAILED 后正常 ack，不 requeue 死循环
         default-requeue-rejected: false
+        acknowledge-mode: auto
   data:
     redis:
       # 图形验证码、短信验证码都存放在 Redis；本地没有 Redis 时请先启动
@@ -73,18 +79,46 @@ mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
 
-sa-token:
-  experiment:
-    # Sa-Token 试写代码默认关闭：运行期认证仍由 Spring Security/JWT 负责。
-    # 仅在需要对比学习时置为 true 才会装配 SaTokenConfigure 与 StpInterfaceImpl。
-    enabled: false
-
 jwt:
   # HS512密钥：≥64字节，.env注入（S-14密钥零明文）；缺失时启动即失败（JwtService校验）
   secret: ${JWT_SECRET:}
   # S-10：AT 2h / RT 7d旋转
   access-token-minutes: 120
   refresh-token-days: 7
+
+mq:
+  # 消费者并发参数（RabbitConfig 独立容器工厂读取）
+  parse:
+    concurrency: 2
+    max-concurrency: 4
+    prefetch: 1
+    # 瞬时故障（DB/存储抖动）有限次退避重试，仍失败才进死信队列
+    max-attempts: 3
+  eval:
+    # LLM 慢任务：实际 LLM 并发还受 ai.semaphore.permits=2 限制
+    concurrency: 1
+    max-concurrency: 2
+    prefetch: 1
+    # LLM 成本高：只重试1次，避免重复计费
+    max-attempts: 2
+  alert:
+    # 死信 >= 阈值即告警；主队列积压 > 阈值即告警（状态变化才输出日志，避免刷屏）
+    dlq-warn-threshold: 1
+    backlog-warn-threshold: 100
+    check-ms: 300000
+    initial-ms: 60000
+
+schedule:
+  # 任务截止自动关闭：PUBLISHED + deadline 已过 → CLOSED
+  task-close-ms: 60000
+  task-close-initial-ms: 30000
+  # 异步链补偿扫描周期与阈值
+  recovery-ms: 300000
+  recovery-initial-ms: 60000
+  parse-pending-minutes: 10
+  parse-queued-minutes: 30
+  eval-pending-minutes: 15
+  recovery-batch: 50
 
 auth:
   captcha:
@@ -135,6 +169,15 @@ ai:
     queue-warn-seconds: 30           # 排队超30s打WARN（规范§三）
   prompt:
     text-limit: 12000                # 提取文本塞入模板前截断上限（保头保尾）
+
+app:
+  upload:
+    # R-02 病毒扫描：默认关闭（Noop 直通）；开启后走 ClamAV clamd INSTREAM，异常 fail-closed
+    clamav:
+      enabled: ${CLAMAV_ENABLED:false}
+      host: ${CLAMAV_HOST:localhost}
+      port: ${CLAMAV_PORT:3310}
+      timeout-ms: 3000
 
 llm:
   deepseek:

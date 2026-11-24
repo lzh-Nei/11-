@@ -8,7 +8,10 @@ import com.aies.dto.admin.AdminDtos.AdminPermissionVO;
 import com.aies.dto.admin.AdminDtos.AdminRoleVO;
 import com.aies.dto.admin.AdminDtos.AdminTeacherVO;
 import com.aies.dto.admin.AdminDtos.AdminUserVO;
+import com.aies.dto.admin.AdminDtos.AuditLogFilter;
 import com.aies.dto.admin.AdminDtos.AuditLogVO;
+import com.aies.dto.admin.AdminDtos.AuditStatsVO;
+import com.aies.dto.admin.AdminDtos.RuntimeLogPageVO;
 import com.aies.dto.admin.AdminDtos.ClassCreateRequest;
 import com.aies.dto.admin.AdminDtos.ClassUpdateRequest;
 import com.aies.dto.admin.AdminDtos.CreatePromptRequest;
@@ -19,6 +22,9 @@ import com.aies.dto.admin.AdminDtos.LlmTestResult;
 import com.aies.dto.admin.AdminDtos.MqMonitorVO;
 import com.aies.dto.admin.AdminDtos.PromptDetailVO;
 import com.aies.dto.admin.AdminDtos.PromptTemplateVO;
+import com.aies.dto.admin.AdminDtos.ResetPasswordResult;
+import com.aies.dto.admin.AdminDtos.ResetUserPasswordRequest;
+import com.aies.dto.admin.AdminDtos.SystemConfigUpdateRequest;
 import com.aies.dto.admin.AdminDtos.SystemConfigVO;
 import com.aies.dto.admin.AdminDtos.ToggleActiveRequest;
 import com.aies.dto.admin.AdminDtos.UpdateLlmConfigRequest;
@@ -31,6 +37,7 @@ import com.aies.security.PrincipalUtils;
 import com.aies.service.AdminAiService;
 import com.aies.service.AdminClassService;
 import com.aies.service.AdminEvaluationService;
+import com.aies.service.AdminLogService;
 import com.aies.service.AdminRbacService;
 import com.aies.service.AdminSystemService;
 import com.aies.service.AdminUserService;
@@ -42,6 +49,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -53,7 +61,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -73,6 +84,7 @@ public class AdminController {
     private final AdminClassService classService;
     private final AdminAiService aiService;
     private final AdminSystemService systemService;
+    private final AdminLogService logService;
     private final AdminEvaluationService evaluationService;
     private final MqMonitorService mqMonitorService;
     private final MqReplayService mqReplayService;
@@ -132,6 +144,15 @@ public class AdminController {
                                          @Valid @RequestBody UpdateUserStatusRequest request) {
         userService.updateStatus(id, request.getStatus(), PrincipalUtils.current());
         return Result.success();
+    }
+
+    /** 重置用户密码：留空生成临时密码（仅生成时回传一次），并置首登改密标记 */
+    @PreAuthorize("hasAuthority('" + PermissionConstants.USER_MANAGE + "')")
+    @PostMapping("/users/{id}/reset-password")
+    public Result<ResetPasswordResult> resetPassword(
+            @PathVariable("id") @Positive long id,
+            @Valid @RequestBody ResetUserPasswordRequest request) {
+        return Result.success(userService.resetPassword(id, request, PrincipalUtils.current()));
     }
 
     @PreAuthorize("hasAuthority('" + PermissionConstants.USER_MANAGE + "')")
@@ -215,7 +236,7 @@ public class AdminController {
         return Result.success();
     }
 
-    /* ==================== 审计日志（audit:view） ==================== */
+    /* ==================== 日志采集与审计窗口（audit:view，仅管理员） ==================== */
 
     @PreAuthorize("hasAuthority('" + PermissionConstants.AUDIT_VIEW + "')")
     @GetMapping("/audit-logs")
@@ -224,8 +245,44 @@ public class AdminController {
             @RequestParam(defaultValue = "20") @Min(value = 1, message = "每页条数最小为1")
             @Max(value = 100, message = "每页条数最大为100") long size,
             @RequestParam(required = false) String module,
-            @RequestParam(required = false) String action) {
-        return Result.success(systemService.auditLogs(page, size, module, action));
+            @RequestParam(required = false) String action,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String operator,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end) {
+        AuditLogFilter filter = new AuditLogFilter(module, action, keyword, operator, start, end);
+        return Result.success(systemService.auditLogs(page, size, filter));
+    }
+
+    /** 审计窗口概览：总量/今日/近24h + 模块/动作分布 + 近7日趋势 */
+    @PreAuthorize("hasAuthority('" + PermissionConstants.AUDIT_VIEW + "')")
+    @GetMapping("/audit-logs/stats")
+    public Result<AuditStatsVO> auditStats() {
+        return Result.success(logService.auditStats(PrincipalUtils.current()));
+    }
+
+    /** 运行日志分页（内存采集缓冲，级别阈值/关键字/logger 过滤） */
+    @PreAuthorize("hasAuthority('" + PermissionConstants.AUDIT_VIEW + "')")
+    @GetMapping("/logs/runtime")
+    public Result<RuntimeLogPageVO> runtimeLogs(
+            @RequestParam(defaultValue = "1") @Min(value = 1, message = "页码最小为1") long page,
+            @RequestParam(defaultValue = "20") @Min(value = 1, message = "每页条数最小为1")
+            @Max(value = 200, message = "每页条数最大为200") long size,
+            @RequestParam(required = false) String level,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String logger) {
+        return Result.success(logService.runtimeLogs(page, size, level, keyword, logger,
+                PrincipalUtils.current()));
+    }
+
+    /** 清空内存采集缓冲（审计留痕，仅管理员） */
+    @PreAuthorize("hasAuthority('" + PermissionConstants.AUDIT_VIEW + "')")
+    @DeleteMapping("/logs/runtime")
+    public Result<Void> clearRuntimeLogs() {
+        logService.clearRuntimeLogs(PrincipalUtils.current());
+        return Result.success();
     }
 
     /* ==================== 系统配置（system:config，只读） ==================== */
@@ -234,6 +291,14 @@ public class AdminController {
     @GetMapping("/system/config")
     public Result<SystemConfigVO> systemConfig() {
         return Result.success(systemService.config());
+    }
+
+    /** 更新白名单系统参数（类型/范围校验，变更后报表缓存全量失效） */
+    @PreAuthorize("hasAuthority('" + PermissionConstants.SYSTEM_CONFIG + "')")
+    @PutMapping("/system/config")
+    public Result<Void> updateSystemConfig(@Valid @RequestBody SystemConfigUpdateRequest request) {
+        systemService.updateConfig(request.getValues(), PrincipalUtils.current());
+        return Result.success();
     }
 
     /* ==================== 消息队列监控与重放（system:config） ==================== */
@@ -307,6 +372,28 @@ public class AdminController {
         return Result.success();
     }
 
+    /** 编辑模板（仅未启用版本） */
+    @PreAuthorize("hasAuthority('" + PermissionConstants.PROMPT_MANAGE + "')")
+    @PutMapping("/prompts/{id}")
+    public Result<PromptDetailVO> updatePrompt(@PathVariable("id") @Positive long id,
+                                               @Valid @RequestBody CreatePromptRequest request) {
+        return Result.success(aiService.updatePrompt(id, request, PrincipalUtils.current()));
+    }
+
+    @PreAuthorize("hasAuthority('" + PermissionConstants.PROMPT_MANAGE + "')")
+    @PutMapping("/prompts/{id}/disable")
+    public Result<Void> disablePrompt(@PathVariable("id") @Positive long id) {
+        aiService.disablePrompt(id, PrincipalUtils.current());
+        return Result.success();
+    }
+
+    @PreAuthorize("hasAuthority('" + PermissionConstants.PROMPT_MANAGE + "')")
+    @DeleteMapping("/prompts/{id}")
+    public Result<Void> deletePrompt(@PathVariable("id") @Positive long id) {
+        aiService.deletePrompt(id, PrincipalUtils.current());
+        return Result.success();
+    }
+
     /* ==================== 黄金数据集（golden:manage） ==================== */
 
     @PreAuthorize("hasAuthority('" + PermissionConstants.GOLDEN_MANAGE + "')")
@@ -323,6 +410,24 @@ public class AdminController {
     public Result<Void> toggleGoldenActive(@PathVariable("id") @Positive long id,
                                            @Valid @RequestBody ToggleActiveRequest request) {
         aiService.setGoldenActive(id, request.getActive(), PrincipalUtils.current());
+        return Result.success();
+    }
+
+    /** 上传黄金样本（docx/pdf ≤20MB，教师总分 0-100，可选指标 JSON） */
+    @PreAuthorize("hasAuthority('" + PermissionConstants.GOLDEN_MANAGE + "')")
+    @PostMapping(value = "/golden-samples", consumes = "multipart/form-data")
+    public Result<GoldenSampleVO> createGoldenSample(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("teacherTotal") BigDecimal teacherTotal,
+            @RequestParam(value = "teacherMetrics", required = false) String teacherMetrics) {
+        return Result.success(aiService.createGoldenSample(file, teacherTotal, teacherMetrics,
+                PrincipalUtils.current()));
+    }
+
+    @PreAuthorize("hasAuthority('" + PermissionConstants.GOLDEN_MANAGE + "')")
+    @DeleteMapping("/golden-samples/{id}")
+    public Result<Void> deleteGoldenSample(@PathVariable("id") @Positive long id) {
+        aiService.deleteGoldenSample(id, PrincipalUtils.current());
         return Result.success();
     }
 }

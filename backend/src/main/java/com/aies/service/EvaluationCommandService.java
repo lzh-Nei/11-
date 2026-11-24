@@ -27,6 +27,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -345,7 +346,8 @@ public class EvaluationCommandService {
     private void dispatchEvalMessage(long submissionId) {
         try {
             rabbitTemplate.convertAndSend(RabbitConfig.EVAL_EXCHANGE,
-                    RabbitConfig.EVAL_ROUTING_KEY, new EvalMessage(submissionId));
+                    RabbitConfig.EVAL_ROUTING_KEY, new EvalMessage(submissionId),
+                    new CorrelationData("eval-" + submissionId));
             log.info("重评消息已投递: submissionId={}", submissionId);
         } catch (Exception e) {
             // 与解析链同口径：不让消息故障反噬接口；PENDING留存，恢复路径登记偏差（人工/重放）

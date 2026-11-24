@@ -60,7 +60,13 @@ const router = createRouter({
           name: 'legacy-report',
           redirect: '/modules?group=analysis&child=report'
         },
-        { path: 'evaluations/:id', name: 'evaluation-report', component: EvaluationReport },
+        {
+          // 评价详情：需 evaluation:view；越权查看他人评价由后端 40301 兜底（页面友好提示）
+          path: 'evaluations/:id',
+          name: 'evaluation-report',
+          component: EvaluationReport,
+          meta: { permission: 'evaluation:view' }
+        },
         {
           path: 'review',
           name: 'review-hub',
@@ -78,6 +84,19 @@ const router = createRouter({
           name: 'file-center',
           component: () => import('@/views/FileCenterView.vue'),
           meta: { roles: ['ADMIN'] }
+        },
+        {
+          // 在线聊天（V20）：学生 ↔ 任课教师
+          path: 'messages',
+          name: 'chat',
+          component: () => import('@/views/ChatView.vue'),
+          meta: { roles: ['STUDENT', 'TEACHER'] }
+        },
+        {
+          // 通知中心（V2）：登录用户均可查看本人通知
+          path: 'notifications',
+          name: 'notifications',
+          component: () => import('@/views/NotificationView.vue')
         },
         {
           path: 'modules',
@@ -156,6 +175,11 @@ router.beforeEach(async (to) => {
   if (roles?.length && auth.me) {
     const mine = auth.me.roles ?? []
     if (!roles.some((r) => mine.includes(r))) return { path: '/403' }
+  }
+  // 权限点门控（比角色更细，如评价详情需 evaluation:view）
+  const permission = to.meta.permission as string | undefined
+  if (permission && auth.me && !(auth.me.permissions ?? []).includes(permission)) {
+    return { path: '/403' }
   }
   return true
 })

@@ -73,7 +73,7 @@ import AdminEvaluationsView from '@/components/admin/AdminEvaluationsView.vue'
 import UsersPanel from '@/components/admin/UsersPanel.vue'
 import RolesPanel from '@/components/admin/RolesPanel.vue'
 import ClassesPanel from '@/components/admin/ClassesPanel.vue'
-import AuditLogsPanel from '@/components/admin/AuditLogsPanel.vue'
+import LogCenterPanel from '@/components/admin/LogCenterPanel.vue'
 import LlmConfigPanel from '@/components/admin/LlmConfigPanel.vue'
 import PromptPanel from '@/components/admin/PromptPanel.vue'
 import GoldenPanel from '@/components/admin/GoldenPanel.vue'
@@ -244,7 +244,7 @@ const adminGroups: ModuleGroup[] = [
     label: '系统运维',
     icon: 'system',
     children: [
-      { key: 'audit', label: '审计日志', icon: 'archive', component: AuditLogsPanel },
+      { key: 'audit', label: '日志与审计', icon: 'archive', component: LogCenterPanel },
       { key: 'mq', label: '消息队列', icon: 'chart', component: MqMonitorPanel },
       { key: 'config', label: '系统配置', icon: 'system', component: ConfigPanel }
     ]

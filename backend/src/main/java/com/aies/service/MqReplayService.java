@@ -13,6 +13,7 @@ import com.aies.security.LoginPrincipal;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -64,7 +65,8 @@ public class MqReplayService {
         }
         audit(principal, "REPLAY_PARSE", submissionId);
         sendAfterCommit(() -> rabbitTemplate.convertAndSend(RabbitConfig.PARSE_EXCHANGE,
-                RabbitConfig.PARSE_ROUTING_KEY, new ParseMessage(submissionId)));
+                RabbitConfig.PARSE_ROUTING_KEY, new ParseMessage(submissionId),
+                new CorrelationData("replay-parse-" + submissionId)));
         log.info("解析重放已触发: submissionId={} operator={}", submissionId, principal.userId());
     }
 
@@ -105,7 +107,8 @@ public class MqReplayService {
         }
         audit(principal, "REPLAY_EVALUATION", submissionId);
         sendAfterCommit(() -> rabbitTemplate.convertAndSend(RabbitConfig.EVAL_EXCHANGE,
-                RabbitConfig.EVAL_ROUTING_KEY, new EvalMessage(submissionId)));
+                RabbitConfig.EVAL_ROUTING_KEY, new EvalMessage(submissionId),
+                new CorrelationData("replay-eval-" + submissionId)));
         log.info("评价重放已触发: submissionId={} operator={}", submissionId, principal.userId());
     }
 

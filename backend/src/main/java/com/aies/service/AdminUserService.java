@@ -5,6 +5,8 @@ import com.aies.common.ErrorCode;
 import com.aies.dto.admin.AdminDtos.AdminTeacherVO;
 import com.aies.dto.admin.AdminDtos.AdminUserVO;
 import com.aies.dto.admin.AdminDtos.CreateUserRequest;
+import com.aies.dto.admin.AdminDtos.ResetPasswordResult;
+import com.aies.dto.admin.AdminDtos.ResetUserPasswordRequest;
 import com.aies.dto.admin.AdminDtos.UpdateUserRequest;
 import com.aies.dto.admin.AdminDtos.UserDeletionImpactVO;
 import com.aies.entity.AuditLog;
@@ -39,6 +41,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.security.SecureRandom;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -60,6 +64,7 @@ public class AdminUserService {
     private static final String AUTH_PERM_PREFIX = "auth:perm:";
     private static final String ROLE_ADMIN = "ADMIN";
     private static final String ROLE_TEACHER = "TEACHER";
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     private final UserMapper userMapper;
     private final SysRoleMapper roleMapper;
@@ -141,6 +146,58 @@ public class AdminUserService {
                 "user:" + userId, detail);
     }
 
+    /**
+     * 管理员重置用户密码：指定新密码或生成临时密码；重置后置首登标记并作废全部 RT。
+     * 管理员账号与当前登录账号受保护（走个人中心）。
+     */
+    @Transactional
+    public ResetPasswordResult resetPassword(long userId, ResetUserPasswordRequest request,
+                                             LoginPrincipal principal) {
+        if (principal.userId() == userId) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "请在个人中心修改当前账号密码");
+        }
+        User user = requireUser(userId);
+        if (hasRole(userId, ROLE_ADMIN)) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "管理员账号密码请在个人中心维护");
+        }
+        String rawPassword = request == null ? null : request.getNewPassword();
+        boolean generated = !StringUtils.hasText(rawPassword);
+        String finalPassword;
+        if (generated) {
+            finalPassword = generateTemporaryPassword();
+        } else {
+            ensurePasswordStrong(rawPassword);
+            finalPassword = rawPassword;
+        }
+        userMapper.update(null, new UpdateWrapper<User>()
+                .eq("id", userId)
+                .set("password", passwordEncoder.encode(finalPassword))
+                .set("first_login", 1)
+                .set("update_time", LocalDateTime.now()));
+        jwtService.revokeAllRefreshTokens(userId);
+
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("username", user.getUsername());
+        detail.put("generated", generated);
+        auditService.record(principal, "user", "RESET_USER_PASSWORD", "user:" + userId, detail);
+        return new ResetPasswordResult(user.getUsername(),
+                generated ? finalPassword : null, generated);
+    }
+
+    /** 12 位随机临时密码（必含字母与数字，满足 30013 强度口径） */
+    private String generateTemporaryPassword() {
+        String letters = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz";
+        String digits = "23456789";
+        String all = letters + digits;
+        StringBuilder sb = new StringBuilder(12);
+        sb.append(letters.charAt(RANDOM.nextInt(letters.length())));
+        sb.append(digits.charAt(RANDOM.nextInt(digits.length())));
+        for (int i = 2; i < 12; i++) {
+            sb.append(all.charAt(RANDOM.nextInt(all.length())));
+        }
+        return sb.toString();
+    }
+
     /** 角色分配（单角色/多角色均按传入集合重建；权限缓存即时失效） */
     @Transactional
     public void updateRoles(long userId, List<String> roleCodes, LoginPrincipal principal) {
@@ -155,6 +212,9 @@ public class AdminUserService {
                 .map(String::trim).distinct().toList();
         if (codes.isEmpty()) {
             throw new BusinessException(ErrorCode.PARAM_ERROR, "至少保留一个角色");
+        }
+        if (codes.contains(ROLE_ADMIN)) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "不能分配管理员角色");
         }
         List<SysRole> roles = roleMapper.selectList(new LambdaQueryWrapper<SysRole>()
                 .in(SysRole::getRoleCode, codes));
@@ -225,12 +285,30 @@ public class AdminUserService {
         return toVO(created, classNames(List.of(created)));
     }
 
-    /** 编辑用户基础资料（管理员）：姓名/邮箱/手机号/班级；ADMIN 账号受保护 */
+    /**
+     * 编辑用户全部资料（管理员）：账号/姓名/邮箱/手机/班级/状态/角色，可选重置密码。
+     * 当前登录账号与 ADMIN 账号受保护；角色不允许分配 ADMIN。
+     */
     @Transactional
     public AdminUserVO update(long userId, UpdateUserRequest request, LoginPrincipal principal) {
         User user = requireUser(userId);
         if (hasRole(userId, ROLE_ADMIN)) {
             throw new BusinessException(ErrorCode.PARAM_ERROR, "管理员账号资料请在个人中心维护");
+        }
+        if (principal.userId() == userId) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "不能修改当前登录账号的资料");
+        }
+        String username = StringUtils.hasText(request.getUsername())
+                ? request.getUsername().trim() : user.getUsername();
+        if (!username.equals(user.getUsername())) {
+            if (!username.matches("[A-Za-z0-9_]{4,20}")) {
+                throw new BusinessException(ErrorCode.PARAM_ERROR,
+                        "学号/工号需为4-20位字母、数字或下划线");
+            }
+            User existing = userMapper.selectByUsername(username);
+            if (existing != null && !existing.getId().equals(userId)) {
+                throw new BusinessException(ErrorCode.USERNAME_REGISTERED);
+            }
         }
         String realName = request.getRealName().trim();
         if (realName.isEmpty()) {
@@ -241,22 +319,67 @@ public class AdminUserService {
         Long classId = request.getClassId();
         ensureClassExists(classId);
 
+        int currentStatus = user.getStatus() == null ? 1 : user.getStatus();
+        int nextStatus = request.getStatus() == null ? currentStatus : request.getStatus();
+        if (nextStatus != 0 && nextStatus != 1) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "状态取值非法");
+        }
+        List<String> beforeRoles = rbacMapper.selectRoleCodes(userId);
+        List<String> nextRoles = request.getRoleCodes() == null
+                ? null : normalizeRoleCodes(request.getRoleCodes());
+        if (nextRoles != null) {
+            if (nextRoles.contains(ROLE_ADMIN)) {
+                throw new BusinessException(ErrorCode.PARAM_ERROR, "不能分配管理员角色");
+            }
+            validateRolesExist(nextRoles);
+        }
+        String newPassword = request.getNewPassword();
+        boolean passwordReset = StringUtils.hasText(newPassword);
+        if (passwordReset) {
+            ensurePasswordStrong(newPassword);
+        }
+
         userMapper.update(null, new UpdateWrapper<User>()
                 .eq("id", userId)
+                .set("username", username)
                 .set("real_name", realName)
                 .set("email", email)
                 .set("phone", phone)
-                .set("class_id", classId));
+                .set("class_id", classId)
+                .set("status", nextStatus));
+        if (passwordReset) {
+            userMapper.update(null, new UpdateWrapper<User>()
+                    .eq("id", userId)
+                    .set("password", passwordEncoder.encode(newPassword))
+                    .set("first_login", 1)
+                    .set("update_time", LocalDateTime.now()));
+        }
+        if (nextRoles != null) {
+            userRoleMapper.delete(new LambdaQueryWrapper<SysUserRole>()
+                    .eq(SysUserRole::getUserId, userId));
+            for (String code : nextRoles) {
+                rbacMapper.insertUserRole(userId, code);
+            }
+        }
+        redis.delete(AUTH_PERM_PREFIX + userId);
+        if (passwordReset || (nextStatus == 0 && currentStatus != 0)) {
+            jwtService.revokeAllRefreshTokens(userId);
+        }
 
         Map<String, Object> detail = new LinkedHashMap<>();
-        detail.put("username", user.getUsername());
-        detail.put("realName", Map.of("before", user.getRealName(), "after", realName));
-        detail.put("email", Map.of("before", maskEmail(user.getEmail()), "after", maskEmail(email)));
-        detail.put("phone", Map.of("before", maskPhone(user.getPhone()), "after", maskPhone(phone)));
-        Map<String, Object> classDetail = new LinkedHashMap<>();
-        classDetail.put("before", user.getClassId());
-        classDetail.put("after", classId);
-        detail.put("classId", classDetail);
+        detail.put("userId", userId);
+        detail.put("username", change(user.getUsername(), username));
+        detail.put("realName", change(user.getRealName(), realName));
+        detail.put("email", change(maskEmail(user.getEmail()), maskEmail(email)));
+        detail.put("phone", change(maskPhone(user.getPhone()), maskPhone(phone)));
+        detail.put("classId", change(user.getClassId(), classId));
+        detail.put("status", change(currentStatus, nextStatus));
+        if (nextRoles != null) {
+            detail.put("roleCodes", change(beforeRoles, nextRoles));
+        }
+        if (passwordReset) {
+            detail.put("passwordReset", true);
+        }
         auditService.record(principal, "user", "UPDATE_USER", "user:" + userId, detail);
 
         User updated = userMapper.selectById(userId);
@@ -413,6 +536,13 @@ public class AdminUserService {
         if (!missing.isEmpty()) {
             throw new BusinessException(ErrorCode.PARAM_ERROR, "角色不存在：" + String.join(",", missing));
         }
+    }
+
+    private Map<String, Object> change(Object before, Object after) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("before", before);
+        map.put("after", after);
+        return map;
     }
 
     private String maskEmail(String email) {

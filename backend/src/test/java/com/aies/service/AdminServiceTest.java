@@ -3,6 +3,7 @@ package com.aies.service;
 import com.aies.common.BusinessException;
 import com.aies.common.ErrorCode;
 import com.aies.config.AuthProperties;
+import com.aies.dto.admin.AdminDtos.AuditLogFilter;
 import com.aies.dto.admin.AdminDtos.ClassCreateRequest;
 import com.aies.dto.admin.AdminDtos.CreatePromptRequest;
 import com.aies.dto.admin.AdminDtos.CreateUserRequest;
@@ -129,10 +130,12 @@ class AdminServiceTest {
                 userRoleMapper, redis, auditService);
         classService = new AdminClassService(classMapper, userMapper, taskMapper, rbacMapper, auditService);
         aiService = new AdminAiService(llmConfigMapper, promptMapper, goldenMapper,
-                new ObjectMapper(), auditService, mock(ApiKeyCipher.class), mock(LlmClient.class));
+                new ObjectMapper(), auditService, mock(ApiKeyCipher.class), mock(LlmClient.class),
+                mock(FileStorage.class));
         systemService = new AdminSystemService(new AuthProperties(), userMapper, classMapper, taskMapper,
                 submissionMapper, evaluationResultMapper, llmConfigMapper,
-                promptMapper, goldenMapper, auditLogMapper);
+                promptMapper, goldenMapper, auditLogMapper, mock(SysConfigService.class),
+                mock(ReportQueryService.class), auditService);
     }
 
     private User user(long id, String username, String role) {
@@ -324,6 +327,61 @@ class AdminServiceTest {
         assertThatThrownBy(() -> userService.update(1L, updateUserRequest(), admin))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("管理员账号资料");
+        verify(userMapper, never()).update(any(), any());
+    }
+
+    @Test
+    void updateUserShouldApplyAccountStatusRolesAndPassword() {
+        User original = user(5L, "stu01", "STUDENT");
+        User updated = user(5L, "stu0102", "STUDENT");
+        updated.setRealName("新名");
+        updated.setStatus(0);
+        when(userMapper.selectById(5L)).thenReturn(original, updated);
+        when(rbacMapper.selectRoleCodes(5L)).thenReturn(List.of("STUDENT"));
+        when(userMapper.selectByUsername("stu0102")).thenReturn(null);
+        when(roleMapper.selectList(any())).thenReturn(List.of(role(2L, "TEACHER")));
+        when(passwordEncoder.encode("NewPass123")).thenReturn("encoded");
+
+        UpdateUserRequest request = updateUserRequest();
+        request.setUsername("stu0102");
+        request.setStatus(0);
+        request.setRoleCodes(List.of("TEACHER"));
+        request.setNewPassword("NewPass123");
+
+        var vo = userService.update(5L, request, admin);
+
+        assertThat(vo.username()).isEqualTo("stu0102");
+        verify(userMapper, times(2)).update(any(), any());
+        verify(userRoleMapper).delete(any());
+        verify(rbacMapper).insertUserRole(5L, "TEACHER");
+        verify(jwtService).revokeAllRefreshTokens(5L);
+        verify(passwordEncoder).encode("NewPass123");
+    }
+
+    @Test
+    void updateUserShouldRejectAssigningAdminRole() {
+        when(userMapper.selectById(5L)).thenReturn(user(5L, "stu01", "STUDENT"));
+        when(rbacMapper.selectRoleCodes(5L)).thenReturn(List.of("STUDENT"));
+        UpdateUserRequest request = updateUserRequest();
+        request.setRoleCodes(List.of("ADMIN"));
+
+        assertThatThrownBy(() -> userService.update(5L, request, admin))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("不能分配管理员角色");
+        verify(userMapper, never()).update(any(), any());
+    }
+
+    @Test
+    void updateUserShouldRejectDuplicateUsername() {
+        when(userMapper.selectById(5L)).thenReturn(user(5L, "stu01", "STUDENT"));
+        when(rbacMapper.selectRoleCodes(5L)).thenReturn(List.of("STUDENT"));
+        when(userMapper.selectByUsername("stu02")).thenReturn(user(6L, "stu02", "STUDENT"));
+        UpdateUserRequest request = updateUserRequest();
+        request.setUsername("stu02");
+
+        assertThatThrownBy(() -> userService.update(5L, request, admin))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("已注册");
         verify(userMapper, never()).update(any(), any());
     }
 
@@ -597,7 +655,8 @@ class AdminServiceTest {
         operator.setRealName("系统管理员");
         when(userMapper.selectBatchIds(anyList())).thenReturn(List.of(operator));
 
-        var result = systemService.auditLogs(1, 20, "system", "LLM");
+        var result = systemService.auditLogs(1, 20,
+                new AuditLogFilter("system", "LLM", null, null, null, null));
 
         assertThat(result.getRecords()).hasSize(1);
         assertThat(result.getRecords().get(0).operatorName()).isEqualTo("系统管理员");

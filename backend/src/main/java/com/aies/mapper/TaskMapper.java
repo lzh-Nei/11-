@@ -5,7 +5,9 @@ import com.aies.entity.Task;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -35,4 +37,11 @@ public interface TaskMapper extends BaseMapper<Task> {
             + "<foreach collection='taskIds' item='id' open='(' separator=',' close=')'>#{id}</foreach>"
             + "</script>")
     List<TaskOwnerVO> selectOwners(@Param("taskIds") List<Long> taskIds);
+
+    /** 定时关闭：PUBLISHED 且 deadline 已过的任务置 CLOSED（ScheduledMaintenanceService 调用） */
+    @Update("""
+            UPDATE task SET status = 'CLOSED'
+            WHERE status = 'PUBLISHED' AND deadline < #{now}
+            """)
+    int closeExpiredPublished(@Param("now") LocalDateTime now);
 }

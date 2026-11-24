@@ -9,6 +9,7 @@ import com.aies.mapper.EvaluationHistoryMapper;
 import com.aies.mapper.EvaluationResultMapper;
 import com.aies.mapper.SubmissionMapper;
 import com.aies.mapper.TaskMapper;
+import com.aies.mapper.UserMapper;
 import com.aies.model.ReportOverviewDTO;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -54,6 +56,10 @@ class ReportQueryServiceTest {
     @Mock
     private EvaluationHistoryMapper evaluationHistoryMapper;
     @Mock
+    private UserMapper userMapper;
+    @Mock
+    private SysConfigService sysConfigService;
+    @Mock
     private StringRedisTemplate redis;
     @Mock
     private ValueOperations<String, String> valueOps;
@@ -64,8 +70,11 @@ class ReportQueryServiceTest {
     @BeforeEach
     void setUp() {
         service = new ReportQueryService(taskMapper, submissionMapper,
-                evaluationResultMapper, evaluationHistoryMapper, redis, objectMapper, null);
+                evaluationResultMapper, evaluationHistoryMapper, userMapper, sysConfigService,
+                redis, objectMapper, null);
         lenient().when(redis.opsForValue()).thenReturn(valueOps);
+        lenient().when(userMapper.countStudentsByClassIds(any())).thenReturn(List.of());
+        lenient().when(sysConfigService.getInt(anyString(), anyInt())).thenReturn(10);
     }
 
     private Task task(long id) {

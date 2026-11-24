@@ -18,6 +18,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -33,6 +34,7 @@ import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -60,8 +62,11 @@ public class SubmissionService {
             "docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             "pdf", "application/pdf");
 
-    /** UC-16 E2：≤20MB（先校验后落盘，S-07） */
-    private static final long MAX_FILE_BYTES = 20L * 1024 * 1024;
+    /** UC-16 E2：默认 ≤20MB（可经 sys_config.upload.maxFileMb 调整；先校验后落盘 S-07） */
+    private static final long DEFAULT_MAX_FILE_BYTES = 20L * 1024 * 1024;
+    /** 图片/扫描件：当前无可用 OCR 服务，上传即明确拒绝（避免落入 docx 解析分支） */
+    private static final Set<String> IMAGE_EXTENSIONS = Set.of(
+            "png", "jpg", "jpeg", "bmp", "tif", "tiff", "webp");
     /** DB file_name varchar(128) 上限（超长截断防插入失败） */
     private static final int MAX_FILE_NAME_LEN = 128;
     /** 解析状态机（V3 §7.1 四态） */
@@ -81,6 +86,7 @@ public class SubmissionService {
     private final VirusScanHook virusScanHook;
     private final RabbitTemplate rabbitTemplate;
     private final EvaluationResultMapper evaluationResultMapper;
+    private final SysConfigService sysConfigService;
 
     /**
      * S-01 提交作业（UC-16）：版本号自增（重复上传新版本覆盖展示、旧版保留可追溯——UC-16 A1）。
@@ -105,13 +111,17 @@ public class SubmissionService {
         if (file == null || file.isEmpty()) {
             throw new BusinessException(ErrorCode.PARAM_ERROR.getCode(), "文件为空");
         }
-        // UC-16 E2：≤20MB →30003（S-07：先校验后落盘）
-        if (file.getSize() > MAX_FILE_BYTES) {
+        // UC-16 E2：≤20MB（可配置）→30003（S-07：先校验后落盘）
+        if (file.getSize() > maxFileBytes()) {
             throw new BusinessException(ErrorCode.FILE_TOO_LARGE);
         }
         // UC-16 E1：扩展名+MIME 双重白名单 →30001（S-07：禁只信扩展名或只信 Content-Type）
         String originalName = file.getOriginalFilename() == null ? "" : file.getOriginalFilename();
         String ext = extensionOf(originalName);
+        if (IMAGE_EXTENSIONS.contains(ext)) {
+            throw new BusinessException(ErrorCode.FILE_TYPE_UNSUPPORTED.getCode(),
+                    "暂不支持图片/扫描件解析，请上传 docx 或可复制文本的 PDF");
+        }
         String expectedMime = MIME_WHITELIST.get(ext);
         if (expectedMime == null || !expectedMime.equalsIgnoreCase(file.getContentType())) {
             throw new BusinessException(ErrorCode.FILE_TYPE_UNSUPPORTED);
@@ -286,12 +296,20 @@ public class SubmissionService {
     private void dispatchParseMessage(long submissionId) {
         try {
             rabbitTemplate.convertAndSend(RabbitConfig.PARSE_EXCHANGE,
-                    RabbitConfig.PARSE_ROUTING_KEY, new ParseMessage(submissionId));
+                    RabbitConfig.PARSE_ROUTING_KEY, new ParseMessage(submissionId),
+                    new CorrelationData("parse-" + submissionId));
             log.info("解析消息已投递: submissionId={}", submissionId);
         } catch (Exception e) {
             // 提交已成功，解析链可重放（PENDING 留存），不让消息故障反噬提交接口
             log.error("解析消息发送失败(留PENDING可重放): submissionId={} err={}", submissionId, e.getMessage());
         }
+    }
+
+    /** 上传上限（MB → bytes），读取 sys_config 白名单键，缺失/非法回退 20MB */
+    private long maxFileBytes() {
+        int defaultMb = (int) (DEFAULT_MAX_FILE_BYTES / (1024 * 1024));
+        int maxMb = sysConfigService.getInt(SysConfigService.KEY_UPLOAD_MAX_FILE_MB, defaultMb);
+        return maxMb * 1024L * 1024L;
     }
 
     /** 小写扩展名（无扩展名→空串即白名单不命中）；文件名仅取路径最后一节（S-07 防路径携带） */

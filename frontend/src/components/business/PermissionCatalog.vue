@@ -57,6 +57,7 @@ const PERM_GROUP_ORDER = [
   'submission',
   'evaluation',
   'report',
+  'chat',
   'role',
   'system',
   'audit',

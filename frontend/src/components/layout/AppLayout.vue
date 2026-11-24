@@ -9,6 +9,7 @@
           <b>AIES</b>
           <small>教学AI检查评价系统</small>
         </div>
+        <NotificationBell class="brand-bell" />
       </div>
 
       <nav class="nav">
@@ -24,6 +25,9 @@
           >
             <NavIcon :name="item.icon" />
             <span class="nav-text">{{ item.label }}</span>
+            <span v-if="item.key === 'messages' && chatStore.totalUnread > 0" class="nav-badge">
+              {{ chatStore.totalUnread > 99 ? '99+' : chatStore.totalUnread }}
+            </span>
             <span v-if="item.newWindow" class="nav-ext" aria-hidden="true">↗</span>
           </router-link>
         </div>
@@ -43,8 +47,10 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useChatStore } from '@/stores/chat'
 import NavIcon from '@/components/ui/NavIcon.vue'
 import UserBadge from '@/components/layout/UserBadge.vue'
+import NotificationBell from '@/components/layout/NotificationBell.vue'
 
 interface ModuleItem {
   key: string
@@ -61,7 +67,10 @@ interface ModuleGroup {
 
 const route = useRoute()
 const auth = useAuthStore()
+const chatStore = useChatStore()
 const isModulesPage = computed(() => route.path === '/modules')
+/** 入口可见性按权限点（chat:use）而非角色硬编码 */
+const canUseChat = computed(() => (auth.me?.permissions ?? []).includes('chat:use'))
 
 /** 左侧模块栏：功能模块 + 文件中心（仅管理员）+ 个人中心 */
 const groups = computed<ModuleGroup[]>(() => {
@@ -82,6 +91,15 @@ const groups = computed<ModuleGroup[]>(() => {
         /^\/evaluations\/\d+(\/review)?$/.test(p)
     }
   ]
+  if (canUseChat.value) {
+    items.push({
+      key: 'messages',
+      label: '消息',
+      icon: 'chat',
+      to: '/messages',
+      match: (p) => p === '/messages'
+    })
+  }
   if (auth.role === 'ADMIN') {
     items.push({
       key: 'files',
@@ -157,6 +175,9 @@ function isActive(item: ModuleItem): boolean {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.brand-bell {
+  margin-left: auto;
+}
 .nav {
   flex: 1;
   overflow-y: auto;
@@ -221,6 +242,18 @@ function isActive(item: ModuleItem): boolean {
 .nav-ext {
   font-size: 11px;
   color: var(--aies-ink3);
+}
+.nav-badge {
+  flex: none;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--aies-brand);
+  color: #fff;
+  font-size: 10.5px;
+  line-height: 17px;
+  text-align: center;
 }
 .content-topbar {
   display: flex;

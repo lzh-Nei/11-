@@ -96,8 +96,8 @@ npm run dev
 
 bash
 
-# 1. 初始化数据库（创建 ai_evaluate 库、sys_user 表与演示账号）
-mysql --default-character-set=utf8mb4 -uroot -p < backend/sql/schema.sql
+# 1. 初始化数据库（先创建空库 ai_evaluate；表结构与种子由 Flyway 在应用启动时自动迁移）
+#    注意：backend/sql/schema.sql 已废弃，请勿再执行
 
 # 2. 启动后端（数据库/Redis 地址见 backend/src/main/resources/application.yml）
 cd backend

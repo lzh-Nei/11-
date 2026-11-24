@@ -36,6 +36,8 @@ class EvaluationWorkerTest {
     private EvaluationResultMapper evaluationResultMapper;
     private EvaluationService evaluationService;
     private TraceRecorder traceRecorder;
+    private com.aies.realtime.RealtimeNotifier realtimeNotifier;
+    private MqProcessingGuard processingGuard;
     private EvaluationWorker worker;
 
     @BeforeEach
@@ -45,8 +47,11 @@ class EvaluationWorkerTest {
         evaluationResultMapper = mock(EvaluationResultMapper.class);
         evaluationService = mock(EvaluationService.class);
         traceRecorder = mock(TraceRecorder.class);
+        realtimeNotifier = mock(com.aies.realtime.RealtimeNotifier.class);
+        processingGuard = mock(MqProcessingGuard.class);
+        when(processingGuard.tryLock(anyString(), any())).thenReturn("token");
         worker = new EvaluationWorker(submissionMapper, evaluationResultMapper,
-                evaluationService, traceRecorder, mock(com.aies.realtime.RealtimeNotifier.class));
+                evaluationService, traceRecorder, realtimeNotifier, processingGuard);
         when(evaluationResultMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
     }
 
@@ -71,6 +76,40 @@ class EvaluationWorkerTest {
         cfg.setTimeoutSeconds(60);
         cfg.setMaxRetry(3);
         return new PreparedEvaluation(submissionId, template, cfg, "prompt", Map.of(), "trace0001");
+    }
+
+    /** 单飞锁：已有实例评价中时跳过重复投递（避免重复 LLM 计费） */
+    @Test
+    void duplicateDeliverySkippedWhenAnotherWorkerHoldsLock() {
+        when(processingGuard.tryLock(anyString(), any())).thenReturn(null);
+
+        worker.onMessage(new EvalMessage(5L));
+
+        verify(submissionMapper, never()).selectById(anyLong());
+        verify(evaluationService, never()).runPipeline(any());
+    }
+
+    /** 旁路推送失败不影响已落库评价：不抛异常、不触发重投 */
+    @Test
+    void notificationFailureDoesNotBreakAck() {
+        when(submissionMapper.selectById(5L)).thenReturn(submission("SUCCESS"));
+        PreparedEvaluation prepared = prep(5L);
+        when(evaluationService.loadTemplate()).thenReturn(prepared.template());
+        when(evaluationService.loadLlmConfig()).thenReturn(prepared.cfg());
+        when(evaluationService.prepare(any(Submission.class), any(PromptTemplate.class), any(LlmConfig.class)))
+                .thenReturn(prepared);
+        when(evaluationService.digest(anyString())).thenReturn("len=6");
+        when(evaluationService.runPipeline(prepared)).thenReturn(new EvaluationOutcome(
+                true, new BigDecimal("80"), "{}", "评语", 0, 500L, "qwen2.5:7b", null, "raw"));
+        when(evaluationService.persistEvaluation(eq(5L), eq("trace0001"), any(), anyString()))
+                .thenReturn(new EvaluationResult());
+        org.mockito.Mockito.doThrow(new IllegalStateException("ws down"))
+                .when(realtimeNotifier).notifyEvaluation(any(), any(), anyString());
+
+        worker.onMessage(new EvalMessage(5L));
+
+        verify(evaluationService).persistEvaluation(eq(5L), eq("trace0001"), any(), anyString());
+        verify(traceRecorder).record(eq("trace0001"), any(), any(), eq("len=6"));
     }
 
     /** 脏消息：提交不存在→跳过（不评价不落库） */

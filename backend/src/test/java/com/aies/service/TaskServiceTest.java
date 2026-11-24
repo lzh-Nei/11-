@@ -409,6 +409,15 @@ class TaskServiceTest {
         verify(taskMapper, never()).deleteById(5L);
     }
 
+    /** 定时任务：关闭过期已发布任务，透传 mapper 更新条数 */
+    @Test
+    void closeExpiredTasksShouldReturnUpdatedCount() {
+        LocalDateTime now = LocalDateTime.now();
+        when(taskMapper.closeExpiredPublished(now)).thenReturn(3);
+
+        assertThat(taskService.closeExpiredTasks(now)).isEqualTo(3);
+    }
+
     private Task task(long id, long teacherId, long classId, String status) {
         Task task = new Task();
         task.setId(id);

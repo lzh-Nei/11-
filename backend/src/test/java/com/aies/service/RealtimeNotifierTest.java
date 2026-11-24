@@ -28,7 +28,7 @@ class RealtimeNotifierTest {
     void setUp() {
         handler = mock(RealtimeWebSocketHandler.class);
         taskMapper = mock(TaskMapper.class);
-        notifier = new RealtimeNotifier(handler, taskMapper);
+        notifier = new RealtimeNotifier(handler, taskMapper, mock(NotificationService.class));
     }
 
     @Test

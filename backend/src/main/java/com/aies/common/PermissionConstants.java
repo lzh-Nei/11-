@@ -46,6 +46,10 @@ public final class PermissionConstants {
     public static final String REPORT_VIEW = "report:view";
     public static final String REPORT_EXPORT = "report:export";
 
+    /* ===== chat（1，V20） ===== */
+    /** 在线聊天（学生 ↔ 任课教师） */
+    public static final String CHAT_USE = "chat:use";
+
     /* ===== system（6） ===== */
     public static final String ROLE_MANAGE = "role:manage";
     public static final String SYSTEM_CONFIG = "system:config";

@@ -9,6 +9,8 @@ import com.aies.mapper.EvaluationHistoryMapper;
 import com.aies.mapper.EvaluationResultMapper;
 import com.aies.mapper.SubmissionMapper;
 import com.aies.mapper.TaskMapper;
+import com.aies.mapper.UserMapper;
+import com.aies.model.ClassStudentCount;
 import com.aies.model.ReportOverviewDTO;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -29,6 +31,9 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.ToIntFunction;
 import java.util.stream.Collectors;
 
 /**
@@ -48,7 +53,7 @@ import java.util.stream.Collectors;
 public class ReportQueryService {
 
     static final String CACHE_PREFIX = "report:overview:";
-    static final Duration CACHE_TTL = Duration.ofMinutes(10);
+    static final Duration DEFAULT_CACHE_TTL = Duration.ofMinutes(10);
     /** result 计入均分/分布的状态集（FAILED/PENDING 排除） */
     static final List<String> SCORED_STATUS = List.of("AI_DONE", "REVIEWED");
 
@@ -56,6 +61,8 @@ public class ReportQueryService {
     private final SubmissionMapper submissionMapper;
     private final EvaluationResultMapper evaluationResultMapper;
     private final EvaluationHistoryMapper evaluationHistoryMapper;
+    private final UserMapper userMapper;
+    private final SysConfigService sysConfigService;
     private final StringRedisTemplate redis;
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher eventPublisher;
@@ -70,7 +77,10 @@ public class ReportQueryService {
             }
             List<Submission> subs = submissionMapper.selectList(
                     new LambdaQueryWrapper<Submission>().in(Submission::getTaskId, taskIds(tasks)));
-            return aggregate(tasks, subs);
+            Map<Long, Integer> expectedByClass = expectedByClass(tasks);
+            return aggregate(tasks, subs,
+                    task -> task.getClassId() == null ? 0
+                            : expectedByClass.getOrDefault(task.getClassId(), 0));
         });
     }
 
@@ -84,7 +94,8 @@ public class ReportQueryService {
             }
             List<Long> taskIds = subs.stream().map(Submission::getTaskId).distinct().toList();
             List<Task> tasks = taskMapper.selectBatchIds(taskIds);
-            return aggregate(tasks, subs);
+            // 学生视角仅统计本人：每个任务应交人数=1
+            return aggregate(tasks, subs, task -> 1);
         });
     }
 
@@ -92,6 +103,15 @@ public class ReportQueryService {
     public void refresh(String scope, long userId) {
         redis.delete(CACHE_PREFIX + scope + ":" + userId);
         log.info("报表缓存已强制失效: scope={} userId={}", scope, userId);
+    }
+
+    /** 清空全部报表缓存（系统参数变更后调用） */
+    public void evictAll() {
+        Set<String> keys = redis.keys(CACHE_PREFIX + "*");
+        if (keys != null && !keys.isEmpty()) {
+            redis.delete(keys);
+        }
+        log.info("报表缓存已全量失效: keys={}", keys == null ? 0 : keys.size());
     }
 
     /**
@@ -131,15 +151,33 @@ public class ReportQueryService {
         }
         ReportOverviewDTO dto = builder.build();
         try {
-            redis.opsForValue().set(key, objectMapper.writeValueAsString(dto), CACHE_TTL);
+            int ttlMinutes = sysConfigService.getInt(
+                    SysConfigService.KEY_REPORT_CACHE_TTL_MINUTES,
+                    (int) DEFAULT_CACHE_TTL.toMinutes());
+            redis.opsForValue().set(key, objectMapper.writeValueAsString(dto),
+                    Duration.ofMinutes(ttlMinutes));
         } catch (Exception e) {
             log.warn("报表缓存写入失败（TTL 兜底不受影响）: key={} err={}", key, e.getMessage());
         }
         return dto;
     }
 
+    /** 班级应交学生数（role=STUDENT 且启用；无班级任务不入分母）。 */
+    private Map<Long, Integer> expectedByClass(List<Task> tasks) {
+        List<Long> classIds = tasks.stream().map(Task::getClassId)
+                .filter(Objects::nonNull).distinct().toList();
+        if (classIds.isEmpty()) {
+            return Map.of();
+        }
+        return userMapper.countStudentsByClassIds(classIds).stream()
+                .filter(row -> row.getClassId() != null)
+                .collect(Collectors.toMap(ClassStudentCount::getClassId,
+                        ClassStudentCount::getStudentCount, (a, b) -> a));
+    }
+
     /** 四图聚合核心（内存等价 LLD SQL 口径）。 */
-    private ReportOverviewDTO aggregate(List<Task> tasks, List<Submission> subs) {
+    private ReportOverviewDTO aggregate(List<Task> tasks, List<Submission> subs,
+                                        ToIntFunction<Task> expectedResolver) {
         List<Long> subIds = subs.stream().map(Submission::getId).toList();
         Map<Long, EvaluationResult> resultMap = subIds.isEmpty() ? Map.of()
                 : evaluationResultMapper.selectList(
@@ -150,7 +188,7 @@ public class ReportQueryService {
         Map<Long, Task> taskMap = tasks.stream()
                 .collect(Collectors.toMap(Task::getId, t -> t));
 
-        // 图1 任务级统计（submitted=全部解析链状态提交；rate=submitted/total*100，total暂以提交数为分母占位）
+        // 图1 任务级统计：submitted=提交记录数；rate=去重提交学生数/应交学生数（无应交=0）
         List<ReportOverviewDTO.TaskStat> taskStats = tasks.stream().map(t -> {
             List<Submission> taskSubs = subs.stream()
                     .filter(s -> t.getId().equals(s.getTaskId())).toList();
@@ -165,11 +203,16 @@ public class ReportQueryService {
                             .map(s -> resultMap.get(s.getId()).getTotalScore())
                             .reduce(BigDecimal.ZERO, BigDecimal::add)
                             .divide(BigDecimal.valueOf(scored), 1, RoundingMode.HALF_UP);
-            return new ReportOverviewDTO.TaskStat(t.getId(), t.getTitle(),
-                    taskSubs.size(), (int) scored, avg,
-                    BigDecimal.valueOf(taskSubs.size())
+            long submittedStudents = taskSubs.stream().map(Submission::getStudentId)
+                    .filter(Objects::nonNull).distinct().count();
+            int expected = expectedResolver.applyAsInt(t);
+            BigDecimal rate = expected <= 0 ? BigDecimal.ZERO
+                    : BigDecimal.valueOf(submittedStudents)
                             .multiply(BigDecimal.valueOf(100))
-                            .divide(BigDecimal.valueOf(Math.max(taskSubs.size(), 1)), 1, RoundingMode.HALF_UP));
+                            .divide(BigDecimal.valueOf(expected), 1, RoundingMode.HALF_UP)
+                            .min(BigDecimal.valueOf(100));
+            return new ReportOverviewDTO.TaskStat(t.getId(), t.getTitle(),
+                    taskSubs.size(), (int) scored, avg, rate);
         }).toList();
 
         // 图2 均分分布（0-59/60-69/70-79/80-89/90-100）

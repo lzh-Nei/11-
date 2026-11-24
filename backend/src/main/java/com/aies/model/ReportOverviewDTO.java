@@ -25,7 +25,7 @@ public record ReportOverviewDTO(
                         new RangeCount("无复核", 0)));
     }
 
-    /** 任务级统计：total=应交（暂=1 次提交机会，total 取提交数上限占位）/submitted=已交/scored=已出分/avgScore=已出分均分/rate=提交率 */
+    /** 任务级统计：submitted=提交记录数/scored=已出分/avgScore=已出分均分/rate=去重提交学生数占班级应交学生数百分比（无应交=0） */
     public record TaskStat(Long taskId, String title, int submitted, int scored,
                            BigDecimal avgScore, BigDecimal rate) {
     }

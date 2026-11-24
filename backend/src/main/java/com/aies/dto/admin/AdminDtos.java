@@ -13,6 +13,7 @@ import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * M3 管理端契约集合（用户/角色权限/班级/审计/LLM/Prompt/黄金集/系统配置）。
@@ -67,6 +68,16 @@ public final class AdminDtos {
         private List<@NotBlank(message = "角色编码不能为空") String> roleCodes;
     }
 
+    /** 管理员重置密码：newPassword 留空则生成临时密码（响应仅在生成时回传一次） */
+    @Data
+    public static class ResetUserPasswordRequest {
+        @Size(max = 32, message = "密码长度不能超过32位")
+        private String newPassword;
+    }
+
+    public record ResetPasswordResult(String username, String temporaryPassword, boolean generated) {
+    }
+
     @Data
     public static class CreateUserRequest {
         @NotBlank(message = "学号/工号不能为空")
@@ -94,8 +105,14 @@ public final class AdminDtos {
         private List<@NotBlank(message = "角色编码不能为空") String> roleCodes;
     }
 
+    /** 管理员编辑用户全部资料：基础资料 + 账号/状态/角色 + 可选重置密码 */
     @Data
     public static class UpdateUserRequest {
+        /** 学号/工号；留空表示不修改 */
+        @Pattern(regexp = "^$|^[A-Za-z0-9_]{4,20}$",
+                message = "学号/工号需为4-20位字母、数字或下划线")
+        private String username;
+
         @NotBlank(message = "姓名不能为空")
         @Size(max = 32, message = "姓名最长32字")
         private String realName;
@@ -108,6 +125,18 @@ public final class AdminDtos {
         private String phone;
 
         private Long classId;
+
+        /** 1=正常，0=禁用；留空表示不修改 */
+        @Min(value = 0, message = "状态取值非法")
+        @Max(value = 1, message = "状态取值非法")
+        private Integer status;
+
+        /** 角色编码集合；留空表示不修改 */
+        private List<@NotBlank(message = "角色编码不能为空") String> roleCodes;
+
+        /** 新密码；留空表示不修改，填写后该账号首次登录需改密 */
+        @Size(max = 32, message = "密码长度不能超过32位")
+        private String newPassword;
     }
 
     /* ==================== 角色权限管理 ==================== */
@@ -241,7 +270,15 @@ public final class AdminDtos {
     public record SystemConfigVO(CountsVO counts, boolean smtpConfigured, String smtpHost,
                                  long captchaExpireSeconds, int captchaCodeCount,
                                  long emailExpireSeconds, long emailCooldownSeconds,
-                                 String llmModel, Integer activePromptVersion, long goldenActiveCount) {
+                                 String llmModel, Integer activePromptVersion, long goldenActiveCount,
+                                 Map<String, String> editable) {
+    }
+
+    /** 系统参数更新：仅白名单键，值为字符串（服务端按类型/范围校验） */
+    @Data
+    public static class SystemConfigUpdateRequest {
+        @NotEmpty(message = "没有可更新的配置项")
+        private Map<String, String> values;
     }
 
     /* ==================== 消息队列监控（system:config） ==================== */
@@ -264,8 +301,48 @@ public final class AdminDtos {
                             String aiModel, LocalDateTime updateTime) {
     }
 
-    /** 管理端 MQ 监控快照：连接状态 + 队列水位 + 数据库侧流水 + 最近事件 */
+    /** 队列告警：level=OK/WARN/ERROR，messages 与后端巡检阈值保持一致 */
+    public record MqAlertVO(boolean alert, String level, List<String> messages) {
+    }
+
+    /** 管理端 MQ 监控快照：连接状态 + 队列水位 + 告警 + 数据库侧流水 + 最近事件 */
     public record MqMonitorVO(boolean rabbitConnected, String broker, LocalDateTime sampledAt,
-                              List<MqQueueVO> queues, MqStatsVO stats, List<MqEventVO> recentEvents) {
+                              List<MqQueueVO> queues, MqAlertVO alert,
+                              MqStatsVO stats, List<MqEventVO> recentEvents) {
+    }
+
+    /* ==================== 日志采集与审计窗口（仅管理员） ==================== */
+
+    /** 审计检索条件：模块/动作/关键字/操作人 + 时间窗 */
+    public record AuditLogFilter(String module, String action, String keyword, String operator,
+                                 LocalDateTime start, LocalDateTime end) {
+    }
+
+    /** 运行日志条目（采集器内存快照，detail 为异常堆栈） */
+    public record RuntimeLogVO(long seq, LocalDateTime time, String level, String logger,
+                               String thread, String message, String detail) {
+    }
+
+    /** 运行日志采集指标 */
+    public record RuntimeLogStatsVO(int capacity, int captured, long total, long errorCount,
+                                    long warnCount, LocalDateTime startedAt, boolean capturing) {
+    }
+
+    /** 运行日志分页结果（附带采集指标，便于窗口顶部展示） */
+    public record RuntimeLogPageVO(RuntimeLogStatsVO stats, List<RuntimeLogVO> records,
+                                   long total, long page, long size) {
+    }
+
+    /** 审计统计分组（模块/动作维度） */
+    public record AuditBucketVO(String label, long count) {
+    }
+
+    /** 审计量日趋势（近7日） */
+    public record AuditTrendVO(String day, long count) {
+    }
+
+    /** 审计窗口概览：总量/今日/近24h + 模块/动作分布 + 日趋势 */
+    public record AuditStatsVO(long total, long today, long last24h, List<AuditBucketVO> byModule,
+                               List<AuditBucketVO> byAction, List<AuditTrendVO> trend) {
     }
 }

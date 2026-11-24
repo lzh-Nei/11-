@@ -23,8 +23,8 @@ import java.util.List;
 /**
  * JWT 认证过滤器（03-04 §2.1 步骤5/6）：Bearer AT 解析 → 黑名单校验 → 权限集装载 → SecurityContext。
  *
- * <p>权限集缓存 {@code auth:perm:{userId}} TTL 30min（LLD 行6；Y-02 变更广播失效在 UC-32 接入）。
- * 无凭证或凭证非法时不阻断链路，由 SecurityConfig 的 entryPoint 统一按 40101 应答。</p>
+ * 权限集缓存 {@code auth:perm:{userId}} TTL 30min（LLD 行6；Y-02 变更广播失效在 UC-32 接入）。
+ * 无凭证或凭证非法时不阻断链路，由 SecurityConfig 的 entryPoint 统一按 40101 应答。
  */
 @Component
 @RequiredArgsConstructor

@@ -25,7 +25,7 @@ public class EvaluationAppeal {
 
     private String reason;
 
-    /** PENDING/RESOLVED */
+    /** PENDING/RESOLVED/REJECTED/CANCELED */
     private String status;
 
     private Long assignedTeacherId;
@@ -33,4 +33,10 @@ public class EvaluationAppeal {
     private LocalDateTime createTime;
 
     private LocalDateTime resolvedTime;
+
+    /** 教师驳回理由（REJECTED 时非空） */
+    private String rejectReason;
+
+    /** 处理时间（撤回/驳回/复评完成） */
+    private LocalDateTime handledTime;
 }

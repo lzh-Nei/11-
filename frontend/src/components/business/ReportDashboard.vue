@@ -1,6 +1,7 @@
 <template>
   <PageShell :bare="embedded">
     <PageHeader v-if="!embedded" title="报表驾驶舱" :subtitle="subtitle">
+      <el-button v-if="canExport" plain :loading="exporting" @click="exportCsv"> 导出 CSV </el-button>
       <el-button v-if="canRefresh" plain :loading="refreshing" @click="refresh">
         刷新数据
       </el-button>
@@ -11,9 +12,14 @@
         <h3>报表驾驶舱</h3>
         <p>{{ subtitle }}</p>
       </div>
-      <el-button v-if="canRefresh" size="small" plain :loading="refreshing" @click="refresh">
-        刷新数据
-      </el-button>
+      <div class="embedded-actions">
+        <el-button v-if="canExport" size="small" plain :loading="exporting" @click="exportCsv">
+          导出 CSV
+        </el-button>
+        <el-button v-if="canRefresh" size="small" plain :loading="refreshing" @click="refresh">
+          刷新数据
+        </el-button>
+      </div>
     </div>
 
     <AppSkeleton v-if="loading" :rows="4" :row-height="90" />
@@ -112,6 +118,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { reportApi, type ReportOverview, type TaskStat } from '@/api/report'
 import { toast } from '@/utils/toast'
+import { saveBlob } from '@/utils/file'
 import PageShell from '@/components/ui/PageShell.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import AppSkeleton from '@/components/ui/AppSkeleton.vue'
@@ -127,6 +134,7 @@ const router = useRouter()
 const auth = useAuthStore()
 const loading = ref(false)
 const refreshing = ref(false)
+const exporting = ref(false)
 const error = ref<string | null>(null)
 const overview = ref<ReportOverview | null>(null)
 
@@ -137,6 +145,7 @@ const subtitle = computed(() =>
     : '汇总你本人的提交、成绩分布、指标表现与评分差值'
 )
 const canRefresh = computed(() => (auth.me?.permissions ?? []).includes('report:refresh'))
+const canExport = computed(() => (auth.me?.permissions ?? []).includes('report:export'))
 const taskRows = computed(() => overview.value?.tasks ?? [])
 const scoreDist = computed(() => overview.value?.scoreDist ?? [])
 const metricRadar = computed(() => overview.value?.metricRadar ?? [])
@@ -185,6 +194,20 @@ async function load() {
   }
 }
 
+async function exportCsv() {
+  exporting.value = true
+  try {
+    const blob = await reportApi.exportCsv()
+    const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+    saveBlob(blob, `报表-${stamp}.csv`)
+    toast.success('报表已导出')
+  } catch (e) {
+    toast.error((e as { message?: string })?.message || '导出失败', '请稍后重试')
+  } finally {
+    exporting.value = false
+  }
+}
+
 async function refresh() {
   refreshing.value = true
   try {
@@ -219,6 +242,11 @@ onMounted(load)
   margin: 5px 0 0;
   font-size: 12.5px;
   color: var(--aies-ink3);
+}
+.embedded-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 .kpi-grid {
   display: grid;

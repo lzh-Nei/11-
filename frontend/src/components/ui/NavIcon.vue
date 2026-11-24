@@ -47,9 +47,17 @@
     <template v-else-if="name === 'files'">
       <path d="M3.5 7h6l2 2H20.5v10H3.5z" />
     </template>
+    <template v-else-if="name === 'chat'">
+      <path d="M4 5.5h16v10.5H9.5L4 19.5z" />
+      <path d="M8 9.5h8M8 12.5h5" />
+    </template>
     <template v-else-if="name === 'user'">
       <circle cx="12" cy="8" r="3.5" />
       <path d="M5 20c1.5-4 4-6 7-6s5.5 2 7 6" />
+    </template>
+    <template v-else-if="name === 'bell'">
+      <path d="M6 16.5V11a6 6 0 1112 0v5.5l1.8 2H4.2z" />
+      <path d="M10 19.5a2 2 0 004 0" />
     </template>
     <template v-else-if="name === 'lock'">
       <rect x="5" y="10" width="14" height="10" rx="2" />

@@ -1,6 +1,7 @@
-import axios from 'axios'
+import axios, { type InternalAxiosRequestConfig } from 'axios'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
+import type { LoginResult } from '@/api/auth'
 import router from '@/router'
 
 /** 统一响应体形状（02-02 §九：Result{code,message,data}） */
@@ -10,7 +11,73 @@ interface ApiBody<T = unknown> {
   data: T
 }
 
+/** 允许续期后重放一次的请求配置 */
+interface RetriableConfig extends InternalAxiosRequestConfig {
+  _retried?: boolean
+}
+
 const request = axios.create({ baseURL: '/api', timeout: 15000 })
+const REFRESH_URL = '/auth/refresh'
+/** 单飞刷新：并发 401 共用同一次 RT 轮换（RT 一次即废，并发刷新必失败） */
+let refreshPromise: Promise<string> | null = null
+
+function isRefreshRequest(config?: InternalAxiosRequestConfig): boolean {
+  return (config?.url ?? '').includes(REFRESH_URL)
+}
+
+function refreshAccessToken(): Promise<string> {
+  const auth = useAuthStore()
+  if (!auth.refreshToken) {
+    return Promise.reject(new Error('missing refresh token'))
+  }
+  if (!refreshPromise) {
+    refreshPromise = request
+      .post(REFRESH_URL, { refreshToken: auth.refreshToken })
+      .then((data) => {
+        const result = data as unknown as LoginResult
+        auth.setTokens(result)
+        return result.accessToken
+      })
+      .finally(() => {
+        refreshPromise = null
+      })
+  }
+  return refreshPromise
+}
+
+/** 续期失败/无 RT：清会话并回登录页（并发调用只提示一次） */
+function forceLogout(message = '登录已过期，请重新登录'): void {
+  const auth = useAuthStore()
+  const hadSession = Boolean(auth.accessToken || auth.refreshToken)
+  auth.clear()
+  if (!hadSession) return
+  if (router.currentRoute.value.path !== '/login') router.push('/login')
+  ElMessage.error(message)
+}
+
+/**
+ * 401/40101 统一处理：单飞刷新 AT 并重放原请求；刷新失败才登出。
+ * 刷新请求自身失败直接抛给发起方，避免递归。
+ */
+async function handleUnauthorized(
+  config: InternalAxiosRequestConfig | undefined,
+  message?: string
+): Promise<unknown> {
+  const auth = useAuthStore()
+  if (!config || isRefreshRequest(config) || (config as RetriableConfig)._retried || !auth.refreshToken) {
+    forceLogout(message)
+    return Promise.reject(new Error(message || '登录已过期，请重新登录'))
+  }
+  ;(config as RetriableConfig)._retried = true
+  try {
+    await refreshAccessToken()
+  } catch {
+    forceLogout(message)
+    return Promise.reject(new Error(message || '登录已过期，请重新登录'))
+  }
+  // 重放原请求：请求拦截器会用新 AT 覆盖 Authorization
+  return request(config)
+}
 
 // 请求拦截：装配 Bearer AT（S-10）
 request.interceptors.request.use((config) => {
@@ -37,11 +104,7 @@ request.interceptors.response.use(
       return body.data as never
     }
     if (body.code === 40101) {
-      const auth = useAuthStore()
-      auth.clear()
-      router.push('/login')
-      ElMessage.error(body.message || '登录已过期，请重新登录')
-      return Promise.reject(body)
+      return handleUnauthorized(resp.config, body.message) as never
     }
     if (body.code === 40301) {
       ElMessage.error(body.message || '无操作权限')
@@ -65,10 +128,7 @@ request.interceptors.response.use(
     const status = error.response?.status
     const body = error.response?.data as ApiBody | undefined
     if (status === 401) {
-      const auth = useAuthStore()
-      auth.clear()
-      router.push('/login')
-      ElMessage.error(body?.message || '未登录或登录已过期')
+      return handleUnauthorized(error.config, body?.message || '未登录或登录已过期')
     } else if (status === 403) {
       ElMessage.error(body?.message || '无操作权限')
     } else {

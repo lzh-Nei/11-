@@ -7,7 +7,13 @@
 
     <ScrollArea max-height="calc(100vh - 220px)" padded>
       <AppSkeleton v-if="loading && !evaluation" :rows="3" :row-height="80" />
-      <ErrorState v-else-if="error" :message="error" @retry="load" />
+      <ErrorState
+        v-else-if="error"
+        :title="forbidden ? '无权查看该评价' : undefined"
+        :message="error"
+        :retryable="!forbidden"
+        @retry="load"
+      />
 
       <template v-else-if="evaluation">
         <!-- PENDING：评价进行中（10s 轮询，LLD §4.3 步骤7 学生端刷新口径） -->
@@ -90,6 +96,7 @@ const route = useRoute()
 const auth = useAuthStore()
 const loading = ref(false)
 const error = ref<string | null>(null)
+const forbidden = ref(false)
 const evaluation = ref<EvaluationVO | null>(null)
 let timer: number | undefined
 
@@ -117,7 +124,11 @@ async function load() {
       timer = undefined
     }
   } catch (e) {
-    error.value = (e as { message?: string })?.message || '网络或服务暂时不可用，请稍后重试'
+    const err = e as { code?: number; message?: string }
+    forbidden.value = err?.code === 40301 || err?.code === 403
+    error.value = forbidden.value
+      ? '该评价不属于当前账号的可见范围，请从任务/提交列表进入自己的评价。'
+      : err?.message || '网络或服务暂时不可用，请稍后重试'
   } finally {
     loading.value = false
   }

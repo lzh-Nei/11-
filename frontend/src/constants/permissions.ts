@@ -22,6 +22,7 @@ export const PERM_MAP: Record<string, string> = {
   'report:view': '查看报表',
   'report:view:student': '查看本人报表',
   'report:export': '导出报表',
+  'chat:use': '在线聊天',
   'report:refresh': '刷新报表缓存',
   'report:view:teacher': '教师聚合报表',
   'role:manage': '角色管理',
@@ -41,6 +42,7 @@ export const NS_MAP: Record<string, string> = {
   submission: '提交',
   evaluation: '评价',
   report: '报表',
+  chat: '聊天',
   class: '班级',
   role: '角色',
   system: '系统',
@@ -124,7 +126,16 @@ export const PERM_ROUTE: Record<string, PermEntry> = {
     to: '/modules?group=analysis&child=report',
     hint: '报表驾驶舱内刷新数据'
   },
-  'report:export': { kind: 'reserved', hint: '报表导出暂未开放' },
+  'report:export': {
+    kind: 'route',
+    to: '/modules?group=analysis&child=report',
+    hint: '报表驾驶舱 → 导出 CSV'
+  },
+  'chat:use': {
+    kind: 'route',
+    to: '/messages',
+    hint: '与学生 / 任课教师在线沟通'
+  },
   'user:manage': { kind: 'route', to: '/modules?group=access&child=users', hint: '进入功能模块 → 用户管理' },
   'role:manage': { kind: 'route', to: '/modules?group=access&child=roles', hint: '进入功能模块 → 角色权限' },
   'class:manage': { kind: 'route', to: '/modules?group=data&child=classes', hint: '进入功能模块 → 班级管理' },

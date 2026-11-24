@@ -1,6 +1,7 @@
 package com.aies.service;
 
 import com.aies.config.RabbitConfig;
+import com.aies.dto.admin.AdminDtos.MqAlertVO;
 import com.aies.dto.admin.AdminDtos.MqEventVO;
 import com.aies.dto.admin.AdminDtos.MqMonitorVO;
 import com.aies.dto.admin.AdminDtos.MqQueueVO;
@@ -50,6 +51,7 @@ public class MqMonitorService {
     private final EvaluationResultMapper evaluationResultMapper;
     private final TaskMapper taskMapper;
     private final UserMapper userMapper;
+    private final MqAlertMonitor alertMonitor;
 
     @Value("${spring.rabbitmq.host:localhost}")
     private String rabbitHost;
@@ -58,14 +60,31 @@ public class MqMonitorService {
     private int rabbitPort;
 
     public MqMonitorVO status() {
-        List<MqQueueVO> queues = new ArrayList<>(2);
+        List<MqQueueVO> queues = new ArrayList<>(4);
         queues.add(queueInfo("parse", "文件解析队列", RabbitConfig.PARSE_QUEUE,
                 RabbitConfig.PARSE_EXCHANGE, RabbitConfig.PARSE_ROUTING_KEY));
         queues.add(queueInfo("eval", "AI 评价队列", RabbitConfig.EVAL_QUEUE,
                 RabbitConfig.EVAL_EXCHANGE, RabbitConfig.EVAL_ROUTING_KEY));
+        // 死信队列同样纳入监控：积压意味着有消息重试耗尽或不可路由，需要人工处置
+        queues.add(queueInfo("parseDlq", "解析死信队列", RabbitConfig.PARSE_DLQ,
+                RabbitConfig.DLX_EXCHANGE, RabbitConfig.PARSE_DEAD_ROUTING_KEY));
+        queues.add(queueInfo("evalDlq", "评价死信队列", RabbitConfig.EVAL_DLQ,
+                RabbitConfig.DLX_EXCHANGE, RabbitConfig.EVAL_DEAD_ROUTING_KEY));
         boolean connected = queues.stream().anyMatch(MqQueueVO::available);
+        MqAlertMonitor.AlertState alert = alertMonitor.evaluate(
+                readyCount(queues, "parse"), readyCount(queues, "eval"),
+                readyCount(queues, "parseDlq"), readyCount(queues, "evalDlq"));
         return new MqMonitorVO(connected, rabbitHost + ":" + rabbitPort, LocalDateTime.now(),
-                queues, stats(), recentEvents());
+                queues, new MqAlertVO(alert.alert(), alert.level(), alert.messages()),
+                stats(), recentEvents());
+    }
+
+    /** 从已抓取的队列快照取 ready 数，避免为告警重复查询 broker */
+    private long readyCount(List<MqQueueVO> queues, String key) {
+        return queues.stream().filter(q -> q.key().equals(key))
+                .findFirst()
+                .map(q -> q.readyMessages() == null ? 0L : q.readyMessages().longValue())
+                .orElse(0L);
     }
 
     private MqQueueVO queueInfo(String key, String label, String queueName,

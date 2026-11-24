@@ -3,6 +3,7 @@ package com.aies.service;
 import com.aies.common.BusinessException;
 import com.aies.common.EmailScene;
 import com.aies.common.ErrorCode;
+import com.aies.common.RateLimiter;
 import com.aies.config.AuthProperties;
 import com.aies.dto.EmailCodeSendResponse;
 import jakarta.mail.Session;
@@ -46,6 +47,7 @@ class EmailCodeServiceTest {
     private ValueOperations<String, String> valueOps;
     private AuthProperties authProperties;
     private ObjectProvider<JavaMailSender> mailSenderProvider;
+    private RateLimiter rateLimiter;
     private EmailCodeService emailCodeService;
 
     @BeforeEach
@@ -59,8 +61,9 @@ class EmailCodeServiceTest {
 
         mailSenderProvider = mock(ObjectProvider.class);
         lenient().when(mailSenderProvider.getIfAvailable()).thenReturn(null);
+        rateLimiter = mock(RateLimiter.class);
 
-        emailCodeService = new EmailCodeService(redis, authProperties, mailSenderProvider);
+        emailCodeService = new EmailCodeService(redis, authProperties, mailSenderProvider, rateLimiter);
         ReflectionTestUtils.setField(emailCodeService, "smtpHost", "");
         ReflectionTestUtils.setField(emailCodeService, "smtpFrom", "");
     }
@@ -79,7 +82,7 @@ class EmailCodeServiceTest {
     @Test
     void wrongCodeIncrementsAttemptAndRejected() {
         when(valueOps.get(CODE_KEY)).thenReturn("123456");
-        when(valueOps.increment(ATTEMPT_KEY)).thenReturn(1L);
+        when(rateLimiter.increment(ATTEMPT_KEY, 300)).thenReturn(1L);
 
         assertThatThrownBy(() -> emailCodeService.verify("newuser01", "000000", EmailScene.LOGIN))
                 .isInstanceOfSatisfying(BusinessException.class,
@@ -91,7 +94,7 @@ class EmailCodeServiceTest {
     @Test
     void tooManyAttemptsInvalidatesCode() {
         when(valueOps.get(CODE_KEY)).thenReturn("123456");
-        when(valueOps.increment(ATTEMPT_KEY)).thenReturn(5L);
+        when(rateLimiter.increment(ATTEMPT_KEY, 300)).thenReturn(5L);
 
         assertThatThrownBy(() -> emailCodeService.verify("newuser01", "000000", EmailScene.LOGIN))
                 .isInstanceOf(BusinessException.class);
@@ -114,13 +117,13 @@ class EmailCodeServiceTest {
     @Test
     void sendSuccessStoresCodeResetsAttemptsAndEchoesMockCode() {
         when(valueOps.setIfAbsent(eq(COOLDOWN_KEY), eq("1"), any(Duration.class))).thenReturn(true);
-        when(valueOps.increment(SEND_HOURLY_KEY)).thenReturn(1L);
+        when(rateLimiter.increment(SEND_HOURLY_KEY, 3600)).thenReturn(1L);
 
         EmailCodeSendResponse response =
                 emailCodeService.send("newuser01", "test01@example.com", EmailScene.LOGIN);
 
         verify(valueOps).setIfAbsent(eq(COOLDOWN_KEY), eq("1"), any(Duration.class));
-        verify(redis).expire(SEND_HOURLY_KEY, Duration.ofHours(1));
+        verify(rateLimiter).increment(SEND_HOURLY_KEY, 3600);
         ArgumentCaptor<String> codeCaptor = ArgumentCaptor.forClass(String.class);
         verify(valueOps).set(eq(CODE_KEY), codeCaptor.capture(), eq(Duration.ofSeconds(300)));
         assertThat(codeCaptor.getValue()).matches("\\d{6}");
@@ -134,7 +137,7 @@ class EmailCodeServiceTest {
     @Test
     void sendHourlyLimitExceededRejected() {
         when(valueOps.setIfAbsent(eq(COOLDOWN_KEY), eq("1"), any(Duration.class))).thenReturn(true);
-        when(valueOps.increment(SEND_HOURLY_KEY)).thenReturn(6L);
+        when(rateLimiter.increment(SEND_HOURLY_KEY, 3600)).thenReturn(6L);
 
         assertThatThrownBy(() -> emailCodeService.send("newuser01", "test01@example.com", EmailScene.LOGIN))
                 .isInstanceOfSatisfying(BusinessException.class,
@@ -149,7 +152,7 @@ class EmailCodeServiceTest {
         BusinessException expired = verifyAndCatch("000000");
 
         when(valueOps.get(CODE_KEY)).thenReturn("123456");
-        when(valueOps.increment(ATTEMPT_KEY)).thenReturn(1L);
+        when(rateLimiter.increment(ATTEMPT_KEY, 300)).thenReturn(1L);
         BusinessException wrong = verifyAndCatch("000000");
 
         assertThat(expired.getCode()).isEqualTo(ErrorCode.EMAIL_CODE_INVALID.getCode());
@@ -167,7 +170,7 @@ class EmailCodeServiceTest {
         org.mockito.Mockito.doThrow(new RuntimeException("connection refused"))
                 .when(sender).send(any(MimeMessage.class));
         when(valueOps.setIfAbsent(eq(COOLDOWN_KEY), eq("1"), any(Duration.class))).thenReturn(true);
-        when(valueOps.increment(SEND_HOURLY_KEY)).thenReturn(1L);
+        when(rateLimiter.increment(SEND_HOURLY_KEY, 3600)).thenReturn(1L);
 
         assertThatThrownBy(() -> emailCodeService.send("newuser01", "test01@example.com", EmailScene.LOGIN))
                 .isInstanceOfSatisfying(BusinessException.class,
@@ -182,7 +185,7 @@ class EmailCodeServiceTest {
         when(mailSenderProvider.getIfAvailable()).thenReturn(sender);
         when(sender.createMimeMessage()).thenReturn(new MimeMessage(Session.getInstance(new Properties())));
         when(valueOps.setIfAbsent(eq(COOLDOWN_KEY), eq("1"), any(Duration.class))).thenReturn(true);
-        when(valueOps.increment(SEND_HOURLY_KEY)).thenReturn(1L);
+        when(rateLimiter.increment(SEND_HOURLY_KEY, 3600)).thenReturn(1L);
 
         EmailCodeSendResponse response =
                 emailCodeService.send("newuser01", "test01@example.com", EmailScene.LOGIN);
@@ -196,7 +199,7 @@ class EmailCodeServiceTest {
     void mockChannelWithoutExposeCodeReturnsNull() {
         authProperties.getEmail().setExposeCode(false);
         when(valueOps.setIfAbsent(eq(COOLDOWN_KEY), eq("1"), any(Duration.class))).thenReturn(true);
-        when(valueOps.increment(SEND_HOURLY_KEY)).thenReturn(1L);
+        when(rateLimiter.increment(SEND_HOURLY_KEY, 3600)).thenReturn(1L);
 
         EmailCodeSendResponse response =
                 emailCodeService.send("newuser01", "test01@example.com", EmailScene.LOGIN);

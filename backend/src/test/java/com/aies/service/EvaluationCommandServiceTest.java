@@ -20,6 +20,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 import java.math.BigDecimal;
@@ -335,7 +336,8 @@ class EvaluationCommandServiceTest {
         verify(evaluationResultMapper).updateById(captor.capture());
         assertThat(captor.getValue().getStatus()).isEqualTo("PENDING");
         assertThat(captor.getValue().getCurrentVersionNo()).isEqualTo(3);
-        verify(rabbitTemplate).convertAndSend(eq("aies.eval.exchange"), eq("eval.submit"), any(EvalMessage.class));
+        verify(rabbitTemplate).convertAndSend(eq("aies.eval.exchange"), eq("eval.submit"),
+                any(EvalMessage.class), any(CorrelationData.class));
         verify(auditLogMapper).insert(any(com.aies.entity.AuditLog.class));
     }
 
@@ -351,7 +353,8 @@ class EvaluationCommandServiceTest {
         verify(evaluationResultMapper).updateById(captor.capture());
         assertThat(captor.getValue().getStatus()).isEqualTo("PENDING");
         assertThat(captor.getValue().getCurrentVersionNo()).isEqualTo(1);
-        verify(rabbitTemplate).convertAndSend(eq("aies.eval.exchange"), eq("eval.submit"), any(EvalMessage.class));
+        verify(rabbitTemplate).convertAndSend(eq("aies.eval.exchange"), eq("eval.submit"),
+                any(EvalMessage.class), any(CorrelationData.class));
     }
 
     /** 重评状态前置违规：AI_DONE→30000（仅REVIEWED/FAILED可重评） */
@@ -363,7 +366,8 @@ class EvaluationCommandServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getCode())
                 .isEqualTo(30000);
-        verify(rabbitTemplate, never()).convertAndSend(any(String.class), any(String.class), any(Object.class));
+        verify(rabbitTemplate, never()).convertAndSend(any(String.class), any(String.class),
+                any(Object.class), any(CorrelationData.class));
     }
 
     /** 重评前置：解析未SUCCESS→30000（管道无文本可用） */

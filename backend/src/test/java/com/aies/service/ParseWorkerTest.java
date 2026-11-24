@@ -8,6 +8,7 @@ import com.aies.model.ParseMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 import java.io.ByteArrayInputStream;
@@ -37,6 +38,7 @@ class ParseWorkerTest {
     private FileStorage fileStorage;
     private ParseService parseService;
     private RabbitTemplate rabbitTemplate;
+    private MqProcessingGuard processingGuard;
     private ParseWorker worker;
 
     @BeforeEach
@@ -45,7 +47,10 @@ class ParseWorkerTest {
         fileStorage = mock(FileStorage.class);
         parseService = mock(ParseService.class);
         rabbitTemplate = mock(RabbitTemplate.class);
-        worker = new ParseWorker(submissionMapper, fileStorage, parseService, rabbitTemplate);
+        processingGuard = mock(MqProcessingGuard.class);
+        when(processingGuard.tryLock(anyString(), any())).thenReturn("token");
+        worker = new ParseWorker(submissionMapper, fileStorage, parseService, rabbitTemplate,
+                processingGuard);
     }
 
     private Submission submission(long id, String fileType, String parseStatus) {
@@ -72,7 +77,18 @@ class ParseWorkerTest {
         verify(fileStorage, never()).openStream(anyString());
     }
 
-    /** 例2 脏消息：提交不存在（事务提交早于消息可见的窗口）跳过不落库 */
+    /** 例2 单飞锁：已有实例处理中时跳过重复投递（不读库、不重解析） */
+    @Test
+    void duplicateDeliverySkippedWhenAnotherWorkerHoldsLock() {
+        when(processingGuard.tryLock(anyString(), any())).thenReturn(null);
+
+        worker.onMessage(new ParseMessage(5L));
+
+        verify(submissionMapper, never()).selectById(anyLong());
+        verify(submissionMapper, never()).updateById(any(Submission.class));
+    }
+
+    /** 例3 脏消息：提交不存在（事务提交早于消息可见的窗口）跳过不落库 */
     @Test
     void missingSubmissionSkipped() {
         when(submissionMapper.selectById(9L)).thenReturn(null);
@@ -113,7 +129,7 @@ class ParseWorkerTest {
         // UC-20（W7-C2）：解析SUCCESS→评价消息投递（eval.submit），MQ内部链路无REST触发
         ArgumentCaptor<Object> evalCaptor = ArgumentCaptor.forClass(Object.class);
         verify(rabbitTemplate).convertAndSend(eq(RabbitConfig.EVAL_EXCHANGE),
-                eq(RabbitConfig.EVAL_ROUTING_KEY), evalCaptor.capture());
+                eq(RabbitConfig.EVAL_ROUTING_KEY), evalCaptor.capture(), any(CorrelationData.class));
         assertThat(evalCaptor.getValue()).isEqualTo(new EvalMessage(5L));
     }
 

@@ -15,6 +15,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
+
 /**
  * 评价 worker（UC-20：MQ系统内部链路消费者，03-03 §七"无REST触发接口"契约承载，W7-C2）。
  *
@@ -32,15 +34,37 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class EvaluationWorker {
 
+    /** 单飞锁 TTL：覆盖 LLM 超时×重试的最长链路，异常退出后由超时补偿兜底 */
+    private static final Duration LOCK_TTL = Duration.ofMinutes(60);
+
     private final SubmissionMapper submissionMapper;
     private final EvaluationResultMapper evaluationResultMapper;
     private final EvaluationService evaluationService;
     private final TraceRecorder traceRecorder;
     private final RealtimeNotifier realtimeNotifier;
+    private final MqProcessingGuard processingGuard;
 
-    @RabbitListener(queues = RabbitConfig.EVAL_QUEUE)
+    @RabbitListener(queues = RabbitConfig.EVAL_QUEUE, containerFactory = "evalListenerContainerFactory")
     public void onMessage(EvalMessage message) {
+        if (message == null || message.submissionId() <= 0) {
+            log.warn("评价消息非法，跳过: {}", message);
+            return;
+        }
         long submissionId = message.submissionId();
+        String lockKey = "eval:" + submissionId;
+        String token = processingGuard.tryLock(lockKey, LOCK_TTL);
+        if (token == null) {
+            log.info("同一提交正在评价，跳过重复投递: submissionId={}", submissionId);
+            return;
+        }
+        try {
+            evaluate(submissionId);
+        } finally {
+            processingGuard.unlock(lockKey, token);
+        }
+    }
+
+    private void evaluate(long submissionId) {
         Submission submission = submissionMapper.selectById(submissionId);
         if (submission == null) {
             log.warn("评价消息对应提交不存在，跳过: submissionId={}", submissionId);
@@ -98,8 +122,19 @@ public class EvaluationWorker {
             saved = evaluationService.persistEvaluation(submissionId, traceId, outcome,
                     EvaluationService.SOURCE_AI_INITIAL);
         }
-        realtimeNotifier.notifyEvaluation(submission, saved, EvaluationService.SOURCE_AI_INITIAL);
+        // 事务提交后的旁路副作用：失败仅告警，不重投已成功的评价消息
+        try {
+            realtimeNotifier.notifyEvaluation(submission, saved, EvaluationService.SOURCE_AI_INITIAL);
+        } catch (RuntimeException e) {
+            log.warn("评价结果推送失败(已落库，不重投): submissionId={} err={}",
+                    submissionId, e.getMessage());
+        }
         // 步骤6：留痕写冷桶（独立于事务——persistEvaluation 事务已提交，R2红线达成）
-        traceRecorder.record(traceId, template, outcome, digest);
+        try {
+            traceRecorder.record(traceId, template, outcome, digest);
+        } catch (RuntimeException e) {
+            log.error("评价留痕失败(已落库，不重投): submissionId={} err={}",
+                    submissionId, e.getMessage());
+        }
     }
 }

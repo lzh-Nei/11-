@@ -12,6 +12,7 @@ import com.aies.security.LoginPrincipal;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -70,7 +71,7 @@ class MqReplayServiceTest {
         assertThat(row.getValue().getParsedTextKey()).isNull();
         ArgumentCaptor<Object> message = ArgumentCaptor.forClass(Object.class);
         verify(rabbitTemplate).convertAndSend(eq(RabbitConfig.PARSE_EXCHANGE),
-                eq(RabbitConfig.PARSE_ROUTING_KEY), message.capture());
+                eq(RabbitConfig.PARSE_ROUTING_KEY), message.capture(), any(CorrelationData.class));
         assertThat(message.getValue()).isInstanceOf(ParseMessage.class);
         verify(auditService).record(eq(principal), eq("mq"), eq("REPLAY_PARSE"),
                 eq("submission:9"), anyMap());
@@ -85,7 +86,7 @@ class MqReplayServiceTest {
                 .extracting(e -> ((BusinessException) e).getCode())
                 .isEqualTo(30000);
         verify(rabbitTemplate, never()).convertAndSend(any(String.class), any(String.class),
-                any(Object.class));
+                any(Object.class), any(CorrelationData.class));
     }
 
     @Test
@@ -116,7 +117,7 @@ class MqReplayServiceTest {
         assertThat(result.getUpdateTime()).isNotNull();
         ArgumentCaptor<Object> message = ArgumentCaptor.forClass(Object.class);
         verify(rabbitTemplate).convertAndSend(eq(RabbitConfig.EVAL_EXCHANGE),
-                eq(RabbitConfig.EVAL_ROUTING_KEY), message.capture());
+                eq(RabbitConfig.EVAL_ROUTING_KEY), message.capture(), any(CorrelationData.class));
         assertThat(message.getValue()).isInstanceOf(EvalMessage.class);
         verify(auditService).record(eq(principal), eq("mq"), eq("REPLAY_EVALUATION"),
                 eq("submission:9"), anyMap());

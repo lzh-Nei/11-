@@ -1,4 +1,4 @@
-import request from './request'
+import request, { fetchBlob } from './request'
 
 /* 报表域接口（W11 ReportController 真身；DTO 对齐 ReportOverviewDTO 契约锁定版） */
 
@@ -40,5 +40,9 @@ export const reportApi = {
   /** 缓存强制重建（report:refresh；教师/学生 scope 由权限点天然隔离） */
   async refresh(): Promise<void> {
     await request.post('/reports/refresh')
+  },
+  /** 导出当前范围报表 CSV（report:export），返回 Blob 由页面保存 */
+  async exportCsv(): Promise<Blob> {
+    return fetchBlob('/api/reports/export')
   }
 }

@@ -4,6 +4,7 @@ import cn.hutool.core.util.RandomUtil;
 import com.aies.common.BusinessException;
 import com.aies.common.EmailScene;
 import com.aies.common.ErrorCode;
+import com.aies.common.RateLimiter;
 import com.aies.config.AuthProperties;
 import com.aies.dto.EmailCodeSendResponse;
 import jakarta.mail.internet.MimeMessage;
@@ -39,10 +40,13 @@ public class EmailCodeService {
     private static final String ATTEMPT_KEY_PREFIX = "auth:emailcode:attempts:";
     private static final String SEND_COOLDOWN_KEY = "email:send:";
     private static final String SEND_HOURLY_KEY = "email:hour:";
+    /** 每小时上限窗口（秒） */
+    private static final int HOURLY_WINDOW_SECONDS = 3600;
 
     private final StringRedisTemplate redis;
     private final AuthProperties authProperties;
     private final ObjectProvider<JavaMailSender> mailSenderProvider;
+    private final RateLimiter rateLimiter;
 
     /** 模拟/真实通道判定：SMTP_HOST有值才走真实投递（compose恒注入空串，以hasText判定，不能依赖bean存在性） */
     @Value("${spring.mail.host:}")
@@ -66,11 +70,8 @@ public class EmailCodeService {
         if (Boolean.FALSE.equals(acquired)) {
             throw new BusinessException(ErrorCode.CODE_SEND_TOO_FREQUENT);
         }
-        // S-12：单邮箱每小时上限
-        Long hourly = redis.opsForValue().increment(SEND_HOURLY_KEY + email);
-        if (hourly != null && hourly == 1) {
-            redis.expire(SEND_HOURLY_KEY + email, Duration.ofHours(1));
-        }
+        // S-12：单邮箱每小时上限（RateLimiter 内 Lua 原子完成 INCR + 首次 EXPIRE）
+        Long hourly = rateLimiter.increment(SEND_HOURLY_KEY + email, HOURLY_WINDOW_SECONDS);
         if (hourly != null && hourly > config.getHourlyLimit()) {
             throw new BusinessException(ErrorCode.CODE_SEND_TOO_FREQUENT);
         }
@@ -131,12 +132,11 @@ public class EmailCodeService {
     }
 
     private void recordFailure(String codeKey, String attemptKey) {
-        Long attempts = redis.opsForValue().increment(attemptKey);
+        // 错次计数同样走 Lua 原子计数（首次自增即设 TTL，避免键永不过期）
+        Long attempts = rateLimiter.increment(attemptKey,
+                (int) authProperties.getEmail().getExpireSeconds());
         if (attempts == null) {
             return;
-        }
-        if (attempts == 1) {
-            redis.expire(attemptKey, Duration.ofSeconds(authProperties.getEmail().getExpireSeconds()));
         }
         if (attempts >= authProperties.getEmail().getMaxAttempts()) {
             redis.delete(codeKey);

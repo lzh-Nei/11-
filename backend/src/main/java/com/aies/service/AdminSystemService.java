@@ -1,6 +1,7 @@
 package com.aies.service;
 
 import com.aies.config.AuthProperties;
+import com.aies.dto.admin.AdminDtos.AuditLogFilter;
 import com.aies.dto.admin.AdminDtos.AuditLogVO;
 import com.aies.dto.admin.AdminDtos.CountsVO;
 import com.aies.dto.admin.AdminDtos.SystemConfigVO;
@@ -18,6 +19,7 @@ import com.aies.mapper.SubmissionMapper;
 import com.aies.mapper.SysClassMapper;
 import com.aies.mapper.TaskMapper;
 import com.aies.mapper.UserMapper;
+import com.aies.security.LoginPrincipal;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
@@ -51,6 +53,9 @@ public class AdminSystemService {
     private final PromptTemplateMapper promptTemplateMapper;
     private final GoldenDatasetMapper goldenDatasetMapper;
     private final AuditLogMapper auditLogMapper;
+    private final SysConfigService sysConfigService;
+    private final ReportQueryService reportQueryService;
+    private final AdminAuditService auditService;
 
     @Value("${spring.mail.host:}")
     private String smtpHost;
@@ -85,17 +90,46 @@ public class AdminSystemService {
         return new SystemConfigVO(counts, smtpConfigured, smtpConfigured ? smtpHost : null,
                 captcha.getExpireSeconds(), captcha.getCodeCount(),
                 email.getExpireSeconds(), email.getCooldownSeconds(),
-                llmModel, activePromptVersion, goldenActive);
+                llmModel, activePromptVersion, goldenActive, sysConfigService.editable());
     }
 
-    /** 审计日志分页（module/action 可筛选；operator 名称回填） */
-    public Page<AuditLogVO> auditLogs(long page, long size, String module, String action) {
+    /** 更新白名单系统参数并清空报表缓存（变更即时生效） */
+    public void updateConfig(Map<String, String> values, LoginPrincipal principal) {
+        sysConfigService.apply(values);
+        reportQueryService.evictAll();
+        auditService.record(principal, "system", "UPDATE_SYSTEM_CONFIG", "sys_config",
+                new java.util.LinkedHashMap<>(values));
+    }
+
+    /** 审计日志分页（模块/动作/关键字/操作人/时间窗筛选；operator 名称回填） */
+    public Page<AuditLogVO> auditLogs(long page, long size, AuditLogFilter filter) {
         LambdaQueryWrapper<AuditLog> wrapper = new LambdaQueryWrapper<>();
-        if (StringUtils.hasText(module)) {
-            wrapper.eq(AuditLog::getModule, module.trim());
+        if (StringUtils.hasText(filter.module())) {
+            wrapper.eq(AuditLog::getModule, filter.module().trim());
         }
-        if (StringUtils.hasText(action)) {
-            wrapper.like(AuditLog::getAction, action.trim());
+        if (StringUtils.hasText(filter.action())) {
+            wrapper.like(AuditLog::getAction, filter.action().trim());
+        }
+        if (StringUtils.hasText(filter.keyword())) {
+            String keyword = filter.keyword().trim();
+            wrapper.and(w -> w.like(AuditLog::getAction, keyword)
+                    .or().like(AuditLog::getTarget, keyword)
+                    .or().like(AuditLog::getDetail, keyword));
+        }
+        if (StringUtils.hasText(filter.operator())) {
+            List<Long> operatorIds = operatorIds(filter.operator().trim());
+            if (operatorIds.isEmpty()) {
+                Page<AuditLogVO> empty = new Page<>(page, size, 0);
+                empty.setRecords(List.of());
+                return empty;
+            }
+            wrapper.in(AuditLog::getOperatorId, operatorIds);
+        }
+        if (filter.start() != null) {
+            wrapper.ge(AuditLog::getCreateTime, filter.start());
+        }
+        if (filter.end() != null) {
+            wrapper.le(AuditLog::getCreateTime, filter.end());
         }
         wrapper.orderByDesc(AuditLog::getId);
 
@@ -110,6 +144,15 @@ public class AdminSystemService {
         Page<AuditLogVO> voPage = new Page<>(result.getCurrent(), result.getSize(), result.getTotal());
         voPage.setRecords(records);
         return voPage;
+    }
+
+    /** 按账号/姓名模糊匹配操作人（上限200，避免超长 IN 列表） */
+    private List<Long> operatorIds(String keyword) {
+        LambdaQueryWrapper<User> query = new LambdaQueryWrapper<>();
+        query.select(User::getId)
+                .and(w -> w.like(User::getUsername, keyword).or().like(User::getRealName, keyword))
+                .last("LIMIT 200");
+        return userMapper.selectList(query).stream().map(User::getId).toList();
     }
 
     private Map<Long, User> operators(List<AuditLog> logs) {

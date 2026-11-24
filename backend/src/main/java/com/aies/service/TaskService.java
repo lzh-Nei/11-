@@ -255,8 +255,8 @@ public class TaskService {
      * 此处仍作防御兜底），不存在与无权访问统一 40400 同形（防探测）。
      * 发布后指标集锁定（当前无指标编辑端点，锁定语义由"发布后不可再改"承载）。
      *
-     * <p>TODO(截止自动关闭)：deadline 到达后任务应转 CLOSED——留待定时任务
-     * （@Scheduled 扫描 PUBLISHED 且 deadline 已过）实现，接口层不做假实现（W6-C2 §四裁决）。</p>
+     * <p>截止自动关闭：由 {@code ScheduledMaintenanceService} 每分钟扫描
+     * PUBLISHED 且 deadline 已过的任务并置 CLOSED（原 W6-C2 TODO 已落地）。</p>
      */
     @Transactional
     public TaskVO publish(long taskId, LoginPrincipal principal) {
@@ -290,6 +290,11 @@ public class TaskService {
                         .orderByAsc(TaskMetric::getSortOrder)
                         .orderByAsc(TaskMetric::getId));
         return toVO(task, metrics, true);
+    }
+
+    /** 定时任务入口：关闭已过截止时间的已发布任务，返回更新条数 */
+    public int closeExpiredTasks(LocalDateTime now) {
+        return taskMapper.closeExpiredPublished(now);
     }
 
     /**

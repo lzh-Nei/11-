@@ -82,6 +82,12 @@ public class RealtimeWebSocketHandler extends TextWebSocketHandler {
         removeSession(session);
     }
 
+    /** 用户是否有在线标签页（聊天会话列表在线状态） */
+    public boolean isOnline(long userId) {
+        Set<WebSocketSession> sessions = sessionsByUser.get(userId);
+        return sessions != null && !sessions.isEmpty();
+    }
+
     /** 向用户的所有在线标签页推送事件 */
     public void sendToUser(long userId, String type, Object data) {
         Set<WebSocketSession> sessions = sessionsByUser.get(userId);

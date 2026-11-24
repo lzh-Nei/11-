@@ -19,6 +19,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.mock.web.MockMultipartFile;
@@ -38,6 +39,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -65,6 +67,7 @@ class SubmissionServiceTest {
     private VirusScanHook virusScanHook;
     private RabbitTemplate rabbitTemplate;
     private EvaluationResultMapper evaluationResultMapper;
+    private SysConfigService sysConfigService;
     private SubmissionService submissionService;
 
     private final LoginPrincipal student =
@@ -79,8 +82,10 @@ class SubmissionServiceTest {
         virusScanHook = mock(VirusScanHook.class);
         rabbitTemplate = mock(RabbitTemplate.class);
         evaluationResultMapper = mock(EvaluationResultMapper.class);
+        sysConfigService = mock(SysConfigService.class);
+        when(sysConfigService.getInt(anyString(), anyInt())).thenReturn(20);
         submissionService = new SubmissionService(submissionMapper, taskMapper, taskService,
-                fileStorage, virusScanHook, rabbitTemplate, evaluationResultMapper);
+                fileStorage, virusScanHook, rabbitTemplate, evaluationResultMapper, sysConfigService);
         when(virusScanHook.clean(any())).thenReturn(true);
     }
 
@@ -255,7 +260,7 @@ class SubmissionServiceTest {
 
         ArgumentCaptor<ParseMessage> message = ArgumentCaptor.forClass(ParseMessage.class);
         verify(rabbitTemplate).convertAndSend(eq(RabbitConfig.PARSE_EXCHANGE),
-                eq(RabbitConfig.PARSE_ROUTING_KEY), message.capture());
+                eq(RabbitConfig.PARSE_ROUTING_KEY), message.capture(), any(CorrelationData.class));
         assertThat(message.getValue().submissionId()).isEqualTo(100L);
     }
 
@@ -278,12 +283,14 @@ class SubmissionServiceTest {
     void submitSurvivesMessageSendFailure() {
         stubVisibleTask();
         doThrow(new RuntimeException("broker down"))
-                .when(rabbitTemplate).convertAndSend(anyString(), anyString(), any(Object.class));
+                .when(rabbitTemplate).convertAndSend(anyString(), anyString(), any(Object.class),
+                        any(CorrelationData.class));
 
         SubmissionVO vo = submissionService.submit(1L, docxFile(), student);
 
         assertThat(vo.getId()).isEqualTo(100L);
-        verify(rabbitTemplate).convertAndSend(anyString(), anyString(), any(Object.class));
+        verify(rabbitTemplate).convertAndSend(anyString(), anyString(), any(Object.class),
+                any(CorrelationData.class));
     }
 
     /** 例13 事务同步激活：消息仅在 afterCommit 后投递（worker 不得先于提交可见） */
@@ -294,7 +301,7 @@ class SubmissionServiceTest {
         try {
             submissionService.submit(1L, docxFile(), student);
             verify(rabbitTemplate, never())
-                    .convertAndSend(anyString(), anyString(), any(Object.class));
+                    .convertAndSend(anyString(), anyString(), any(Object.class), any(CorrelationData.class));
         } finally {
             List<TransactionSynchronization> syncs = new ArrayList<>(
                     TransactionSynchronizationManager.getSynchronizations());
@@ -303,7 +310,7 @@ class SubmissionServiceTest {
         }
         ArgumentCaptor<ParseMessage> message = ArgumentCaptor.forClass(ParseMessage.class);
         verify(rabbitTemplate).convertAndSend(eq(RabbitConfig.PARSE_EXCHANGE),
-                eq(RabbitConfig.PARSE_ROUTING_KEY), message.capture());
+                eq(RabbitConfig.PARSE_ROUTING_KEY), message.capture(), any(CorrelationData.class));
         assertThat(message.getValue().submissionId()).isEqualTo(100L);
     }
 
